@@ -1,0 +1,242 @@
+{
+ "responseContext": {
+  "mainAppWebResponseContext": {
+   "loggedOut": false
+  }
+ },
+ "contents": {
+  "twoColumnWatchNextResults": {
+   "results": {
+    "results": {
+     "contents": [
+      {
+       "videoPrimaryInfoRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
+          }
+         ]
+        },
+        "videoActions": {
+         "menuRenderer": {
+          "topLevelButtons": [
+           {
+            "segmentedLikeDislikeButtonViewModel": {
+             "likeButtonViewModel": {
+              "likeButtonViewModel": {
+               "likeStatusEntityKey": "EgtkUXc0dzlXZ1hjUSA-KAE%3D",
+               "likeStatusEntity": {
+                "key": "EgtkUXc0dzlXZ1hjUSA-KAE%3D",
+                "likeStatus": "LIKE"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        }
+       }
+      },
+      {
+       "videoSecondaryInfoRenderer": {
+        "owner": {
+         "videoOwnerRenderer": {
+          "title": {
+           "runs": [
+            {
+             "text": "Rick Astley",
+             "navigationEndpoint": {
+              "commandMetadata": {
+               "webCommandMetadata": {
+                "url": "/channel/UCuAXFkgsw1L7xaCfnd5JJOw",
+                "webPageType": "WEB_PAGE_TYPE_CHANNEL",
+                "rootVe": 3611,
+                "apiUrl": "/youtubei/v1/browse"
+               }
+              },
+              "browseEndpoint": {
+               "browseId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+               "canonicalBaseUrl": "/channel/UCuAXFkgsw1L7xaCfnd5JJOw"
+              }
+             }
+            }
+           ]
+          },
+          "navigationEndpoint": {
+           "commandMetadata": {
+            "webCommandMetadata": {
+             "url": "/@RickAstleyYT",
+             "webPageType": "WEB_PAGE_TYPE_CHANNEL",
+             "rootVe": 3611,
+             "apiUrl": "/youtubei/v1/browse"
+            }
+           },
+           "browseEndpoint": {
+            "browseId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+            "canonicalBaseUrl": "/@RickAstleyYT"
+           }
+          }
+         }
+        },
+        "subscribeButton": {
+         "subscribeButtonRenderer": {
+          "buttonText": {
+           "runs": [
+            {
+             "text": "Subscribe"
+            }
+           ]
+          },
+          "subscribed": true,
+          "enabled": true,
+          "channelId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+          "onSubscribeEndpoints": [
+           {
+            "commandMetadata": {
+             "webCommandMetadata": {
+              "sendPost": true,
+              "apiUrl": "/youtubei/v1/subscription/subscribe"
+             }
+            },
+            "subscribeEndpoint": {
+             "channelIds": [
+              "UCuAXFkgsw1L7xaCfnd5JJOw"
+             ],
+             "params": "EgIIAxgAIgtkUXc0dzlXZ1hjUQ%3D%3D"
+            }
+           }
+          ]
+         }
+        }
+       }
+      },
+      {
+       "itemSectionRenderer": {
+        "contents": [
+         {
+          "continuationItemRenderer": {
+           "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN",
+           "continuationEndpoint": {
+            "commandMetadata": {
+             "webCommandMetadata": {
+              "sendPost": true,
+              "apiUrl": "/youtubei/v1/next"
+             }
+            },
+            "continuationCommand": {
+             "token": "Eg0SC2RRdzR3OVdnWGNRGAYyJSIRIgtkUXc0dzlXZ1hjUTAAeAJCEGNvbW1lbnRzLXNlY3Rpb24%3D",
+             "request": "CONTINUATION_REQUEST_TYPE_WATCH_NEXT"
+            }
+           }
+          }
+         }
+        ],
+        "header": {
+         "commentsHeaderRenderer": {
+          "countText": {
+           "runs": [
+            {
+             "text": "Comments"
+            }
+           ]
+          },
+          "screenReaderOnly": true
+         }
+        },
+        "sectionIdentifier": "comment-item-section",
+        "targetId": "comments-section"
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ "frameworkUpdates": {
+  "entityBatchUpdate": {
+   "mutations": [
+    {
+     "entityKey": "EgpIRUFUU0VFS0VSIJICKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "macroMarkersListEntity": {
+       "key": "EgpIRUFUU0VFS0VSIJICKAE%3D",
+       "externalVideoId": "dQw4w9WgXcQ",
+       "markersList": {
+        "markerType": "MARKER_TYPE_HEATMAP",
+        "markers": [
+         {
+          "startMillis": "4280",
+          "durationMillis": "2140",
+          "intensityScoreNormalized": 0.3533035491809836
+         },
+         {
+          "startMillis": "0",
+          "durationMillis": "2140",
+          "intensityScoreNormalized": 1
+         },
+         {
+          "startMillis": "6420",
+          "durationMillis": "2140",
+          "intensityScoreNormalized": 0.3007569525427257
+         },
+         {
+          "startMillis": "2140",
+          "durationMillis": "2140",
+          "intensityScoreNormalized": 0.4230315549340408
+         }
+        ],
+        "markersMetadata": {
+         "heatmapMetadata": {
+          "maxHeightDp": 40,
+          "minHeightDp": 4,
+          "showHideAnimationDurationMillis": 200
+         }
+        },
+        "markersDecoration": {
+         "timedMarkerDecorations": [
+          {
+           "visibleTimeRangeStartMillis": 0,
+           "visibleTimeRangeEndMillis": 6420,
+           "decorationTimeMillis": 2140,
+           "label": {
+            "runs": [
+             {
+              "text": "Most replayed"
+             }
+            ]
+           },
+           "icon": "UNKNOWN"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "entityKey": "EgtkUXc0dzlXZ1hjUSA-KAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "likeStatusEntity": {
+       "key": "EgtkUXc0dzlXZ1hjUSA-KAE%3D",
+       "likeStatus": "LIKE"
+      }
+     }
+    },
+    {
+     "entityKey": "EhhVQ3VBWEZrZ3N3MUw3eGFDZm5kNUpKT3cgMygB",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "subscriptionStateEntity": {
+       "key": "EhhVQ3VBWEZrZ3N3MUw3eGFDZm5kNUpKT3cgMygB",
+       "subscribed": true
+      }
+     }
+    }
+   ]
+  }
+ }
+}

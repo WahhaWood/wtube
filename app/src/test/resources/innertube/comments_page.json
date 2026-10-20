@@ -1,0 +1,560 @@
+{
+ "onResponseReceivedEndpoints": [
+  {
+   "reloadContinuationItemsCommand": {
+    "continuationItems": [
+     {
+      "commentsHeaderRenderer": {
+       "countText": {
+        "runs": [
+         {
+          "text": "2,460,059"
+         },
+         {
+          "text": " Comments"
+         }
+        ]
+       },
+       "createRenderer": {
+        "commentSimpleboxRenderer": {
+         "placeholderText": {
+          "runs": [
+           {
+            "text": "Add a comment..."
+           }
+          ]
+         },
+         "submitButton": {
+          "buttonRenderer": {
+           "serviceEndpoint": {
+            "createCommentEndpoint": {
+             "createCommentParams": "create-params"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "reloadContinuationItemsCommand": {
+    "continuationItems": [
+     {
+      "commentThreadRenderer": {
+       "replies": {
+        "commentRepliesRenderer": {
+         "contents": [
+          {
+           "continuationItemRenderer": {
+            "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN",
+            "continuationEndpoint": {
+             "commandMetadata": {
+              "webCommandMetadata": {
+               "sendPost": true,
+               "apiUrl": "/youtubei/v1/next"
+              }
+             },
+             "continuationCommand": {
+              "token": "Eg0SC2RRdzR3OVdnWGNRGAYygwEaUBIaVWd6S1lrc3FlUTVnQTN0MGcwRjRBYUFCQWciAggAKhhVQ3VBWEZrZ3N3MUw3eGFDZm5kNUpKT3cyC2RRdzR3OVdnWGNRQAFICoIBAggBQi9jb21tZW50LXJlcGxpZXMtaXRlbS1VZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZw%3D%3D",
+              "request": "CONTINUATION_REQUEST_TYPE_WATCH_NEXT"
+             }
+            }
+           }
+          }
+         ],
+         "viewReplies": {
+          "buttonRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "621 replies"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "EXPAND"
+           },
+           "iconPosition": "BUTTON_ICON_POSITION_TYPE_LEFT_OF_TEXT"
+          }
+         },
+         "hideReplies": {
+          "buttonRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "621 replies"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "COLLAPSE"
+           },
+           "iconPosition": "BUTTON_ICON_POSITION_TYPE_LEFT_OF_TEXT"
+          }
+         },
+         "targetId": "comment-replies-item-UgzKYksqeQ5gA3t0g0F4AaABAg"
+        }
+       },
+       "commentViewModel": {
+        "commentViewModel": {
+         "commentKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAoKAE%3D",
+         "sharedKey": "EgAgKygB",
+         "toolbarStateKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAsKAE%3D",
+         "toolbarSurfaceKey": "Eh1VZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZy8xMiBGKAE%3D",
+         "commentId": "UgzKYksqeQ5gA3t0g0F4AaABAg",
+         "commentSurfaceKey": "Eh1VZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZy8xMiBPKAE%3D",
+         "sharedSurfaceKey": "EhVWSUVXSU5HX0NPTlRFWFRfV0FUQ0gg9AIoAQ%3D%3D",
+         "inlineRepliesKey": "empty_inline_replies"
+        }
+       }
+      }
+     },
+     {
+      "commentThreadRenderer": {
+       "replies": {
+        "commentRepliesRenderer": {
+         "contents": [
+          {
+           "continuationItemRenderer": {
+            "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN",
+            "continuationEndpoint": {
+             "commandMetadata": {
+              "webCommandMetadata": {
+               "sendPost": true,
+               "apiUrl": "/youtubei/v1/next"
+              }
+             },
+             "continuationCommand": {
+              "token": "Eg0SC2RRdzR3OVdnWGNRGAYygwEaUBIaVWd4emJ2X1plWlhOUmNmd3NTRjRBYUFCQWciAggAKhhVQ3VBWEZrZ3N3MUw3eGFDZm5kNUpKT3cyC2RRdzR3OVdnWGNRQAFICoIBAggBQi9jb21tZW50LXJlcGxpZXMtaXRlbS1VZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZw%3D%3D",
+              "request": "CONTINUATION_REQUEST_TYPE_WATCH_NEXT"
+             }
+            }
+           }
+          }
+         ],
+         "viewReplies": {
+          "buttonRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "683 replies"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "EXPAND"
+           },
+           "iconPosition": "BUTTON_ICON_POSITION_TYPE_LEFT_OF_TEXT"
+          }
+         },
+         "hideReplies": {
+          "buttonRenderer": {
+           "text": {
+            "runs": [
+             {
+              "text": "683 replies"
+             }
+            ]
+           },
+           "icon": {
+            "iconType": "COLLAPSE"
+           },
+           "iconPosition": "BUTTON_ICON_POSITION_TYPE_LEFT_OF_TEXT"
+          }
+         },
+         "targetId": "comment-replies-item-Ugxzbv_ZeZXNRcfwsSF4AaABAg"
+        }
+       },
+       "commentViewModel": {
+        "commentViewModel": {
+         "commentKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAoKAE%3D",
+         "sharedKey": "EgAgKygB",
+         "toolbarStateKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAsKAE%3D",
+         "toolbarSurfaceKey": "Eh1VZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZy8xMiBGKAE%3D",
+         "commentId": "Ugxzbv_ZeZXNRcfwsSF4AaABAg",
+         "commentSurfaceKey": "Eh1VZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZy8xMiBPKAE%3D",
+         "sharedSurfaceKey": "EhVWSUVXSU5HX0NPTlRFWFRfV0FUQ0gg9AIoAQ%3D%3D",
+         "inlineRepliesKey": "empty_inline_replies"
+        }
+       }
+      }
+     },
+     {
+      "continuationItemRenderer": {
+       "trigger": "CONTINUATION_TRIGGER_ON_ITEM_SHOWN",
+       "continuationEndpoint": {
+        "commandMetadata": {
+         "webCommandMetadata": {
+          "sendPost": true,
+          "apiUrl": "/youtubei/v1/next"
+         }
+        },
+        "continuationCommand": {
+         "token": "Eg0SC2RRdzR3OVdnWGNRGAYy_gIK1AJnZXRfcmFua2VkX3N0cmVhbXMtLUNxWUJDSUFFRlJlMzBUZ2Ftd0VLbGdFSTJGOFFnQVFZQnlLTEFWdDhhbWV6cTN2amYxU3FOWXJ0UWVYWkVRRUJJX1JEMEtZaFBnbjV2T3JLMURHRlozV09McHBZakdDRVloT244RV80M0NpOHpnNGoxbkhyTFVqaEp1bGJDUXJMejRnWlBDSENLc0RDNkVkZ2NqekdvQWVpSkxTSXhmUllmbFdUTk1PZ3FkS2FHcUZhMHRNS2Y4WnhRcVdVNThDQlBMZUFUZ0Vsc25hdVVDQ2lHNHJZaFA0b0Yyb3NBZ2NRRkJJSENJVWdFQVVZQVJJRkNJY2dHQUFTQlFpSklCZ0FFZ1VJaUNBWUFCSUZDS2dnR0FBU0JRakFJQmdBRWdVSWhpQVlBQklIQ0lRZ0VBOFlBUklGQ0xzZ0dBQlFBRmdCIhEiC2RRdzR3OVdnWGNRMAB4ASgUQhBjb21tZW50cy1zZWN0aW9u",
+         "request": "CONTINUATION_REQUEST_TYPE_WATCH_NEXT"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "frameworkUpdates": {
+  "entityBatchUpdate": {
+   "mutations": [
+    {
+     "entityKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAoKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "commentEntityPayload": {
+       "key": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAoKAE%3D",
+       "properties": {
+        "commentId": "UgzKYksqeQ5gA3t0g0F4AaABAg",
+        "content": {
+         "content": "I Rick rolled my entire French class because we had to study a city in France and make a quiz about it as well as a presentation, I decided to make a Kahoot quiz because it’s very easy. I put a link in to this saying it’s the kahoot link. The teacher needless to say got very very mad. As well as my classmates asking who rick rolls in 2019"
+        },
+        "publishedTime": "6 years ago (edited)",
+        "replyLevel": 0,
+        "authorButtonA11y": "@grustache4569",
+        "toolbarStateKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAsKAE%3D",
+        "translateButtonEntityKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyD_ASgB"
+       },
+       "author": {
+        "channelId": "UCKrzgYonJnMd0Dk7zQXjYXw",
+        "displayName": "@grustache4569",
+        "avatarThumbnailUrl": "https://yt3.ggpht.com/ytc/AIdro_kDD-FhIbth2qcBbI9VGxR41dJa0kE3kN9iVlGzNgRU_g=s88-c-k-c0x00ffffff-no-rj",
+        "isVerified": false,
+        "isCurrentUser": false,
+        "isCreator": false,
+        "channelCommand": {
+         "innertubeCommand": {
+          "commandMetadata": {
+           "webCommandMetadata": {
+            "url": "/@grustache4569",
+            "webPageType": "WEB_PAGE_TYPE_CHANNEL",
+            "rootVe": 3611,
+            "apiUrl": "/youtubei/v1/browse"
+           }
+          },
+          "browseEndpoint": {
+           "browseId": "UCKrzgYonJnMd0Dk7zQXjYXw",
+           "canonicalBaseUrl": "/@grustache4569"
+          }
+         }
+        },
+        "isArtist": false
+       },
+       "toolbar": {
+        "likeCountLiked": "104K",
+        "likeCountNotliked": "104K",
+        "replyCount": "621",
+        "likeButtonA11y": "Like this comment along with 104K other people",
+        "engagementToolbarStyle": {
+         "value": "ENGAGEMENT_TOOLBAR_STYLE_VALUE_DEFAULT"
+        },
+        "likeCountA11y": "104K likes",
+        "replyCountA11y": "621 replies",
+        "likeInactiveTooltip": "Like",
+        "likeActiveTooltip": "Unlike",
+        "dislikeInactiveTooltip": "Dislike",
+        "dislikeActiveTooltip": "Remove dislike",
+        "heartActiveTooltip": "❤ by @RickAstleyYT"
+       },
+       "readMoreLogging": {}
+      }
+     }
+    },
+    {
+     "entityKey": "Eh1VZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZy8xMiBGKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "engagementToolbarSurfaceEntityPayload": {
+       "key": "Eh1VZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZy8xMiBGKAE%3D",
+       "likeCommand": {
+        "innertubeCommand": {
+         "performCommentActionEndpoint": {
+          "action": "like-token"
+         }
+        }
+       },
+       "unlikeCommand": {
+        "innertubeCommand": {
+         "performCommentActionEndpoint": {
+          "action": "unlike-token"
+         }
+        }
+       },
+       "dislikeCommand": {
+        "innertubeCommand": {}
+       },
+       "undislikeCommand": {
+        "innertubeCommand": {}
+       },
+       "replyCommand": {
+        "innertubeCommand": {
+         "createCommentReplyDialogEndpoint": {
+          "dialog": {
+           "commentReplyDialogRenderer": {
+            "replyButton": {
+             "buttonRenderer": {
+              "serviceEndpoint": {
+               "createCommentReplyEndpoint": {
+                "createReplyParams": "reply-params"
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "isEngagementToolbar": true
+      }
+     }
+    },
+    {
+     "entityKey": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAsKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "engagementToolbarStateEntityPayload": {
+       "key": "EhpVZ3pLWWtzcWVRNWdBM3QwZzBGNEFhQUJBZyAsKAE%3D",
+       "likeState": "TOOLBAR_LIKE_STATE_LIKED",
+       "heartState": "TOOLBAR_HEART_STATE_UNHEARTED"
+      }
+     }
+    },
+    {
+     "entityKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAoKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "commentEntityPayload": {
+       "key": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAoKAE%3D",
+       "properties": {
+        "commentId": "Ugxzbv_ZeZXNRcfwsSF4AaABAg",
+        "content": {
+         "content": "At 0:43 <3 see https://example.com\nbye",
+         "commandRuns": [
+          {
+           "startIndex": 3,
+           "length": 4,
+           "onTap": {
+            "innertubeCommand": {
+             "commandMetadata": {
+              "webCommandMetadata": {
+               "url": "/watch?v=dQw4w9WgXcQ&t=43s"
+              }
+             }
+            }
+           }
+          },
+          {
+           "startIndex": 15,
+           "length": 19,
+           "onTap": {
+            "innertubeCommand": {
+             "commandMetadata": {
+              "webCommandMetadata": {
+               "url": "https://www.youtube.com/redirect?event=comments&q=https%3A%2F%2Fexample.com&html_redirect=1"
+              }
+             }
+            }
+           }
+          }
+         ]
+        },
+        "publishedTime": "6 years ago",
+        "replyLevel": 0,
+        "authorButtonA11y": "@candycake9531",
+        "toolbarStateKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAsKAE%3D",
+        "translateButtonEntityKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyD_ASgB"
+       },
+       "author": {
+        "channelId": "UCNLgzvqrGzFi5SEAbVkFchg",
+        "displayName": "@candycake9531",
+        "avatarThumbnailUrl": "https://yt3.ggpht.com/ytc/AIdro_mEO82VrM8XtyGrBUkJgbAYgpAmDpUZixd1QvK9kyA=s88-c-k-c0x00ffffff-no-rj",
+        "isVerified": false,
+        "isCurrentUser": false,
+        "isCreator": false,
+        "channelCommand": {
+         "innertubeCommand": {
+          "commandMetadata": {
+           "webCommandMetadata": {
+            "url": "/@candycake9531",
+            "webPageType": "WEB_PAGE_TYPE_CHANNEL",
+            "rootVe": 3611,
+            "apiUrl": "/youtubei/v1/browse"
+           }
+          },
+          "browseEndpoint": {
+           "browseId": "UCNLgzvqrGzFi5SEAbVkFchg",
+           "canonicalBaseUrl": "/@candycake9531"
+          }
+         }
+        },
+        "isArtist": false
+       },
+       "toolbar": {
+        "likeCountLiked": "291K",
+        "likeCountNotliked": "291K",
+        "replyCount": "683",
+        "likeButtonA11y": "Like this comment along with 291K other people",
+        "engagementToolbarStyle": {
+         "value": "ENGAGEMENT_TOOLBAR_STYLE_VALUE_DEFAULT"
+        },
+        "likeCountA11y": "291K likes",
+        "replyCountA11y": "683 replies",
+        "likeInactiveTooltip": "Like",
+        "likeActiveTooltip": "Unlike",
+        "dislikeInactiveTooltip": "Dislike",
+        "dislikeActiveTooltip": "Remove dislike",
+        "heartActiveTooltip": "❤ by @RickAstleyYT"
+       },
+       "readMoreLogging": {}
+      }
+     }
+    },
+    {
+     "entityKey": "Eh1VZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZy8xMiBGKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "engagementToolbarSurfaceEntityPayload": {
+       "key": "Eh1VZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZy8xMiBGKAE%3D",
+       "prepareAccountCommand": {
+        "innertubeCommand": {
+         "commandMetadata": {
+          "webCommandMetadata": {
+           "ignoreNavigation": true
+          }
+         },
+         "modalEndpoint": {
+          "modal": {
+           "modalWithTitleAndButtonRenderer": {
+            "title": {
+             "runs": [
+              {
+               "text": "Want to join the conversation?"
+              }
+             ]
+            },
+            "content": {
+             "runs": [
+              {
+               "text": "Sign in to continue"
+              }
+             ]
+            },
+            "button": {
+             "buttonRenderer": {
+              "style": "STYLE_MONO_FILLED",
+              "size": "SIZE_DEFAULT",
+              "isDisabled": false,
+              "text": {
+               "simpleText": "Sign in"
+              },
+              "navigationEndpoint": {
+               "commandMetadata": {
+                "webCommandMetadata": {
+                 "url": "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3Den%26next%3Dhttps%253A%252F%252Fwww.youtube.com%252Fyoutubei%252Fv1%252Fnext%253FprettyPrint%253Dfalse&hl=en",
+                 "webPageType": "WEB_PAGE_TYPE_UNKNOWN",
+                 "rootVe": 83769
+                }
+               },
+               "signInEndpoint": {
+                "hack": true
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "likeCommand": {
+        "innertubeCommand": {}
+       },
+       "unlikeCommand": {
+        "innertubeCommand": {}
+       },
+       "dislikeCommand": {
+        "innertubeCommand": {}
+       },
+       "undislikeCommand": {
+        "innertubeCommand": {}
+       },
+       "replyCommand": {
+        "innertubeCommand": {
+         "commandMetadata": {
+          "webCommandMetadata": {
+           "ignoreNavigation": true
+          }
+         },
+         "modalEndpoint": {
+          "modal": {
+           "modalWithTitleAndButtonRenderer": {
+            "title": {
+             "runs": [
+              {
+               "text": "Want to join the conversation?"
+              }
+             ]
+            },
+            "content": {
+             "runs": [
+              {
+               "text": "Sign in to continue"
+              }
+             ]
+            },
+            "button": {
+             "buttonRenderer": {
+              "style": "STYLE_MONO_FILLED",
+              "size": "SIZE_DEFAULT",
+              "isDisabled": false,
+              "text": {
+               "simpleText": "Sign in"
+              },
+              "navigationEndpoint": {
+               "commandMetadata": {
+                "webCommandMetadata": {
+                 "url": "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3Den%26next%3Dhttps%253A%252F%252Fwww.youtube.com%252Fyoutubei%252Fv1%252Fnext%253FprettyPrint%253Dfalse&hl=en",
+                 "webPageType": "WEB_PAGE_TYPE_UNKNOWN",
+                 "rootVe": 83769
+                }
+               },
+               "signInEndpoint": {
+                "hack": true
+               }
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       },
+       "isEngagementToolbar": true
+      }
+     }
+    },
+    {
+     "entityKey": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAsKAE%3D",
+     "type": "ENTITY_MUTATION_TYPE_REPLACE",
+     "payload": {
+      "engagementToolbarStateEntityPayload": {
+       "key": "EhpVZ3h6YnZfWmVaWE5SY2Z3c1NGNEFhQUJBZyAsKAE%3D",
+       "likeState": "TOOLBAR_LIKE_STATE_INDIFFERENT",
+       "heartState": "TOOLBAR_HEART_STATE_UNHEARTED"
+      }
+     }
+    }
+   ]
+  }
+ }
+}

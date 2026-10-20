@@ -1,0 +1,107 @@
+<div align="center">
+
+# WTube
+
+**Личный YouTube-клиент для Android: без рекламы, без Google Play и без своего сервера.**
+
+![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
+![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+
+</div>
+
+WTube — самодельный клиент YouTube в духе NewPipe и SimpMusic: потоки достаются
+через [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor), аккаунт
+подключается по cookies, интерфейс — тёмный, на «жидком стекле».
+Приложение ставится на телефон напрямую через `adb`, ему не нужен ни сервер, ни Google-сервисы.
+
+> Неофициальный клиент. Не связан с YouTube и Google. Используйте на свой риск и в рамках
+> правил сервиса.
+
+## Возможности
+
+**Просмотр**
+- Видео и трансляции в хорошем качестве, фоновое воспроизведение, мини-плеер и «картинка в картинке»
+- Шторка плеера со жестами: свайпы, предиктивный «назад», полноэкранный режим с автоповоротом
+- Субтитры (в том числе автоперевод), расшифровка, дорожки дубляжа, скорость, таймер сна, автовоспроизведение
+- «Самые пересматриваемые» моменты (heatmap), SponsorBlock и Return YouTube Dislike
+
+**Аккаунт** (по желанию)
+- Вход через Google во встроенном WebView или вставкой `Cookie` / `cookies.txt`
+- Настоящая главная, подписки, библиотека, лайки, плейлисты, комментарии
+- Сессия хранится запечатанной ключом Android Keystore (AES-GCM) и никогда не попадает в логи
+
+**Без аккаунта**
+- Рекомендации по локальной истории просмотров, поиск, каналы, плейлисты
+- «Не интересно» и «Не рекомендовать канал» — только на телефоне
+- Бэкап настроек и истории
+
+**Скачивание**
+- Загрузка видео и аудио с склейкой H.264 + AAC, воспроизведение скачанного из файла
+
+## Стек
+
+| Область | Что используется |
+| --- | --- |
+| Язык и UI | Kotlin, Jetpack Compose, Material 3 (MaterialKolor), [Kyant backdrop](https://github.com/Kyant0/AndroidLiquidGlass) для стекла |
+| Потоки | NewPipeExtractor, собственный мини-клиент InnerTube |
+| Плеер | Media3 ExoPlayer + `MediaSessionService` |
+| Сеть и данные | OkHttp, kotlinx.serialization, DataStore, Coil 3 |
+| Сборка | Gradle (AGP 9), version catalog, Baseline Profile, R8 |
+
+DI написан вручную, модуль один (`app`) плюс `baselineprofile`.
+
+## Сборка
+
+Нужны JDK 21 и Android SDK (platform 37). Путь к SDK задаётся в `local.properties`
+(`sdk.dir=...`, файл не в git).
+
+```bash
+# debug-сборка и установка на подключённый телефон или эмулятор
+./gradlew installDebug
+
+# релизный APK (R8 + baseline profile)
+./gradlew assembleRelease
+```
+
+Debug-сборка ставится как `dev.wahha.wtube.debug` и не мешает релизной.
+
+### Подпись релиза
+
+Ключ подписи в репозиторий не входит. Чтобы подписать релиз, создайте свой keystore и укажите
+его в `~/.gradle/gradle.properties`:
+
+```properties
+wtube.keystore=/путь/к/wtube-release.jks
+wtube.keystore.password=...
+```
+
+Алиас ключа — `wtube`. Без этих свойств release собирается неподписанным.
+
+## Тесты
+
+```bash
+./gradlew testDebugUnitTest            # JVM: форматирование, выбор потоков, разбор InnerTube на фикстурах
+./gradlew :app:connectedDebugAndroidTest   # на эмуляторе или телефоне, по сети
+```
+
+Если `ExtractorSmokeTest` упал, скорее всего YouTube что-то поменял — обновите версию
+NewPipeExtractor в `gradle/libs.versions.toml`.
+
+## Устройство
+
+```
+app/src/main/kotlin/dev/wahha/wtube/
+├── data/          настройки, история, сеть, расширения (SponsorBlock, RYD)
+│   ├── account/   сессия, cookies, шифрование Keystore
+│   └── innertube/ собственный клиент InnerTube и разбор лент
+├── player/        PlaybackService, источники медиа, субтитры, автовоспроизведение
+├── download/      сервис скачивания и склейка дорожек
+└── ui/            экраны, тема, жидкое стекло, шторка плеера
+```
+
+## Лицензия
+
+[GPL-3.0](LICENSE). Проект использует NewPipeExtractor (GPL-3.0) и портирует идеи интерфейса
+из SimpMusic (GPL-3.0). Шрифты Inter и Montserrat распространяются по SIL Open Font License.

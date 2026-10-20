@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Deep indigo with a cyan glow top-left and a violet one bottom-right: the light the glass tile refracts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108">
+                <item android:offset="0" android:color="#FF2A1766" />
+                <item android:offset="1" android:color="#FF081A38" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="38"
+                android:centerY="40"
+                android:gradientRadius="24">
+                <item android:offset="0" android:color="#FF3FD0FF" />
+                <item android:offset="1" android:color="#003FD0FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="72"
+                android:centerY="70"
+                android:gradientRadius="26">
+                <item android:offset="0" android:color="#FFC05CFF" />
+                <item android:offset="1" android:color="#00C05CFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

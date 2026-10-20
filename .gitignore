@@ -1,0 +1,44 @@
+.gradle/
+.kotlin/
+build/
+.idea/
+*.iml
+local.properties
+build.log
+*.jks
+*.keystore
+captures/
+.cxx/
+
+# Secrets and signing
+*.jks
+*.keystore
+*.p12
+*.pem
+*.pfx
+keystore.properties
+signing.properties
+google-services.json
+secrets.properties
+.env
+.env.*
+cookies.txt
+*cookies*.txt
+
+# Local and private notes
+Plan.md
+CLAUDE.md
+PATTERNS.md
+.claude/
+.agents/
+build.log
+*.log
+hs_err_pid*
+
+# Build output
+*.apk
+*.aab
+*.ap_
+*.dex
+.externalNativeBuild/
+.DS_Store

@@ -1,0 +1,4 @@
+{"contents":[{"addToPlaylistRenderer":{"playlists":[
+ {"playlistAddToOptionRenderer":{"playlistId":"WL","title":{"simpleText":"Watch later"},"privacy":"PRIVATE","containsSelectedVideos":"NONE"}},
+ {"playlistAddToOptionRenderer":{"playlistId":"PLmusic","title":{"runs":[{"text":"Музыка"}]},"privacy":"PUBLIC","containsSelectedVideos":"ALL"}}
+],"actions":[{"addToPlaylistCreateRenderer":{"buttonText":{"simpleText":"Create new playlist"}}}]}}]}
