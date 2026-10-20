@@ -62,6 +62,7 @@ import dev.wahha.wtube.data.HiddenItems
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.data.SponsorBlock
 import dev.wahha.wtube.player.sponsorCategoryLabel
 import dev.wahha.wtube.ui.components.Avatar
@@ -176,6 +177,9 @@ fun SettingsScreen() {
             SwitchRow(stringResource(R.string.settings_pure_black), stringResource(R.string.settings_pure_black_summary), settings.pureBlack, Settings.PureBlack)
         }
         item {
+            SwitchRow(stringResource(R.string.settings_cover_accent), stringResource(R.string.settings_cover_accent_summary), settings.coverAccent, Settings.CoverAccent)
+        }
+        item {
             SwitchRow(stringResource(R.string.settings_ambient), stringResource(R.string.settings_ambient_summary), settings.ambientMode, Settings.AmbientMode)
         }
         item {
@@ -202,6 +206,9 @@ fun SettingsScreen() {
         }
         item {
             SwitchRow(stringResource(R.string.settings_dislikes), stringResource(R.string.settings_dislikes_summary), settings.showDislikes, Settings.ShowDislikes)
+        }
+        item {
+            SwitchRow(stringResource(R.string.settings_dearrow), stringResource(R.string.settings_dearrow_summary), settings.deArrow, Settings.DeArrowOn)
         }
 
         item { SectionHeader(stringResource(R.string.settings_recommendations)) }
@@ -232,6 +239,17 @@ fun SettingsScreen() {
 
         item { SectionHeader(stringResource(R.string.settings_about)) }
         item { ValueRow(stringResource(R.string.settings_version), "${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})", onClick = null) }
+        item {
+            SwitchRow(stringResource(R.string.settings_update_check), stringResource(R.string.settings_update_check_summary), settings.updateCheck, Settings.UpdateCheck)
+        }
+        item {
+            ValueRow(stringResource(R.string.settings_update_now), null) {
+                scope.launch {
+                    val found = Updates.check(context, BuildConfig.VERSION_NAME, force = true)
+                    if (found == null) Notices.show(R.string.settings_update_none)
+                }
+            }
+        }
         item { ValueRow(stringResource(R.string.settings_extractor), BuildConfig.EXTRACTOR_VERSION, onClick = null) }
         item {
             ValueRow(stringResource(R.string.settings_share_log), stringResource(R.string.settings_share_log_summary)) {

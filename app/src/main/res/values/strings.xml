@@ -179,6 +179,8 @@
     <string name="settings_subtitle_size_huge">Очень крупный</string>
     <string name="settings_subtitle_background">Фон под текстом</string>
     <string name="settings_subtitle_background_summary">Тёмная подложка, чтобы текст читался на светлых кадрах</string>
+    <string name="settings_cover_accent">Акцент из обложки</string>
+    <string name="settings_cover_accent_summary">Плеер и мини-плеер окрашиваются в цвет обложки видео</string>
     <string name="settings_ambient">Эмбиент-подсветка</string>
     <string name="settings_ambient_summary">Размытая обложка светится под плеером</string>
     <string name="settings_resume">Продолжать с места остановки</string>
@@ -209,6 +211,13 @@
     <string name="settings_clear">Очистить</string>
     <string name="settings_cancel">Отмена</string>
     <string name="settings_about">О приложении</string>
+    <string name="settings_update_check">Проверять обновления</string>
+    <string name="settings_update_check_summary">При запуске смотреть новые версии на GitHub</string>
+    <string name="settings_update_now">Проверить обновления</string>
+    <string name="settings_update_none">Установлена последняя версия</string>
+    <string name="update_title">Доступна версия %1$s</string>
+    <string name="update_download">Скачать</string>
+    <string name="update_later">Позже</string>
     <string name="settings_version">Версия</string>
     <string name="settings_extractor">NewPipeExtractor</string>
 
@@ -267,6 +276,8 @@
     <string name="settings_sponsorblock_summary">Пропускать рекламные вставки и прочее, что отметили зрители; отметки на полосе перемотки</string>
     <string name="settings_sponsorblock_categories">Что пропускать</string>
     <string name="settings_none">Ничего</string>
+    <string name="settings_dearrow">DeArrow</string>
+    <string name="settings_dearrow_summary">Заголовок видео от сообщества вместо кликбейта (только на странице видео)</string>
     <string name="settings_dislikes">Дизлайки</string>
     <string name="settings_dislikes_summary">Число дизлайков рядом с лайками (оценка Return YouTube Dislike)</string>
     <string name="downloads_title">Загрузки</string>

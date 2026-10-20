@@ -11,6 +11,7 @@ import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.DeArrow
 import dev.wahha.wtube.data.Dislikes
 import androidx.compose.runtime.mutableLongStateOf
 import dev.wahha.wtube.data.account.Account
@@ -154,6 +155,10 @@ class VideoViewModel : ViewModel() {
     var heatmap by mutableStateOf<List<Float>>(emptyList())
         private set
 
+    /** DeArrow's title for the video, null when off, unknown or the same as the real one. */
+    var betterTitle by mutableStateOf<String?>(null)
+        private set
+
     /** Return YouTube Dislike's estimate; -1 when off or unknown. */
     var dislikes by mutableLongStateOf(-1L)
         private set
@@ -195,6 +200,7 @@ class VideoViewModel : ViewModel() {
         commentSort = 0
         replies.clear()
         dislikes = -1
+        betterTitle = null
         heatmap = emptyList()
         comments = PagedList(viewModelScope, Comment::id) { loadComments(id, it) }
         load()
@@ -209,6 +215,9 @@ class VideoViewModel : ViewModel() {
                 val watch = async { runCatching { Actions.watch(id) }.getOrNull() }
                 if (Settings.current.value.showDislikes) {
                     launch { runCatching { Dislikes.of(id) }.onSuccess { if (this@VideoViewModel.id == id) dislikes = it } }
+                }
+                if (Settings.current.value.deArrow) {
+                    launch { runCatching { DeArrow.title(id) }.onSuccess { if (this@VideoViewModel.id == id) betterTitle = it } }
                 }
                 this@VideoViewModel.watch = watch
                 val details = try {
@@ -473,7 +482,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
     ) {
         item(key = "title") {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(video.title, style = MaterialTheme.typography.titleMedium)
+                Text(vm.betterTitle?.takeIf { it != video.title } ?: video.title, style = MaterialTheme.typography.titleMedium)
                 val date = details.uploadedAt?.let { DateFormat.getDateInstance(DateFormat.MEDIUM, AppLocale).format(Date(it)) } ?: video.uploaded
                 Text(
                     listOfNotNull(viewsText(video.views), date).joinToString(stringResource(R.string.meta_separator)),

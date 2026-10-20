@@ -55,6 +55,12 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** Leave videos played to their end out of the subscriptions feed. */
     val hideWatched: Boolean = false,
+    /** Tint the player page and mini player with the current video's cover. */
+    val coverAccent: Boolean = true,
+    /** Community titles from DeArrow instead of clickbait on the video page. */
+    val deArrow: Boolean = false,
+    /** Look for a newer release on GitHub at start. */
+    val updateCheck: Boolean = true,
 )
 
 /** User settings in DataStore, mirrored into [current] so the player and UI read them synchronously. */
@@ -82,6 +88,9 @@ object Settings {
     val TextSize = intPreferencesKey("text_size")
     val PureBlack = booleanPreferencesKey("pure_black")
     val HideWatched = booleanPreferencesKey("hide_watched")
+    val CoverAccent = booleanPreferencesKey("cover_accent")
+    val UpdateCheck = booleanPreferencesKey("update_check")
+    val DeArrowOn = booleanPreferencesKey("dearrow")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -137,6 +146,9 @@ object Settings {
             prefs[TextSize] = settings.textSize
             prefs[PureBlack] = settings.pureBlack
             prefs[HideWatched] = settings.hideWatched
+            prefs[CoverAccent] = settings.coverAccent
+            prefs[UpdateCheck] = settings.updateCheck
+            prefs[DeArrowOn] = settings.deArrow
         }
     }
 
@@ -166,6 +178,9 @@ object Settings {
             textSize = this[TextSize] ?: defaults.textSize,
             pureBlack = this[PureBlack] ?: defaults.pureBlack,
             hideWatched = this[HideWatched] ?: defaults.hideWatched,
+            coverAccent = this[CoverAccent] ?: defaults.coverAccent,
+            updateCheck = this[UpdateCheck] ?: defaults.updateCheck,
+            deArrow = this[DeArrowOn] ?: defaults.deArrow,
         )
     }
 }

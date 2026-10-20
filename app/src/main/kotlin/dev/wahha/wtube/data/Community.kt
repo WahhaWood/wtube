@@ -75,3 +75,27 @@ object Dislikes {
         }
     }
 }
+
+/**
+ * DeArrow (sponsor.ajay.app/api/branding): the community's plain title for a clickbait one. Asked by the first
+ * 4 hex digits of the id's SHA-256, like [SponsorBlock]; only the video page shows it, the feeds keep the real titles.
+ */
+object DeArrow {
+    suspend fun title(videoId: String): String? = withContext(Dispatchers.IO) {
+        val prefix = MessageDigest.getInstance("SHA-256").digest(videoId.toByteArray()).joinToString("") { "%02x".format(it) }.take(4)
+        val request = Request.Builder().url("https://sponsor.ajay.app/api/branding/$prefix").get().build()
+        Http.client.newCall(request).execute().use { response ->
+            if (response.code == 404) return@withContext null
+            if (!response.isSuccessful) throw IOException("DeArrow: HTTP ${response.code}")
+            parse(JsonParser.`object`().from(response.body.string()), videoId)
+        }
+    }
+
+    /** The top title of [videoId], unless the community left the original on top or has not agreed on one yet. */
+    fun parse(branding: JsonObject, videoId: String): String? {
+        val top = branding.getObject(videoId)?.getArray("titles")?.filterIsInstance<JsonObject>()?.firstOrNull() ?: return null
+        if (top.getBoolean("original") || !(top.getBoolean("locked") || top.getInt("votes") >= 1)) return null
+        // A leading ">" only tells DeArrow's own clients not to re-case the title.
+        return top.getString("title", "").trimStart('>').trim().ifEmpty { null }
+    }
+}

@@ -75,7 +75,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import android.content.Intent
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
+import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.LocalPlayerState
@@ -111,6 +119,7 @@ import dev.wahha.wtube.ui.search.SearchScreen
 import dev.wahha.wtube.ui.settings.SettingsScreen
 import dev.wahha.wtube.ui.subscriptions.SubscriptionsScreen
 import dev.wahha.wtube.ui.video.MiniPlayerHeight
+import dev.wahha.wtube.ui.theme.CoverAccent
 import dev.wahha.wtube.ui.video.PlayerSheet
 import dev.wahha.wtube.ui.video.PlayerSheetState
 import dev.wahha.wtube.ui.video.VideoViewModel
@@ -181,6 +190,7 @@ fun WTubeApp(deepLinkVideo: String? = null, onDeepLinkHandled: () -> Unit = {}) 
     val video: VideoViewModel = viewModel()
     val scope = rememberCoroutineScope()
     Notices.Host()
+    UpdateOffer()
     val sheet = remember { PlayerSheetState(scope) }
 
     val navigator = remember(navController) {
@@ -335,19 +345,21 @@ fun WTubeApp(deepLinkVideo: String? = null, onDeepLinkHandled: () -> Unit = {}) 
                 },
             )
             if (sheetOpen) {
-                PlayerSheet(
-                    vm = video,
-                    sheet = sheet,
-                    miniWidth = rowWidth,
-                    // With the bar away the mini player takes its place at the bottom.
-                    miniBottom = lerp(barSpace, WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomPadding, barAway) + MiniPlayerGap,
-                    backdrop = backdrop,
-                    luminance = { luminance.value },
-                    onClose = {
-                        connection.stop()
-                        video.close()
-                    },
-                )
+                CoverAccent(video.details?.item?.thumbnail) {
+                    PlayerSheet(
+                        vm = video,
+                        sheet = sheet,
+                        miniWidth = rowWidth,
+                        // With the bar away the mini player takes its place at the bottom.
+                        miniBottom = lerp(barSpace, WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomPadding, barAway) + MiniPlayerGap,
+                        backdrop = backdrop,
+                        luminance = { luminance.value },
+                        onClose = {
+                            connection.stop()
+                            video.close()
+                        },
+                    )
+                }
             }
         }
     }
@@ -456,5 +468,30 @@ private fun GlassBottomBar(
                 tint = if (searchSelected) colors.primary else colors.onSurface,
             )
         }
+    }
+}
+
+/** Checks GitHub for a newer release once the app starts (at most every 12 hours) and offers it in a dialog. */
+@Composable
+private fun UpdateOffer() {
+    val context = LocalContext.current
+    val settings by Settings.current.collectAsStateWithLifecycle()
+    val release by Updates.available.collectAsStateWithLifecycle()
+    LaunchedEffect(settings.updateCheck) {
+        if (settings.updateCheck) Updates.check(context, BuildConfig.VERSION_NAME)
+    }
+    release?.let { found ->
+        AlertDialog(
+            onDismissRequest = { Updates.dismiss(context) },
+            title = { Text(stringResource(R.string.update_title, found.version)) },
+            text = { if (found.notes.isNotEmpty()) Text(found.notes.take(600)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, found.url.toUri()))
+                    Updates.dismiss(context)
+                }) { Text(stringResource(R.string.update_download)) }
+            },
+            dismissButton = { TextButton(onClick = { Updates.dismiss(context) }) { Text(stringResource(R.string.update_later)) } },
+        )
     }
 }

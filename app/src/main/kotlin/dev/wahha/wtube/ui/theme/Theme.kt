@@ -4,6 +4,7 @@ import dev.wahha.wtube.data.Settings
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
@@ -17,21 +18,13 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.rememberDynamicColorScheme
 
 // SimpMusic's brand seed; the whole dark scheme is generated from it, as SimpMusic does (TonalSpot, no AMOLED).
-private val Seed = Color(0xFF8ECAE6)
+internal val Seed = Color(0xFF8ECAE6)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WTubeTheme(content: @Composable () -> Unit) {
     val settings by Settings.current.collectAsState()
-    val tinted = rememberDynamicColorScheme(
-        seedColor = Seed,
-        isDark = true,
-        style = PaletteStyle.TonalSpot,
-    )
-    // Pure black: the page itself goes black (OLED pixels off); raised surfaces keep their tint to stand out.
-    val colorScheme = remember(tinted, settings.pureBlack) {
-        if (settings.pureBlack) tinted.copy(background = Color.Black, surface = Color.Black, surfaceDim = Color.Black, surfaceContainerLowest = Color.Black) else tinted
-    }
+    val colorScheme = wtubeColorScheme(Seed, settings.pureBlack)
     // SimpMusic uses MaterialExpressiveTheme, which stable androidx material3 keeps internal.
     MaterialTheme(
         colorScheme = colorScheme,
@@ -42,6 +35,19 @@ fun WTubeTheme(content: @Composable () -> Unit) {
             LocalContentColor provides colorScheme.onSurfaceVariant,
             content = content,
         )
+    }
+}
+
+/** The dark scheme generated from [seed]; with [pureBlack] the page itself goes black, raised surfaces keep their tint. */
+@Composable
+internal fun wtubeColorScheme(seed: Color, pureBlack: Boolean): ColorScheme {
+    val tinted = rememberDynamicColorScheme(
+        seedColor = seed,
+        isDark = true,
+        style = PaletteStyle.TonalSpot,
+    )
+    return remember(tinted, pureBlack) {
+        if (pureBlack) tinted.copy(background = Color.Black, surface = Color.Black, surfaceDim = Color.Black, surfaceContainerLowest = Color.Black) else tinted
     }
 }
 
