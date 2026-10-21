@@ -194,6 +194,8 @@ class ExtractorSmokeTest {
     @Test
     fun recommendationsFromHistorySkipWatched() = runBlocking {
         val watched = "jNQXAC9IVRw"
+        // Recommendations swallow a failed seed; asking for it directly surfaces a bot check (skipped on CI).
+        YouTube.video(watched)
         val page = YouTube.recommendations(listOf(watched), setOf(watched))
         val videos = page.items.filterIsInstance<VideoItem>()
         println("recommendations: ${videos.size} videos")
