@@ -8,6 +8,7 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+[![CI](https://github.com/WahhaWood/wtube/actions/workflows/ci.yml/badge.svg)](https://github.com/WahhaWood/wtube/actions/workflows/ci.yml)
 
 </div>
 
@@ -42,6 +43,8 @@ WTube — самодельный клиент YouTube в духе NewPipe и Sim
 
 **Скачивание**
 - Загрузка видео и аудио с склейкой H.264 + AAC, воспроизведение скачанного из файла
+- Плейлист (в том числе «Смотреть позже») целиком: качество «до 1080p / 720p / 480p / 360p» или только звук
+- Скачанное играет как плейлист — по порядку или вперемешку, без сети
 
 ## Стек
 
@@ -57,7 +60,7 @@ DI написан вручную, модуль один (`app`) плюс `baseli
 
 ## Установка
 
-Готовые подписанные APK всех версий лежат в [Releases](https://github.com/WahhaWood/wtube/releases). Последняя — 0.12.0.
+Готовые подписанные APK всех версий лежат в [Releases](https://github.com/WahhaWood/wtube/releases). Последняя — 0.13.0. Релизы собирает и подписывает GitHub Actions по тегу `v*`.
 Скачайте файл и поставьте на телефон (Android 8.0+) или выполните `adb install -r WTube-<версия>.apk`.
 Все версии подписаны одним ключом, поэтому ставятся поверх друг друга. SHA-256 сертификата:
 `7176fdd0e04f6dabef40d308596f3152e76d09f86ef2ae0d742a9600b1ee7948`.
@@ -97,7 +100,8 @@ wtube.keystore.password=...
 ```
 
 Если `ExtractorSmokeTest` упал, скорее всего YouTube что-то поменял — обновите версию
-NewPipeExtractor в `gradle/libs.versions.toml`.
+NewPipeExtractor в `gradle/libs.versions.toml`. В CI сетевые смоук-тесты пропускаются (`-PofflineTests`),
+а раз в сутки идут отдельно (`nightly.yml`); при падении открывается issue.
 
 ## Устройство
 

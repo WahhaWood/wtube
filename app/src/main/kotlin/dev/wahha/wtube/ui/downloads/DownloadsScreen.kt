@@ -34,6 +34,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.R
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
+import dev.wahha.wtube.player.PlayQueue
+import dev.wahha.wtube.ui.icon.PlayArrow
+import dev.wahha.wtube.ui.icon.Shuffle
 import dev.wahha.wtube.download.Download
 import dev.wahha.wtube.download.DownloadState
 import dev.wahha.wtube.download.Downloads
@@ -69,6 +75,25 @@ fun DownloadsScreen() {
             }
         }
         if (downloads.isEmpty()) item { MessageState(WIcons.Download, stringResource(R.string.downloads_empty)) }
+        // What is saved plays like a playlist, also offline: the first now, the rest through the queue.
+        val saved = downloads.filter { it.state == DownloadState.DONE }.map { it.video }.distinctBy { it.id }
+        if (saved.isNotEmpty()) item(key = "play") {
+            fun play(shuffle: Boolean) {
+                val videos = if (shuffle) saved.shuffled() else saved
+                PlayQueue.replace(videos.drop(1))
+                nav.openVideo(videos.first().id)
+            }
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { play(false) }, modifier = Modifier.weight(1f)) {
+                    Icon(WIcons.PlayArrow, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                    Text(stringResource(R.string.playlist_play_all), color = LocalContentColor.current)
+                }
+                FilledTonalButton(onClick = { play(true) }, modifier = Modifier.weight(1f)) {
+                    Icon(WIcons.Shuffle, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                    Text(stringResource(R.string.playlist_shuffle), color = LocalContentColor.current)
+                }
+            }
+        }
         items(downloads, key = { it.key }) { download ->
             Box(Modifier.animateItem()) { DownloadRow(download, onOpen = { nav.openVideo(download.video.id) }) }
         }

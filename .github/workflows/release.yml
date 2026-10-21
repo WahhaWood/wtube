@@ -1,0 +1,58 @@
+name: Release
+
+# A tag v<version> builds the signed APK and publishes it with the tag's message as the notes.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-37.0 build-tools;36.0.0
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.WTUBE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WTUBE_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/wtube-release.jks"
+          mkdir -p ~/.gradle
+          {
+            echo "wtube.keystore=$RUNNER_TEMP/wtube-release.jks"
+            echo "wtube.keystore.password=$KEYSTORE_PASSWORD"
+          } >> ~/.gradle/gradle.properties
+      - name: Unit tests (offline) and release build
+        run: ./gradlew testDebugUnitTest assembleRelease -PofflineTests
+      - name: Check the signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -n 1)
+          # Every release so far is signed with this key; another one would not install over them.
+          "$APKSIGNER" verify --print-certs "$APK" | grep -q 'SHA-256 digest: 7176fdd0e04f6dabef40d308596f3152e76d09f86ef2ae0d742a9600b1ee7948'
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          cp app/build/outputs/apk/release/app-release.apk "WTube-$VERSION.apk"
+          git tag -l --format='%(contents)' "$TAG" > notes.md
+          [ -s notes.md ] || git log -1 --format=%B > notes.md
+          gh release create "$TAG" "WTube-$VERSION.apk" --title "WTube $VERSION" --notes-file notes.md --verify-tag
+      - name: Wipe the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/wtube-release.jks" ~/.gradle/gradle.properties

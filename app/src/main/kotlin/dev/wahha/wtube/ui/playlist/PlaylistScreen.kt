@@ -4,6 +4,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import dev.wahha.wtube.ui.components.Notices
+import dev.wahha.wtube.download.Downloads
+import dev.wahha.wtube.ui.downloads.PlaylistDownloadSheet
+import dev.wahha.wtube.ui.icon.Download
 import androidx.compose.material3.Button
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.data.VideoItem
@@ -93,7 +100,33 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
     init {
         list.refresh()
     }
+
+    /** Queues every video of the playlist for download, all pages of it, not only the ones scrolled to. */
+    fun download(audioOnly: Boolean, quality: Int) {
+        viewModelScope.launch {
+            try {
+                val first = details?.firstPage ?: return@launch
+                val items = first.items.toMutableList()
+                var next = first.next
+                while (next != null && items.size < MAX_DOWNLOAD) {
+                    val page = if (Feeds.isCursor(next)) Feeds.more(next) else YouTube.playlistMore(url, next)
+                    items += page.items
+                    next = page.next
+                }
+                val videos = items.filterIsInstance<VideoItem>().filter { !it.isLive && it.duration > 0 }
+                val queued = Downloads.enqueueAll(videos, audioOnly, quality)
+                if (queued > 0) Notices.show(R.string.downloads_playlist_queued, queued.toString()) else Notices.show(R.string.downloads_playlist_nothing)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Notices.failed(e)
+            }
+        }
+    }
 }
+
+// A safety cap: Watch later can hold thousands.
+private const val MAX_DOWNLOAD = 500
 
 @Composable
 fun PlaylistScreen(url: String) {
@@ -109,6 +142,8 @@ fun PlaylistScreen(url: String) {
         PlayQueue.replace(videos.drop(1))
         nav.openVideo(first.id)
     }
+    var downloading by remember { mutableStateOf(false) }
+    if (downloading) PlaylistDownloadSheet(onPick = vm::download, onDismiss = { downloading = false })
     LoadMoreEffect(listState) { list.loadMore() }
 
     Box(Modifier.fillMaxSize()) {
@@ -123,7 +158,9 @@ fun PlaylistScreen(url: String) {
                     bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
                 ),
             ) {
-                item(key = "header") { Header(details, canPlay = list.items.any { it is VideoItem }, onPlay = ::playAll) }
+                item(key = "header") {
+                    Header(details, canPlay = list.items.any { it is VideoItem }, onPlay = ::playAll, onDownload = { downloading = true })
+                }
                 items(list.items, key = { it.url }) { ItemView(it, compact = true) }
                 item(key = "footer") { ListFooter(list.loading, list.error, list::retry) }
             }
@@ -133,7 +170,7 @@ fun PlaylistScreen(url: String) {
 }
 
 @Composable
-private fun Header(details: PlaylistDetails, canPlay: Boolean, onPlay: (shuffle: Boolean) -> Unit) {
+private fun Header(details: PlaylistDetails, canPlay: Boolean, onPlay: (shuffle: Boolean) -> Unit, onDownload: () -> Unit) {
     Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Thumbnail(details.thumbnail, Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)))
         val name = when (YouTube.playlistIdOf(details.url)) {
@@ -141,9 +178,18 @@ private fun Header(details: PlaylistDetails, canPlay: Boolean, onPlay: (shuffle:
             Feeds.LIKED -> stringResource(R.string.library_liked)
             else -> details.name
         }
-        Text(name, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 6.dp))
-        val count = details.count.takeIf { it >= 0 }?.let { pluralStringResource(R.plurals.videos_count, it.toInt(), it.toString()) }
-        Text(listOfNotNull(details.uploader, count).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(name, style = MaterialTheme.typography.headlineMedium)
+                val count = details.count.takeIf { it >= 0 }?.let { pluralStringResource(R.plurals.videos_count, it.toInt(), it.toString()) }
+                Text(listOfNotNull(details.uploader, count).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+            }
+            if (canPlay) {
+                FilledTonalIconButton(onClick = onDownload) {
+                    Icon(WIcons.Download, contentDescription = stringResource(R.string.downloads_playlist))
+                }
+            }
+        }
         if (canPlay) {
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onPlay(false) }, modifier = Modifier.weight(1f)) {

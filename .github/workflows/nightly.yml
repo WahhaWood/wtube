@@ -1,0 +1,46 @@
+name: Nightly extractor check
+
+# YouTube changes often; the smoke tests show when NewPipeExtractor needs a bump. A failure opens an issue.
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-37.0 build-tools;36.0.0
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Newer extractor?
+        run: |
+          OURS=$(sed -n 's/^newpipeExtractor = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          LATEST=$(git ls-remote https://github.com/TeamNewPipe/NewPipeExtractor refs/heads/dev | cut -f1)
+          if [ "$OURS" = "$LATEST" ]; then
+            echo "NewPipeExtractor: up to date (${OURS:0:7})" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "NewPipeExtractor: ours ${OURS:0:7}, dev is at ${LATEST:0:7}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Extractor smoke tests
+        run: ./gradlew testDebugUnitTest --tests 'dev.wahha.wtube.ExtractorSmokeTest'
+      - name: Report
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Extractor smoke tests fail"
+          if [ -z "$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[].number')" ]; then
+            gh issue create --title "$TITLE" --body "The nightly run failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. YouTube may have changed something; NewPipeExtractor may need a bump (or the runner got a bot check)."
+          fi

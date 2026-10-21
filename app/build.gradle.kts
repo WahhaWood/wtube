@@ -17,8 +17,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.12.0"
+        versionCode = 19
+        versionName = "0.13.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -65,6 +65,12 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+// GitHub's runners get YouTube's bot checks, so CI builds skip the network smoke tests (-PofflineTests);
+// a nightly job runs them on their own.
+tasks.withType<Test>().configureEach {
+    if (providers.gradleProperty("offlineTests").isPresent) filter.excludeTestsMatching("*SmokeTest")
 }
 
 dependencies {

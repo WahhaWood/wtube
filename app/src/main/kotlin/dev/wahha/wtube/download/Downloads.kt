@@ -77,13 +77,34 @@ object Downloads {
 
     /** Queues [video] (or its sound) at [quality] and starts the service; an earlier copy is replaced. */
     fun enqueue(video: VideoItem, audioOnly: Boolean, quality: Int) {
-        val context = app ?: return
-        val folder = context.getExternalFilesDir(if (audioOnly) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES) ?: context.filesDir
-        val name = safeName(video.title).ifEmpty { video.id } + " [${video.id}]" + if (audioOnly) ".m4a" else ".mp4"
-        val download = Download(video, audioOnly, quality, File(File(folder, "WTube"), name).absolutePath)
+        val download = newDownload(video, audioOnly, quality, System.currentTimeMillis()) ?: return
         remove(download.key)
         change { listOf(download) + it }
         startService()
+    }
+
+    /**
+     * Queues a whole list (a playlist) at up to [quality], fetched in the list's order and shown in it.
+     * Videos already saved or on their way are left alone; failed ones are queued again. Returns how many were queued.
+     */
+    fun enqueueAll(videos: List<VideoItem>, audioOnly: Boolean, quality: Int): Int {
+        val now = System.currentTimeMillis()
+        val kept = state.value.filter { it.state != DownloadState.FAILED }.mapTo(HashSet()) { it.key }
+        // Later in the list = added later, so the queue takes them in order.
+        val fresh = videos.distinctBy { it.id }.filter { Download.key(it.id, audioOnly) !in kept }
+            .mapIndexedNotNull { index, video -> newDownload(video, audioOnly, quality, now + index) }
+        if (fresh.isEmpty()) return 0
+        val keys = fresh.mapTo(HashSet()) { it.key }
+        change { list -> fresh + list.filterNot { it.key in keys } }
+        startService()
+        return fresh.size
+    }
+
+    private fun newDownload(video: VideoItem, audioOnly: Boolean, quality: Int, addedAt: Long): Download? {
+        val context = app ?: return null
+        val folder = context.getExternalFilesDir(if (audioOnly) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES) ?: context.filesDir
+        val name = safeName(video.title).ifEmpty { video.id } + " [${video.id}]" + if (audioOnly) ".m4a" else ".mp4"
+        return Download(video, audioOnly, quality, File(File(folder, "WTube"), name).absolutePath, addedAt = addedAt)
     }
 
     /** Stops (the service notices) and deletes [key] with its files. */
@@ -102,7 +123,8 @@ object Downloads {
     fun finished(videoId: String, audioOnly: Boolean): Download? =
         find(Download.key(videoId, audioOnly))?.takeIf { it.state == DownloadState.DONE && File(it.file).exists() }
 
-    internal fun next(): Download? = state.value.lastOrNull { it.state == DownloadState.QUEUED }
+    /** The queued download added first. */
+    internal fun next(): Download? = state.value.filter { it.state == DownloadState.QUEUED }.minByOrNull { it.addedAt }
 
     internal fun find(key: String): Download? = state.value.firstOrNull { it.key == key }
 

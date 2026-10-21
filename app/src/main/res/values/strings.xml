@@ -293,6 +293,11 @@
     <string name="downloads_failed">Ошибка</string>
     <string name="downloads_delete">Удалить</string>
     <string name="downloads_running">Скачивается…</string>
+    <string name="downloads_playlist">Скачать весь список</string>
+    <string name="downloads_up_to">До %1$dp (MP4)</string>
+    <string name="downloads_playlist_hint">Где такого качества нет, скачается лучшее из меньших. Уже скачанное пропускается.</string>
+    <string name="downloads_playlist_queued">В очереди на скачивание: %1$s</string>
+    <string name="downloads_playlist_nothing">Всё из списка уже скачано</string>
     <string name="downloads_muxing">Склеиваем видео и звук…</string>
     <string name="queue_title">Очередь</string>
     <string name="queue_count">Очередь · %1$d</string>

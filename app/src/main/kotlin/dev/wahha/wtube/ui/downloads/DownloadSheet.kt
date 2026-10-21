@@ -96,3 +96,48 @@ fun DownloadSheet(video: VideoItem, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** Qualities a whole list is saved at: each video gets the best it has up to the pick. */
+private val ListQualities = listOf(1080, 720, 480, 360)
+
+/** What to save of a whole playlist: a quality cap for every video, or the sound alone. [onPick] gets (audioOnly, height). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaylistDownloadSheet(onPick: (Boolean, Int) -> Unit, onDismiss: () -> Unit) {
+    var picked by remember { mutableStateOf<Pair<Boolean, Int>?>(null) }
+    fun start(choice: Pair<Boolean, Int>) {
+        onPick(choice.first, choice.second)
+        onDismiss()
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { picked?.let(::start) }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+            Text(stringResource(R.string.downloads_playlist), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+            Text(
+                stringResource(R.string.downloads_playlist_hint),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+            )
+            (ListQualities.map { false to it } + (true to 0)).forEach { choice ->
+                Row(
+                    Modifier.fillMaxWidth().clickable {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            picked = choice
+                            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            start(choice)
+                        }
+                    }.padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Icon(if (choice.first) WIcons.Audiotrack else WIcons.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (choice.first) stringResource(R.string.downloads_audio) else stringResource(R.string.downloads_up_to, choice.second),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
+    }
+}

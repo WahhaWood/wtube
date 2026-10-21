@@ -62,9 +62,12 @@ private fun bestAudio(info: StreamInfo): AudioStream? = info.audioStreams.filter
     .filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }
     .maxByOrNull { it.averageBitrate }
 
-private fun videoFor(info: StreamInfo, height: Int): VideoStream? = info.videoOnlyStreams.filter(::downloadable)
-    .filter { VideoCodec.AVC.matches(it.codec) && it.height == height }
-    .maxByOrNull { it.fps }
+/** The H.264 stream at [height], else the best one below it (a playlist is saved "up to" a quality), else the lowest. */
+private fun videoFor(info: StreamInfo, height: Int): VideoStream? {
+    val streams = info.videoOnlyStreams.filter(::downloadable).filter { VideoCodec.AVC.matches(it.codec) }
+    return streams.filter { it.height <= height }.maxWithOrNull(compareBy<VideoStream>({ it.height }, { it.fps }))
+        ?: streams.minWithOrNull(compareBy<VideoStream>({ it.height }, { -it.fps }))
+}
 
 private fun downloadable(stream: org.schabi.newpipe.extractor.stream.Stream): Boolean =
     stream.isUrl && stream.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && length(stream) > 0
@@ -120,9 +123,9 @@ class DownloadService : Service() {
         var refreshed = false
         while (true) {
             val audio = bestAudio(info) ?: throw IOException("No AAC sound for this video")
-            val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw IOException("No ${download.quality}p H.264 stream")
+            val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw IOException("No H.264 stream")
             val total = length(audio) + (video?.let(::length) ?: 0)
-            Downloads.update(download.key) { it.copy(total = total) }
+            Downloads.update(download.key) { it.copy(total = total, quality = video?.height ?: it.quality) }
             try {
                 video?.let { part(download, it.content, length(it), videoPart, offset = 0, total) }
                 part(download, audio.content, length(audio), audioPart, offset = video?.let(::length) ?: 0, total)
