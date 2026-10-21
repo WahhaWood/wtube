@@ -15,15 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platforms;android-37.0 build-tools;36.0.0
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Newer extractor?
         run: |
           OURS=$(sed -n 's/^newpipeExtractor = "\(.*\)"/\1/p' gradle/libs.versions.toml)
@@ -35,6 +35,11 @@ jobs:
           fi
       - name: Extractor smoke tests
         run: ./gradlew testDebugUnitTest --tests 'dev.wahha.wtube.ExtractorSmokeTest'
+      - name: Summary
+        if: always()
+        run: |
+          SKIPPED=$(grep -ho 'skipped="[0-9]*"' app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | grep -o '[0-9]*' | paste -sd+ | bc)
+          echo "Skipped on a YouTube bot check: ${SKIPPED:-0} (streams cannot be fetched from GitHub's IPs)" >> "$GITHUB_STEP_SUMMARY"
       - name: Report
         if: failure()
         env:

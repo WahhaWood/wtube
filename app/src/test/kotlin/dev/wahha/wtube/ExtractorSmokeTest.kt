@@ -25,7 +25,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
+import org.junit.Rule
 import org.junit.Test
+import org.junit.AssumptionViolatedException
+import org.junit.rules.TestRule
+import org.junit.runners.model.Statement
+import org.schabi.newpipe.extractor.exceptions.SignInConfirmNotBotException
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 
 /**
@@ -37,6 +42,23 @@ class ExtractorSmokeTest {
         @JvmStatic
         @BeforeClass
         fun init() = YouTube.init("RU")
+    }
+
+    // On CI (GitHub's data-centre IPs) YouTube asks to sign in before giving streams: that says nothing
+    // about the extractor, so such a test counts as skipped there. Anywhere else it is a failure.
+    @get:Rule
+    val botCheck = TestRule { base, _ ->
+        object : Statement() {
+            override fun evaluate() {
+                try {
+                    base.evaluate()
+                } catch (e: Throwable) {
+                    val botCheck = generateSequence(e) { it.cause }.any { it is SignInConfirmNotBotException }
+                    if (botCheck && System.getenv("CI") != null) throw AssumptionViolatedException("YouTube bot check on CI", e)
+                    throw e
+                }
+            }
+        }
     }
 
     @Test
