@@ -257,6 +257,10 @@ fun PlayerSheet(
             History.record(details.item)
         }
     }
+    // A video that failed to open must not leave the previous one playing under its error.
+    LaunchedEffect(vm.error, player) {
+        if (vm.error != null && vm.playPending && player != null && player.currentMediaItem?.mediaId != vm.id) connection.stop()
+    }
 
     // Orientation we forced with the fullscreen button; null follows the sensor, and a phone turned
     // sideways is fullscreen by itself, as in the YouTube app.

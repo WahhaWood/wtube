@@ -57,8 +57,10 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.ChannelItem
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.Item
+import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.PlaylistItem
 import dev.wahha.wtube.data.VideoItem
+import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.formatAgo
 import dev.wahha.wtube.data.formatCompact
@@ -98,6 +100,17 @@ class Navigator(
 ) {
     /** [from] is the tapped card's thumbnail, for the page to grow out of. */
     fun openVideo(id: String, from: VideoOrigin? = null) = showVideo(id, from)
+
+    /** Opens what a YouTube link points to; a channel's live page opens its stream, or the channel when it is not live. */
+    suspend fun open(target: LinkTarget) {
+        when (target) {
+            is LinkTarget.Video -> openVideo(target.id)
+            is LinkTarget.Playlist -> openPlaylist(target.url)
+            is LinkTarget.Channel -> openChannel(target.url)
+            is LinkTarget.Live -> runCatching { YouTube.liveVideoId(target.url) }.getOrNull()?.let(::openVideo)
+                ?: openChannel(target.url.removeSuffix("/").removeSuffix("/live"))
+        }
+    }
 }
 
 /** A thumbnail's place in the window at the moment of a tap. */

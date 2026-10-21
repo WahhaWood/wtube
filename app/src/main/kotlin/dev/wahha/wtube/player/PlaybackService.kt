@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -103,7 +104,7 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player)
+        session = MediaSession.Builder(this, SessionPlayer(player))
             .setSessionActivity(openApp)
             .setCallback(Callback())
             .build()
@@ -172,16 +173,53 @@ class PlaybackService : MediaSessionService() {
         }
         if (!Settings.current.value.autoplay) return
         scope.launch {
-            val watched = History.entries.value.mapTo(HashSet()) { it.video.id }
-            val hidden = Hidden.items.value
-            val next = runCatching { YouTube.video(id).related }.getOrDefault(emptyList())
-                .filterIsInstance<VideoItem>()
-                .firstOrNull { !it.isLive && it.id !in watched && it.id != id && hidden.allows(it) }
+            val next = relatedNext(id, orWatched = false)
             // Still at the end of the same video: the user may have replayed it or opened another meanwhile.
             if (next != null && player.playbackState == Player.STATE_ENDED && player.currentMediaItem?.mediaId == id) {
                 Autoplay.schedule(next, AUTOPLAY_DELAY_MS)
             }
         }
+    }
+
+    /** "Next" from the notification, lock screen or headset: the queue's first, else a related video, as the player's button. */
+    private fun skipToNext(player: Player) {
+        val id = player.currentMediaItem?.mediaId ?: return
+        PlayQueue.pop()?.let {
+            Autoplay.schedule(it, 0)
+            return
+        }
+        scope.launch {
+            val next = relatedNext(id, orWatched = true)
+            if (next != null && player.currentMediaItem?.mediaId == id) Autoplay.schedule(next, 0)
+        }
+    }
+
+    /** The first related video not watched yet (or, with [orWatched], the first one at all); not live, not hidden. */
+    private suspend fun relatedNext(id: String, orWatched: Boolean): VideoItem? {
+        val watched = History.entries.value.mapTo(HashSet()) { it.video.id }
+        val hidden = Hidden.items.value
+        val related = runCatching { YouTube.video(id).related }.getOrDefault(emptyList())
+            .filterIsInstance<VideoItem>()
+            .filter { !it.isLive && it.id != id && hidden.allows(it) }
+        return related.firstOrNull { it.id !in watched } ?: related.firstOrNull()?.takeIf { orWatched }
+    }
+
+    /**
+     * What the session sees: the player holds one video at a time, the queue and autoplay live outside it,
+     * so "next" is always offered to the system and handled by [skipToNext] (as LibreTube's forwarder does).
+     */
+    private inner class SessionPlayer(player: Player) : ForwardingPlayer(player) {
+        override fun getAvailableCommands(): Player.Commands =
+            super.getAvailableCommands().buildUpon().addAll(COMMAND_SEEK_TO_NEXT, COMMAND_SEEK_TO_NEXT_MEDIA_ITEM).build()
+
+        override fun isCommandAvailable(command: Int): Boolean =
+            command == COMMAND_SEEK_TO_NEXT || command == COMMAND_SEEK_TO_NEXT_MEDIA_ITEM || super.isCommandAvailable(command)
+
+        override fun hasNextMediaItem(): Boolean = currentMediaItem != null
+
+        override fun seekToNext() = skipToNext(this)
+
+        override fun seekToNextMediaItem() = skipToNext(this)
     }
 
     private inner class PlayerListener(private val player: Player) : Player.Listener {

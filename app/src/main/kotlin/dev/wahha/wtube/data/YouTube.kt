@@ -5,6 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.Request
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.NewPipe
@@ -26,6 +27,7 @@ import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQu
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
+import java.io.IOException
 
 /** Everything that works without an account, through NewPipeExtractor. Shorts never leave this object. */
 object YouTube {
@@ -194,6 +196,7 @@ object YouTube {
             ?: return null
         videoIdOf(url)?.let { return LinkTarget.Video(it) }
         playlistIdOf(url)?.let { return LinkTarget.Playlist("https://www.youtube.com/playlist?list=$it") }
+        if (ChannelLive.containsMatchIn(url)) return LinkTarget.Live(url.substringBefore('?'))
         if (runCatching { service.channelLHFactory.acceptUrl(url) }.getOrDefault(false)) return LinkTarget.Channel(url)
         return null
     }
@@ -203,6 +206,15 @@ object YouTube {
      * extractor takes a watch link with `list=` for a playlist link, so that parameter is dropped first.
      */
     fun videoIdOf(url: String): String? = runCatching { service.streamLHFactory.getId(url.replace(ListQueryPart, "")) }.getOrNull()
+
+    /** The stream a channel's live page shows now, read from the page's canonical link; null when it is not live. */
+    suspend fun liveVideoId(url: String): String? = io {
+        val request = Request.Builder().url(url).header("Cookie", "SOCS=CAE=").header("Accept-Language", "en").get().build()
+        Http.client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            CanonicalWatch.find(response.body.string())?.groupValues?.get(1)
+        }
+    }
 
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
 
@@ -224,6 +236,8 @@ object YouTube {
 
     private val ListParam = Regex("[?&]list=([A-Za-z0-9_-]+)")
     private val ListQueryPart = Regex("(?<=[?&])list=[^&#]*&?")
+    private val ChannelLive = Regex("^https?://(www\\.|m\\.)?youtube\\.com/(@[^/?#]+|channel/[^/?#]+|c/[^/?#]+|user/[^/?#]+)/live/?([?#]|$)")
+    private val CanonicalWatch = Regex("<link rel=\"canonical\" href=\"https://www\\.youtube\\.com/watch\\?v=([A-Za-z0-9_-]{11})")
     private val YoutubeHost = Regex("^https?://(www\\.|m\\.)?youtube\\.com/")
 
     private fun InfoItem.toItem(liveWithoutDuration: Boolean = false): Item? = when (this) {

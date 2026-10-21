@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import dev.wahha.wtube.data.AppLocale
+import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.player.LocalPlayerConnection
@@ -25,7 +26,7 @@ import dev.wahha.wtube.ui.theme.WTubeTheme
 class MainActivity : ComponentActivity() {
     private lateinit var connection: PlayerConnection
     private lateinit var pictureInPicture: PictureInPicture
-    private var deepLinkVideo by mutableStateOf<String?>(null)
+    private var deepLink by mutableStateOf<LinkTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dark-only app: light system bar icons whatever the system theme is.
@@ -43,14 +44,14 @@ class MainActivity : ComponentActivity() {
                 connection.player?.pause()
             }
         }
-        if (savedInstanceState == null) deepLinkVideo = videoIdOf(intent)
+        if (savedInstanceState == null) deepLink = linkOf(intent)
         setContent {
             WTubeTheme {
                 CompositionLocalProvider(
                     LocalPlayerConnection provides connection,
                     LocalPictureInPicture provides pictureInPicture,
                 ) {
-                    WTubeApp(deepLinkVideo = deepLinkVideo, onDeepLinkHandled = { deepLinkVideo = null })
+                    WTubeApp(deepLink = deepLink, onDeepLinkHandled = { deepLink = null })
                 }
             }
         }
@@ -69,7 +70,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        videoIdOf(intent)?.let { deepLinkVideo = it }
+        linkOf(intent)?.let { deepLink = it }
     }
 
     override fun onStop() {
@@ -84,13 +85,13 @@ class MainActivity : ComponentActivity() {
     }
 
     /** A YouTube link opened with the app (VIEW) or shared to it as text (SEND). */
-    private fun videoIdOf(intent: Intent?): String? {
+    private fun linkOf(intent: Intent?): LinkTarget? {
         val text = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.dataString
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             else -> null
         } ?: return null
         val url = Regex("""https?://\S+""").find(text)?.value ?: return null
-        return YouTube.videoIdOf(url)
+        return YouTube.linkTarget(url)
     }
 }

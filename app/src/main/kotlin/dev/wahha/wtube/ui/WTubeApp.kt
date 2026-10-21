@@ -83,6 +83,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.LocalPlayerConnection
@@ -124,6 +125,7 @@ import dev.wahha.wtube.ui.video.PlayerSheet
 import dev.wahha.wtube.ui.video.PlayerSheetState
 import dev.wahha.wtube.ui.video.VideoViewModel
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable object Home
@@ -168,9 +170,9 @@ private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 private const val AXIS_MS = 300
 private val AxisShift = 30.dp
 
-/** [deepLinkVideo] is a video id from a shared or opened YouTube link; [onDeepLinkHandled] clears it. */
+/** [deepLink] is where a shared or opened YouTube link points; [onDeepLinkHandled] clears it. */
 @Composable
-fun WTubeApp(deepLinkVideo: String? = null, onDeepLinkHandled: () -> Unit = {}) {
+fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
@@ -244,9 +246,10 @@ fun WTubeApp(deepLinkVideo: String? = null, onDeepLinkHandled: () -> Unit = {}) 
             back = { navController.popBackStack() },
         )
     }
-    LaunchedEffect(deepLinkVideo) {
-        if (deepLinkVideo != null) {
-            navigator.openVideo(deepLinkVideo)
+    // In the app's scope: a live page is looked up first, and clearing the link restarts this effect.
+    LaunchedEffect(deepLink) {
+        if (deepLink != null) {
+            scope.launch { navigator.open(deepLink) }
             onDeepLinkHandled()
         }
     }

@@ -66,7 +66,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.Item
-import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.ui.components.ErrorState
@@ -155,11 +154,7 @@ fun SearchScreen(vm: SearchViewModel = viewModel()) {
         val target = YouTube.linkTarget(text) ?: return false
         vm.reset()
         leaveField()
-        when (target) {
-            is LinkTarget.Video -> nav.openVideo(target.id)
-            is LinkTarget.Playlist -> nav.openPlaylist(target.url)
-            is LinkTarget.Channel -> nav.openChannel(target.url)
-        }
+        vm.viewModelScope.launch { nav.open(target) }
         return true
     }
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->

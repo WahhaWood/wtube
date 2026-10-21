@@ -31,6 +31,9 @@ class LinksTest {
             YouTube.linkTarget("https://m.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI"),
         )
         assertEquals(LinkTarget.Channel("https://www.youtube.com/@LofiGirl"), YouTube.linkTarget("https://www.youtube.com/@LofiGirl"))
+        assertEquals(LinkTarget.Live("https://www.youtube.com/@LofiGirl/live"), YouTube.linkTarget("https://www.youtube.com/@LofiGirl/live?si=abc"))
+        assertEquals(LinkTarget.Live("https://m.youtube.com/channel/UCSJ4gkVC6NrvII8umztf0Ow/live"), YouTube.linkTarget("https://m.youtube.com/channel/UCSJ4gkVC6NrvII8umztf0Ow/live"))
+        assertEquals(LinkTarget.Video("jfKfPfyJRdk"), YouTube.linkTarget("https://www.youtube.com/live/jfKfPfyJRdk?si=abc"))
         assertNull(YouTube.linkTarget("lofi hip hop"))
         assertNull(YouTube.linkTarget("https://example.com/watch?v=dQw4w9WgXcQ"))
     }

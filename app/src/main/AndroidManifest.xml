@@ -40,6 +40,11 @@
                 <data android:pathPrefix="/shorts/" />
                 <data android:pathPrefix="/live/" />
                 <data android:pathPrefix="/embed/" />
+                <data android:pathPrefix="/playlist" />
+                <data android:pathPrefix="/@" />
+                <data android:pathPrefix="/channel/" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/user/" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
