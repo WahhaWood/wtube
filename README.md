@@ -12,6 +12,8 @@
 
 </div>
 
+<p align="center"><img src="docs/screenshots/hero.png" alt="WTube" width="900"></p>
+
 WTube — самодельный клиент YouTube в духе NewPipe и SimpMusic: потоки достаются
 через [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor), аккаунт
 подключается по cookies, интерфейс — тёмный, на «жидком стекле».
@@ -19,6 +21,13 @@ WTube — самодельный клиент YouTube в духе NewPipe и Sim
 
 > Неофициальный клиент. Не связан с YouTube и Google. Используйте на свой риск и в рамках
 > правил сервиса.
+
+## Скриншоты
+
+<p align="center"><img src="docs/screenshots/browse.png" alt="Главная, поиск, каналы, настройки" width="900"></p>
+<p align="center"><img src="docs/screenshots/player.png" alt="Плеер: полный экран, настройки, мини-плеер" width="900"></p>
+
+<sub>Превью и названия роликов на скриншотах принадлежат их авторам и показаны только для демонстрации интерфейса.</sub>
 
 ## Возможности
 

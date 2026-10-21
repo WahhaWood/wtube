@@ -36,6 +36,8 @@ import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.VideoStream
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -151,28 +153,12 @@ class DownloadService : Service() {
 
     /** Appends bytes of [url] to [target] until it holds [length] of them; [offset] places them in the overall progress. */
     private suspend fun part(download: Download, url: String, length: Long, target: File, offset: Long, total: Long) {
-        var position = target.length().coerceAtMost(length)
-        if (target.length() > length) target.delete().also { position = 0 }
-        FileOutputStream(target, true).use { output ->
-            while (position < length) {
-                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                if (Downloads.find(download.key) == null) throw CancellationException("Download removed")
-                val end = minOf(position + CHUNK_BYTES, length)
-                Http.client.newCall(YoutubeRequests.rangeRequest(url, position, end)).execute().use { response ->
-                    if (response.code == 403) throw ExpiredException()
-                    if (!response.isSuccessful) throw IOException("googlevideo: HTTP ${response.code}")
-                    val body = response.body.byteStream()
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val read = body.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        position += read
-                    }
-                }
-                Downloads.update(download.key) { it.copy(bytes = offset + position) }
-                notify(download, total, offset + position, muxing = false)
-            }
+        downloadRange(Http.client, url, length, target, CHUNK_BYTES, YoutubeRequests::rangeRequest, ensureAlive = {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (Downloads.find(download.key) == null) throw CancellationException("Download removed")
+        }) { position ->
+            Downloads.update(download.key) { it.copy(bytes = offset + position) }
+            notify(download, total, offset + position, muxing = false)
         }
     }
 
@@ -203,6 +189,9 @@ class DownloadService : Service() {
                 }
             }
             muxer.stop()
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
         } finally {
             sources.forEach { it.release() }
             muxer.release()
@@ -244,13 +233,57 @@ class DownloadService : Service() {
         super.onDestroy()
     }
 
-    private class ExpiredException : IOException("Stream URL expired")
-
     private companion object {
         const val TAG = "Downloads"
         const val CHANNEL = "downloads"
         const val NOTIFICATION_ID = 2
         // Up to 4 MB per request: like the player's segment requests, which googlevideo serves at full speed.
         const val CHUNK_BYTES = 4L * 1024 * 1024
+    }
+}
+
+/** The stream URL is no longer accepted (googlevideo answered 403). */
+internal class ExpiredException : IOException("Stream URL expired")
+
+/**
+ * Appends bytes of [url] to [target] until it holds [length] of them, in requests of up to [chunk] bytes,
+ * continuing from what [target] already holds. [onProgress] gets the size after each request; [ensureAlive]
+ * throws to stop. A longer [target] is a stale leftover and is started over.
+ */
+internal suspend fun downloadRange(
+    client: OkHttpClient,
+    url: String,
+    length: Long,
+    target: File,
+    chunk: Long,
+    request: (String, Long, Long) -> Request,
+    ensureAlive: suspend () -> Unit = {},
+    onProgress: suspend (Long) -> Unit = {},
+) {
+    var position = target.length().coerceAtMost(length)
+    if (target.length() > length) target.delete().also { position = 0 }
+    FileOutputStream(target, true).use { output ->
+        while (position < length) {
+            ensureAlive()
+            val end = minOf(position + chunk, length)
+            var got = 0L
+            client.newCall(request(url, position, end)).execute().use { response ->
+                if (response.code == 403) throw ExpiredException()
+                if (!response.isSuccessful) throw IOException("googlevideo: HTTP ${response.code}")
+                val body = response.body.byteStream()
+                val buffer = ByteArray(64 * 1024)
+                while (got < end - position) {
+                    val read = body.read(buffer, 0, minOf(buffer.size.toLong(), end - position - got).toInt())
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    got += read
+                }
+            }
+            // An empty answer would repeat forever; the next attempt (a retry) continues from the file.
+            if (got == 0L) throw IOException("googlevideo sent no data")
+            output.flush()
+            position += got
+            onProgress(position)
+        }
     }
 }

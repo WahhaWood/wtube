@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
@@ -26,6 +30,14 @@ data class AccountPosition(val positionMs: Long, val finished: Boolean, val seen
 object WatchProgress {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val accountState = MutableStateFlow<Map<String, AccountPosition>>(emptyMap())
+
+    init {
+        // The places belong to one account: another account, a re-login or an expired session must not inherit them.
+        Account.session.map { s -> s?.let { listOf(it.cookie, it.authUser, it.pageId, it.expired) } }
+            .distinctUntilChanged()
+            .onEach { accountState.value = emptyMap() }
+            .launchIn(scope)
+    }
 
     // Lengths of the videos the account marked, for the fraction of the ones not in the local history.
     private val durations = ConcurrentHashMap<String, Long>()

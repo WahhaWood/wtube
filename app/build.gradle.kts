@@ -17,8 +17,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.13.1"
+        versionCode = 21
+        versionName = "0.14.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -112,10 +112,16 @@ dependencies {
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.espresso)
+}
+
+// `-Poffline` runs only the tests that need no internet (the smoke tests talk to YouTube).
+if (providers.gradleProperty("offline").isPresent) {
+    tasks.withType<Test>().configureEach { exclude("**/*SmokeTest*") }
 }

@@ -32,4 +32,12 @@ class BackupTest {
         assertEquals(5000L, backup.history.single().positionMs)
         assertTrue(backup.searches.isEmpty())
     }
+
+    // A damaged file must fail in parse (the caller shows "failed"), never half-restore.
+    @Test
+    fun damagedFilesAreRejected() {
+        for (text in listOf("", "not json", "[]", "{\"version\":", "{\"settings\":\"oops\"}")) {
+            assertTrue("accepted: $text", runCatching { Backup.parse(text) }.isFailure)
+        }
+    }
 }

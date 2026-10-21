@@ -2,6 +2,9 @@ package dev.wahha.wtube
 
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Transcript
+import dev.wahha.wtube.data.ChannelItem
+import dev.wahha.wtube.data.PlaylistItem
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Session
@@ -238,5 +241,33 @@ class ExtractorSmokeTest {
         assertTrue(channel.tabs.none { it.kind == "shorts" })
         val videos = YouTube.channelTab(channel.tabs.first())
         assertTrue(videos.items.isNotEmpty())
+    }
+
+    @Test
+    fun playlistPagesThrough() = runBlocking {
+        // YouTube's own "Popular music videos" mix of channels is long enough to have a second page.
+        val url = "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI"
+        val playlist = YouTube.playlist(url)
+        println("playlist ${playlist.name}: ${playlist.count} videos, first page ${playlist.firstPage.items.size}")
+        assertTrue(playlist.name.isNotBlank())
+        assertTrue(playlist.firstPage.items.filterIsInstance<VideoItem>().isNotEmpty())
+        val next = playlist.firstPage.next
+        if (next != null) assertTrue(YouTube.playlistMore(url, next).items.isNotEmpty())
+    }
+
+    @Test
+    fun watchHasRelatedVideos() = runBlocking {
+        val info = YouTube.streamInfo("dQw4w9WgXcQ")
+        val related = info.relatedItems.orEmpty()
+        println("related: ${related.size}")
+        assertTrue(related.isNotEmpty())
+    }
+
+    @Test
+    fun searchFindsChannelsAndPlaylists() = runBlocking {
+        val channels = YouTube.search("MrBeast", YoutubeSearchQueryHandlerFactory.CHANNELS).items
+        assertTrue(channels.any { it is ChannelItem })
+        val playlists = YouTube.search("lofi", YoutubeSearchQueryHandlerFactory.PLAYLISTS).items
+        assertTrue(playlists.any { it is PlaylistItem })
     }
 }

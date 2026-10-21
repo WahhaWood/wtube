@@ -84,7 +84,7 @@ object WatchParser {
         FeedParser.findAll(response, "playlistAddToOptionRenderer").mapNotNull { option ->
             PlaylistOption(
                 id = option.getString("playlistId") ?: return@mapNotNull null,
-                title = getTextFromObject(option.getObject("title")).orEmpty(),
+                title = runCatching { getTextFromObject(option.getObject("title")) }.getOrNull().orEmpty(),
                 contains = option.getString("containsSelectedVideos") == "ALL",
                 privacy = option.getString("privacy"),
             )

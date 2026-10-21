@@ -192,7 +192,7 @@ object LiveChatParser {
     private fun runs(message: JsonObject): List<ChatRun> = message.getArray("runs").filterIsInstance<JsonObject>().mapNotNull { run ->
         val emoji = run.getObject("emoji")
         when {
-            run.has("text") -> ChatRun.Text(run.getString("text"))
+            run.has("text") -> ChatRun.Text(run.getString("text", ""))
             emoji.isEmpty() -> null
             else -> {
                 val custom = emoji.getBoolean("isCustomEmoji", false)

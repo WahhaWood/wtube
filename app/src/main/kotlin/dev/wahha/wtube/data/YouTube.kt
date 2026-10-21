@@ -257,8 +257,9 @@ object YouTube {
                 uploadedAt = uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli(),
             )
         }
-        is ChannelInfoItem -> ChannelItem(url, name, thumbnails.pick(AVATAR_PX), subscriberCount, isVerified)
-        is PlaylistInfoItem -> PlaylistItem(url, name, thumbnails.pick(THUMBNAIL_PX), uploaderName, streamCount)
+        // A row YouTube sent without its title is not worth showing.
+        is ChannelInfoItem -> if (name == null) null else ChannelItem(url, name, thumbnails.pick(AVATAR_PX), subscriberCount, isVerified)
+        is PlaylistInfoItem -> if (name == null) null else PlaylistItem(url, name, thumbnails.pick(THUMBNAIL_PX), uploaderName, streamCount)
         else -> null
     }
 

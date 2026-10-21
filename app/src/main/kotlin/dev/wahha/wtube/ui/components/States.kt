@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.account.SessionExpiredException
+import dev.wahha.wtube.data.errorTag
 import dev.wahha.wtube.data.innertube.ActionRejectedException
 import dev.wahha.wtube.data.innertube.InnerTubeHttpException
 import dev.wahha.wtube.ui.icon.Error
@@ -81,7 +82,7 @@ fun errorMessage(error: Throwable): Int {
  * exceptions never carry cookies, and OkHttp leaves the values of Cookie and Authorization out of its own.
  */
 fun errorDetail(error: Throwable): String =
-    generateSequence(error) { it.cause }.take(3)
+    errorTag(error) + " " + generateSequence(error) { it.cause }.take(3)
         .joinToString(" ← ") { e -> e.javaClass.simpleName + (e.message?.let { ": $it" } ?: "") }
         .take(300)
 

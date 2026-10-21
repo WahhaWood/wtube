@@ -3,6 +3,7 @@ package dev.wahha.wtube.data.innertube
 import com.grack.nanojson.JsonBuilder
 import com.grack.nanojson.JsonObject
 import com.grack.nanojson.JsonParser
+import com.grack.nanojson.JsonParserException
 import com.grack.nanojson.JsonWriter
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.account.Account
@@ -28,6 +29,7 @@ import java.io.IOException
 object InnerTube {
     private const val API = "https://www.youtube.com/youtubei/v1/"
     private const val WEB_CLIENT_ID = "1"
+    private const val ACCOUNT_MENU = "account/account_menu"
     private val JsonType = "application/json".toMediaType()
 
     /** A browse page; [params] picks a channel tab, [query] searches one. Without a [session] it is anonymous. */
@@ -71,7 +73,7 @@ object InnerTube {
 
     /** Who [session] acts as, or null when YouTube does not see it as signed in. Network errors are thrown. */
     suspend fun whoAmI(session: Session): Identity? = try {
-        FeedParser.activeAccount(post(session, "account/account_menu"))
+        FeedParser.activeAccount(post(session, ACCOUNT_MENU))
     } catch (_: SessionExpiredException) {
         null
     }
@@ -84,7 +86,17 @@ object InnerTube {
         FeedParser.identities(JsonParser.`object`().from(text))
     }
 
-    suspend fun post(session: Session?, endpoint: String, fill: JsonBuilder<JsonObject>.() -> Unit = {}): JsonObject =
+    suspend fun post(session: Session?, endpoint: String, fill: JsonBuilder<JsonObject>.() -> Unit = {}): JsonObject {
+        val json = rawPost(session, endpoint, fill)
+        if (session != null && isLoggedOut(json)) {
+            // One "logged out" answer can be a hiccup; the session is dropped only when the account menu agrees.
+            val again = if (endpoint == ACCOUNT_MENU) json else rawPost(session, ACCOUNT_MENU)
+            if (isLoggedOut(again)) throw expired(session)
+        }
+        return json
+    }
+
+    private suspend fun rawPost(session: Session?, endpoint: String, fill: JsonBuilder<JsonObject>.() -> Unit = {}): JsonObject =
         withContext(Dispatchers.IO) {
             // The language alone: the extractor's localization is "en-<phone region>", and YouTube answers
             // an hl like "en-RU" with 400 INVALID_ARGUMENT on every endpoint.
@@ -97,20 +109,22 @@ object InnerTube {
                 .post(JsonWriter.string(body).toRequestBody(JsonType))
                 .signedBy(session)
                 .build()
-            val json = JsonParser.`object`().from(execute(session, request))
-            val loggedOut = json.getObject("responseContext").getObject("mainAppWebResponseContext").getBoolean("loggedOut", false)
-            if (loggedOut && session != null) throw expired(session)
-            json
+            parseJson(request.url.encodedPath, execute(session, request))
         }
+
+    private fun isLoggedOut(json: JsonObject): Boolean =
+        json.getObject("responseContext").getObject("mainAppWebResponseContext").getBoolean("loggedOut", false)
 
     private fun execute(session: Session?, request: Request): String =
         Http.client.newCall(request).execute().use { response ->
-            when {
-                session != null && (response.code == 401 || response.code == 403) -> throw expired(session)
-                response.code == 429 -> throw ReCaptchaException("reCaptcha Challenge requested", request.url.toString())
-                !response.isSuccessful -> throw InnerTubeHttpException(response.code, request.url.encodedPath, errorReason(response.body.string()))
+            if (response.isSuccessful) return@use response.body.string()
+            val body = response.body.string()
+            when (failureOf(response.code, body)) {
+                Failure.SessionRejected -> if (session != null) throw expired(session)
+                Failure.Antibot -> throw ReCaptchaException("reCaptcha Challenge requested", request.url.toString())
+                Failure.Http -> {}
             }
-            response.body.string()
+            throw InnerTubeHttpException(response.code, request.url.encodedPath, errorReason(body))
         }
 
     // YouTube's JSON error says what it disliked, e.g. "INVALID_ARGUMENT: Request contains an invalid argument."
@@ -140,6 +154,38 @@ object InnerTube {
         // What the web client and yt-dlp send with a signed-in session.
         header("X-Youtube-Bootstrap-Logged-In", "true")
         session.pageId?.let { header("X-Goog-PageId", it) }
+    }
+}
+
+/** What an unsuccessful InnerTube answer means: the account is refused, YouTube suspects a bot, or just an error. */
+internal enum class Failure { SessionRejected, Antibot, Http }
+
+private val antibotMarks = listOf("unusual traffic", "captcha", "/sorry/", "not a robot")
+
+/**
+ * 401 means the cookies are refused. 403 does too, unless the body is Google's bot-check page (HTML, not
+ * the JSON error of the API): that one says nothing about the session. 429 is always rate limiting.
+ */
+internal fun failureOf(code: Int, body: String): Failure = when {
+    code == 429 -> Failure.Antibot
+    code == 401 -> Failure.SessionRejected
+    code == 403 -> if (antibotMarks.any { body.contains(it, ignoreCase = true) }) Failure.Antibot else Failure.SessionRejected
+    else -> Failure.Http
+}
+
+/** YouTube answered 200 but not with the JSON we asked for (a changed protocol or a block page). */
+class InnerTubeFormatException(path: String, what: String) : Exception("InnerTube $path: $what")
+
+/** The JSON object in [body]; anything else is told apart as a bot check, an HTML page or plain garbage. */
+internal fun parseJson(path: String, body: String): JsonObject = try {
+    JsonParser.`object`().from(body)
+} catch (e: JsonParserException) {
+    val head = body.trimStart()
+    throw when {
+        antibotMarks.any { body.contains(it, ignoreCase = true) } -> ReCaptchaException("reCaptcha Challenge requested", path)
+        head.isEmpty() -> InnerTubeFormatException(path, "empty body")
+        head.startsWith("<") -> InnerTubeFormatException(path, "HTML instead of JSON")
+        else -> InnerTubeFormatException(path, "not JSON")
     }
 }
 

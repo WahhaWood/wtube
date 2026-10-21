@@ -72,9 +72,12 @@ class PagedList<T>(
                     page = load(page.next)
                     fresh += page.items
                 }
+                val before = items.size
                 items = ((if (reset) emptyList() else items) + fresh).distinctBy(key)
-                next = page.next
-                endReached = page.next == null
+                // The same cursor again with nothing new would loop forever: take it as the end.
+                val stuck = !reset && items.size == before && page.next != null && page.next?.id == next?.id && page.next?.url == next?.url
+                next = page.next.takeUnless { stuck }
+                endReached = next == null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

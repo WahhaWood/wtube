@@ -6,6 +6,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import dev.wahha.wtube.data.innertube.InnerTube
 import kotlinx.coroutines.CoroutineScope
@@ -47,7 +49,7 @@ data class Identity(
 
 /** The session, sealed with [Vault] in its own DataStore and mirrored into [session]. */
 object Account {
-    private val Context.dataStore by preferencesDataStore("account")
+    private val Context.dataStore by preferencesDataStore("account", corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() })
     private val SessionKey = stringPreferencesKey("session")
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -66,7 +68,7 @@ object Account {
     fun init(context: Context) {
         val store = context.applicationContext.dataStore.also { store = it }
         scope.launch {
-            val sealed = store.data.first()[SessionKey]
+            val sealed = runCatching { store.data.first()[SessionKey] }.getOrNull()
             // Only the exception's class: a parse error message would quote the cookies.
             state.value = sealed?.let { runCatching { json.decodeFromString<Session>(Vault.open(it)) } }
                 ?.onFailure { Log.w("Account", "Stored session unreadable (${it.javaClass.simpleName}), signed out") }
@@ -111,7 +113,7 @@ object Account {
         scope.launch { save(current.copy(expired = true)) }
     }
 
-    private suspend fun save(session: Session?) {
+    internal suspend fun save(session: Session?) {
         state.value = session
         val store = store ?: return
         store.edit { prefs ->
