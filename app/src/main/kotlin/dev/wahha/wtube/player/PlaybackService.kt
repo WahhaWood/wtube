@@ -121,8 +121,21 @@ class PlaybackService : MediaSessionService() {
     // Wi-Fi ↔ mobile switches move the quality cap mid-video.
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-            scope.launch { applyTrackPreferences() }
+            val online = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            scope.launch {
+                applyTrackPreferences()
+                if (online) resumeAfterOutage()
+            }
         }
+    }
+
+    /** A video that stopped for lack of network goes on by itself once the network is back, from the same spot. */
+    private fun resumeAfterOutage() {
+        val player = session?.player ?: return
+        val code = player.playerError?.errorCode ?: return
+        if (code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+            code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+        ) player.prepare()
     }
 
     /**
