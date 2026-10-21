@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -268,6 +269,24 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
             video.close()
         }
         lastMediaId = mediaId
+    }
+
+    // A killed process takes the player and the view model along: the open video and the sheet's state
+    // come back from the saved instance state, paused where the video was left.
+    var savedVideo by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedExpanded by rememberSaveable { mutableStateOf(false) }
+    val restored = remember { savedVideo to savedExpanded }
+    LaunchedEffect(Unit) {
+        val (id, expanded) = restored
+        if (id != null && video.id == null && connection.player?.currentMediaItem == null) {
+            connection.restoring = id
+            video.open(id)
+            if (expanded) sheet.expand() else sheet.snapCollapsed()
+        }
+    }
+    LaunchedEffect(video.id, sheet.expanded) {
+        savedVideo = video.id
+        savedExpanded = sheet.expanded
     }
 
     val sheetOpen = video.id != null

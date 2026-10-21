@@ -49,10 +49,15 @@ class PlayerConnection(context: Context) {
         future.addListener({ player = runCatching { future.get() }.getOrNull() }, ContextCompat.getMainExecutor(context))
     }
 
+    /** A video brought back after the process was killed: [play] loads it from its saved position but stays paused. */
+    var restoring: String? = null
+
     /** Starts [videoId] from its saved position, unless it is already the current item. */
     fun play(videoId: String) {
         val player = player ?: return
         Autoplay.cancel()
+        val paused = restoring == videoId
+        restoring = null
         if (player.currentMediaItem?.mediaId == videoId && player.playerError == null) {
             if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
             player.play()
@@ -60,7 +65,7 @@ class PlayerConnection(context: Context) {
         }
         player.setMediaItem(MediaItem.Builder().setMediaId(videoId).build(), resumePosition(videoId))
         player.prepare()
-        player.play()
+        if (!paused) player.play()
     }
 
     /** After a playback error: fetch fresh stream URLs and continue from the same spot. */
