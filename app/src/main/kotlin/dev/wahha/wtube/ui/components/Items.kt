@@ -29,7 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.wahha.wtube.data.WatchProgress
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -136,7 +139,11 @@ fun VideoCard(video: VideoItem, onClick: (VideoOrigin?) -> Unit) {
     val nav = LocalNavigator.current
     val anchor = remember { ThumbnailAnchor(0.dp) }
     Column(Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(bottom = 12.dp)) {
-        Thumbnail(video.thumbnail, Modifier.fillMaxWidth().then(anchor.modifier)) { VideoBadge(video) }
+        val watched = watchedFraction(video.id)
+        Thumbnail(video.thumbnail, Modifier.fillMaxWidth().then(anchor.modifier)) {
+            VideoBadge(video)
+            WatchedBar(watched)
+        }
         Row(
             Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -286,6 +293,29 @@ fun shareVideo(context: Context, video: VideoItem) {
     context.startActivity(Intent.createChooser(send, null))
 }
 
+/**
+ * How much of a video was watched, here or on the account's other devices; 0 when not started. Only a
+ * change of this video's share recomposes the card.
+ */
+@Composable
+private fun watchedFraction(id: String): Float {
+    val fractions = WatchProgress.fractions.collectAsStateWithLifecycle()
+    val fraction by remember(id) { derivedStateOf { fractions.value[id] ?: 0f } }
+    return fraction
+}
+
+/** YouTube's bar along the bottom of a thumbnail: how much of the video was watched. */
+@Composable
+private fun BoxScope.WatchedBar(fraction: Float) {
+    if (fraction <= 0f) return
+    LinearProgressIndicator(
+        progress = { fraction },
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+        drawStopIndicator = {},
+        gapSize = 0.dp,
+    )
+}
+
 /** Dense row for related videos, playlists, channels and history. */
 @Composable
 fun VideoRow(video: VideoItem, progress: Float = 0f, onClick: (VideoOrigin?) -> Unit) {
@@ -294,16 +324,10 @@ fun VideoRow(video: VideoItem, progress: Float = 0f, onClick: (VideoOrigin?) -> 
         Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val watched = watchedFraction(video.id)
         Thumbnail(video.thumbnail, Modifier.width(168.dp).clip(ThumbnailShape).then(anchor.modifier)) {
             VideoBadge(video)
-            if (progress > 0f) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
-                    drawStopIndicator = {},
-                    gapSize = 0.dp,
-                )
-            }
+            WatchedBar(if (progress > 0f) progress else watched)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)

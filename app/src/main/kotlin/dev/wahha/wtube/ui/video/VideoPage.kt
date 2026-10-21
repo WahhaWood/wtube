@@ -1,5 +1,8 @@
 package dev.wahha.wtube.ui.video
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import dev.wahha.wtube.download.DownloadState
@@ -155,6 +158,13 @@ class VideoViewModel : ViewModel() {
     var heatmap by mutableStateOf<List<Float>>(emptyList())
         private set
 
+    /** The live chat or chat replay; null when the video has none. */
+    var chat by mutableStateOf<ChatState?>(null)
+        private set
+
+    /** The chat takes the page under the video instead of the details. */
+    var chatOpen by mutableStateOf(false)
+
     /** DeArrow's title for the video, null when off, unknown or the same as the real one. */
     var betterTitle by mutableStateOf<String?>(null)
         private set
@@ -202,6 +212,8 @@ class VideoViewModel : ViewModel() {
         dislikes = -1
         betterTitle = null
         heatmap = emptyList()
+        chat = null
+        chatOpen = false
         comments = PagedList(viewModelScope, Comment::id) { loadComments(id, it) }
         load()
     }
@@ -230,6 +242,7 @@ class VideoViewModel : ViewModel() {
                 comments?.refresh()
                 val watched = watch.await()
                 heatmap = watched?.heatmap.orEmpty()
+                if (chat == null) chat = watched?.chat?.let(::ChatState)
                 watched?.state?.let { s ->
                     ratedBefore = s.like
                     state = if (s.channelId != null) s else s.copy(channelId = details.item.channelUrl?.substringAfter("/channel/", "")?.ifEmpty { null })
@@ -413,8 +426,13 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
     val details = vm.details
     val comments = vm.comments
     val error = vm.error
+    val chat = vm.chat
     Box(modifier) {
         when {
+            chat != null && vm.chatOpen -> {
+                BackHandler { vm.chatOpen = false }
+                ChatContent(chat, onClose = { vm.chatOpen = false }, modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding())
+            }
             details != null && comments != null -> Details(vm, details, comments, onSeek)
             error != null -> ErrorState(error, vm::load)
             else -> FeedSkeleton(Modifier.padding(top = 16.dp), compact = true)
@@ -548,6 +566,9 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
                     }
                 }
             }
+        }
+        vm.chat?.let { chat ->
+            item(key = "chat") { ChatPreview(chat, onOpen = { vm.chatOpen = true }) }
         }
         if (details.description.isNotBlank()) {
             item(key = "description") { Description(details.description, onLink) }

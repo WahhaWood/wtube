@@ -7,6 +7,8 @@ import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.account.SessionExpiredException
 import dev.wahha.wtube.data.innertube.Actions
+import dev.wahha.wtube.data.innertube.ChatAction
+import dev.wahha.wtube.data.innertube.LiveChat
 import dev.wahha.wtube.download.downloadOptions
 import dev.wahha.wtube.player.YoutubeRequests
 import dev.wahha.wtube.data.innertube.Feeds
@@ -184,6 +186,25 @@ class ExtractorSmokeTest {
         println("live: ${live.id} ${info.streamType} hls=${info.hlsUrl.take(60)}")
         assertTrue(info.streamType.isLive())
         assertTrue(info.hlsUrl.isNotEmpty())
+    }
+
+    @Test
+    fun liveChatAndReplayLoadAnonymously() = runBlocking {
+        val live = YouTube.kiosk("live").items.filterIsInstance<VideoItem>().first { it.isLive }
+        val chat = Actions.watch(live.id, session = null).chat
+        println("live chat of ${live.id}: $chat")
+        assertTrue(chat != null && !chat.replay)
+        val page = LiveChat.page(chat!!.token, replay = false)
+        assertTrue(page.continuation != null && page.modes.size == 2)
+        // Lofi Girl's past streams keep their chat replay.
+        val channel = YouTube.channel("https://www.youtube.com/@LofiGirl")
+        val past = YouTube.channelTab(channel.tabs.first { it.kind == "livestreams" }).items.filterIsInstance<VideoItem>().first { !it.isLive && it.duration > 0 }
+        val replay = Actions.watch(past.id, session = null).chat
+        println("chat replay of ${past.id}: $replay")
+        assertTrue(replay != null && replay.replay)
+        val messages = LiveChat.page(replay!!.token, replay = true, offsetMs = 600_000).actions.filterIsInstance<ChatAction.Add>()
+        println("replay messages near 10:00: ${messages.size}")
+        assertTrue(messages.isNotEmpty() && messages.all { it.message.offsetMs >= 0 })
     }
 
     @Test

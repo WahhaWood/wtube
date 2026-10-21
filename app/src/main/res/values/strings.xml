@@ -350,4 +350,17 @@
     <string name="reply_posted">Ответ опубликован</string>
     <string name="settings_report_watching">Отправлять просмотры в YouTube</string>
     <string name="settings_report_watching_summary">Со входом: видео попадают в историю аккаунта, и YouTube учитывает их в рекомендациях</string>
+    <!-- Live chat (0.12) -->
+    <string name="chat_title">Чат</string>
+    <string name="chat_replay_title">Повтор чата</string>
+    <string name="chat_open">Открыть чат</string>
+    <string name="chat_placeholder">Сообщение</string>
+    <string name="chat_mode_top">Топ</string>
+    <string name="chat_mode_all">Весь чат</string>
+    <string name="chat_empty">Сообщений пока нет</string>
+    <string name="chat_ended">Чат завершён</string>
+    <string name="chat_error">Нет связи с чатом, пробую ещё раз</string>
+    <string name="chat_new_messages">Новые сообщения</string>
+    <string name="chat_pinned">Закреплено</string>
+    <string name="player_go_live">Перейти к эфиру</string>
 </resources>

@@ -15,9 +15,10 @@ data class VideoState(val like: LikeStatus, val channelId: String?, val subscrib
 /**
  * The watch page as the account sees it: [state] (null on the anonymous page), the token of the first
  * comments page (null when off) and the "Most replayed" graph: intensities 0..1 of equal slices of the
- * video, in order (empty when YouTube has none, as for new or short videos).
+ * video, in order (empty when YouTube has none, as for new or short videos); [chat] for live streams
+ * and past ones with a chat replay.
  */
-class Watch(val state: VideoState?, val commentsToken: String?, val heatmap: List<Float> = emptyList())
+class Watch(val state: VideoState?, val commentsToken: String?, val heatmap: List<Float> = emptyList(), val chat: ChatSource? = null)
 
 /** One of the account's playlists in "Save to"; [contains] says whether the video is in it already. */
 data class PlaylistOption(val id: String, val title: String, val contains: Boolean, val privacy: String?)
@@ -51,7 +52,15 @@ object WatchParser {
             state = VideoState(LikeStatus.entries.firstOrNull { it.name == like } ?: LikeStatus.INDIFFERENT, channelId, subscribed),
             commentsToken = comments?.let(::continuationToken),
             heatmap = heatmap(updates),
+            chat = chat(contents),
         )
+    }
+
+    // The chat sits in the conversation bar; without a reload token it is off.
+    private fun chat(contents: Any?): ChatSource? {
+        val renderer = FeedParser.findFirst(contents, "liveChatRenderer") ?: return null
+        val token = FeedParser.findFirst(renderer["continuations"], "reloadContinuationData")?.getString("continuation") ?: return null
+        return ChatSource(token, renderer.getBoolean("isReplay", false))
     }
 
     // The web player draws it from a markers entity: equal slices, each with its normalized replay score.

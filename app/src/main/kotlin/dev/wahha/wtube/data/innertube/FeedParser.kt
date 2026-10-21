@@ -16,8 +16,14 @@ import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubePlaylistI
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamInfoItemExtractor
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamInfoItemLockupExtractor
 
-/** What one browse response holds: its items in page order and the token of the next page. */
-class FeedPage(val items: List<InfoItem>, val continuation: String?)
+/**
+ * What one browse response holds: its items in page order, the token of the next page, and where the
+ * account stopped in the videos it started, by video id.
+ */
+class FeedPage(val items: List<InfoItem>, val continuation: String?, val resume: Map<String, ResumeMark> = emptyMap())
+
+/** The account's place in a video as a list shows it: the second it resumes at and the red bar's percent (either may be missing). */
+data class ResumeMark(val startSeconds: Int, val percent: Int)
 
 /**
  * Reads InnerTube browse responses without trusting their layout: walks the whole content tree, hands
@@ -44,6 +50,11 @@ object FeedParser {
     fun page(response: JsonObject, timeAgoParser: TimeAgoParser?): FeedPage {
         val collector = MultiInfoItemsCollector(ServiceList.YouTube.serviceId)
         var continuation: String? = null
+        val resume = HashMap<String, ResumeMark>()
+
+        fun mark(id: String?, mark: ResumeMark) {
+            if (id != null && (mark.startSeconds > 0 || mark.percent > 0)) resume[id] = mark
+        }
 
         // One item the extractor cannot read must not cost the whole page.
         fun commit(key: String, extract: () -> InfoItemExtractor) {
@@ -62,9 +73,15 @@ object FeedParser {
                     val obj = value as? JsonObject
                     when {
                         obj == null -> walk(value)
-                        key in StreamRenderers -> commit(key) { YoutubeStreamInfoItemExtractor(obj, timeAgoParser) }
+                        key in StreamRenderers -> {
+                            commit(key) { YoutubeStreamInfoItemExtractor(obj, timeAgoParser) }
+                            mark(obj.getString("videoId"), rendererMark(obj))
+                        }
                         key == "lockupViewModel" -> when (obj.getString("contentType")) {
-                            "LOCKUP_CONTENT_TYPE_VIDEO" -> commit(key) { YoutubeStreamInfoItemLockupExtractor(obj, timeAgoParser) }
+                            "LOCKUP_CONTENT_TYPE_VIDEO" -> {
+                                commit(key) { YoutubeStreamInfoItemLockupExtractor(obj, timeAgoParser) }
+                                mark(obj.getString("contentId"), lockupMark(obj))
+                            }
                             "LOCKUP_CONTENT_TYPE_PLAYLIST", "LOCKUP_CONTENT_TYPE_PODCAST" ->
                                 commit(key) { YoutubeMixOrPlaylistLockupInfoItemExtractor(obj) }
                         }
@@ -79,8 +96,20 @@ object FeedParser {
         }
 
         ContentRoots.forEach { walk(response[it]) }
-        return FeedPage(collector.items, continuation)
+        return FeedPage(collector.items, continuation, resume)
     }
+
+    // Older renderers: the tap resumes through the watch endpoint, the thumbnail has a resume overlay.
+    private fun rendererMark(renderer: JsonObject) = ResumeMark(
+        startSeconds = renderer.getObject("navigationEndpoint").getObject("watchEndpoint").getInt("startTimeSeconds", 0),
+        percent = findFirst(renderer["thumbnailOverlays"], "thumbnailOverlayResumePlaybackRenderer")?.getInt("percentDurationWatched", 0) ?: 0,
+    )
+
+    // Lockups: the same two, under the tap command and the thumbnail's progress bar view model.
+    private fun lockupMark(lockup: JsonObject) = ResumeMark(
+        startSeconds = findFirst(lockup["rendererContext"], "watchEndpoint")?.getInt("startTimeSeconds", 0) ?: 0,
+        percent = findFirst(lockup["contentImage"], "thumbnailOverlayProgressBarViewModel")?.getInt("startPercent", 0) ?: 0,
+    )
 
     /** The title YouTube gives a playlist page (`VL…`), or null. */
     fun playlistTitle(response: JsonObject): String? =

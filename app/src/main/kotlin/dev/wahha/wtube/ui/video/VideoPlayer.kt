@@ -95,6 +95,7 @@ import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import coil3.compose.AsyncImage
 import dev.wahha.wtube.R
+import dev.wahha.wtube.ui.glass.CapsuleShape
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.formatClock
 import dev.wahha.wtube.player.Autoplay
@@ -123,6 +124,8 @@ private const val HINT_MS = 1_200L
 
 /** A finger drag across the whole width seeks this far (or the whole video, if shorter). */
 private const val SEEK_DRAG_SPAN_MS = 120_000L
+// The player plays a stream some 15 s behind its newest segment; within this it counts as live.
+private const val LIVE_EDGE_MS = 30_000L
 private const val BOOST_SPEED = 2f
 
 /** Consecutive double taps on one side add up: "+10 с", "+20 с"... */
@@ -310,7 +313,7 @@ fun VideoPlayer(
                                 if (total.getDistance() > viewConfiguration.touchSlop) {
                                     val horizontal = abs(total.x) > abs(total.y)
                                     mode = when {
-                                        horizontal && state.duration > 0 && !player.isCurrentMediaItemLive -> DragMode.Seek
+                                        horizontal && state.duration > 0 && player.isCurrentMediaItemSeekable -> DragMode.Seek
                                         !horizontal && fullscreen && down.position.x < size.width / 3f && window != null -> DragMode.Brightness
                                         !horizontal && fullscreen && down.position.x > size.width * 2f / 3f -> DragMode.Volume
                                         else -> return@awaitEachGesture
@@ -646,12 +649,19 @@ private fun Controls(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val shown = scrub?.let { (it * state.duration).toLong() } ?: state.position
-                Text(formatClock(shown), style = MaterialTheme.typography.labelSmall, color = colors.onSurface)
-                Text(
-                    " / " + formatClock(state.duration),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurface.copy(alpha = 0.7f),
-                )
+                if (state.live) {
+                    LiveBadge(behindMs = state.duration - shown, onGoLive = {
+                        player.seekToDefaultPosition()
+                        onInteraction()
+                    })
+                } else {
+                    Text(formatClock(shown), style = MaterialTheme.typography.labelSmall, color = colors.onSurface)
+                    Text(
+                        " / " + formatClock(state.duration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurface.copy(alpha = 0.7f),
+                    )
+                }
                 Text(
                     chapterAt(chapters, shown)?.let { stringResource(R.string.meta_separator) + it.title }.orEmpty(),
                     style = MaterialTheme.typography.bodySmall,
@@ -682,6 +692,28 @@ private fun Controls(
                 modifier = Modifier.padding(end = 12.dp),
             )
             if (fullscreen) fullscreenActions()
+        }
+    }
+}
+
+/**
+ * "Live" for a stream, as in YouTube: the dot is red at the live edge; behind it, how far behind, and a
+ * tap jumps back to the edge.
+ */
+@Composable
+private fun LiveBadge(behindMs: Long, onGoLive: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val atEdge = behindMs < LIVE_EDGE_MS
+    Row(
+        Modifier.clip(CapsuleShape).clickable(enabled = !atEdge, onClickLabel = stringResource(R.string.player_go_live), onClick = onGoLive)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (atEdge) colors.error else colors.outline))
+        Text(stringResource(R.string.live), style = MaterialTheme.typography.labelSmall, color = colors.onSurface)
+        if (!atEdge) {
+            Text("−" + formatClock(behindMs), style = MaterialTheme.typography.bodySmall, color = colors.onSurface.copy(alpha = 0.7f))
         }
     }
 }

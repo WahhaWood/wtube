@@ -14,9 +14,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
-/** [finished] once the video was played to (near) its end; rewatching does not take it back. */
+/**
+ * [finished] once the video was played to (near) its end; rewatching does not take it back. [positionAt]
+ * is when [positionMs] was saved (0 in entries from before 0.12).
+ */
 @Serializable
-data class HistoryEntry(val video: VideoItem, val watchedAt: Long, val positionMs: Long = 0, val finished: Boolean = false)
+data class HistoryEntry(
+    val video: VideoItem,
+    val watchedAt: Long,
+    val positionMs: Long = 0,
+    val finished: Boolean = false,
+    val positionAt: Long = 0,
+)
 
 /**
  * Local watch history with resume positions, newest first, in one small JSON file. Account history
@@ -54,15 +63,16 @@ object History {
 
     private fun recordNow(video: VideoItem) = change { list ->
         val before = list.firstOrNull { it.video.id == video.id }
-        (listOf(HistoryEntry(video, System.currentTimeMillis(), before?.positionMs ?: 0, before?.finished ?: false)) + list.filter { it.video.id != video.id })
+        (listOf(HistoryEntry(video, System.currentTimeMillis(), before?.positionMs ?: 0, before?.finished ?: false, before?.positionAt ?: 0)) + list.filter { it.video.id != video.id })
             .take(MAX_ENTRIES)
     }
 
     fun savePosition(id: String, positionMs: Long, finished: Boolean = false) = change { list ->
-        list.map { if (it.video.id == id) it.copy(positionMs = positionMs, finished = it.finished || finished) else it }
+        val now = System.currentTimeMillis()
+        list.map { if (it.video.id == id) it.copy(positionMs = positionMs, finished = it.finished || finished, positionAt = now) else it }
     }
 
-    fun positionOf(id: String): Long = state.value.firstOrNull { it.video.id == id }?.positionMs ?: 0
+    fun entryOf(id: String): HistoryEntry? = state.value.firstOrNull { it.video.id == id }
 
     fun clear() = change { emptyList() }
 

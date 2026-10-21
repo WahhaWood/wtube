@@ -37,6 +37,7 @@ import dev.wahha.wtube.MainActivity
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.WatchProgress
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.qualityCap
@@ -371,7 +372,7 @@ private class SubtitleRenderersFactory(context: Context) : DefaultRenderersFacto
 /** Saved position to resume [videoId] from, or [C.TIME_UNSET] to start at the beginning. */
 fun resumePosition(videoId: String): Long {
     if (!Settings.current.value.resumePlayback) return C.TIME_UNSET
-    return History.positionOf(videoId).let { if (it > PlayerConnection.RESUME_MIN_MS) it else C.TIME_UNSET }
+    return WatchProgress.resumeMs(videoId).let { if (it > PlayerConnection.RESUME_MIN_MS) it else C.TIME_UNSET }
 }
 
 /** googlevideo answers 403 (sometimes 410) once a stream link has expired or no longer matches the session. */

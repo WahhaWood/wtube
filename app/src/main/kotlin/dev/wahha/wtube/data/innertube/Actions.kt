@@ -22,7 +22,7 @@ object Actions {
     /** The account's view of [videoId]: its rating, subscription and comments token; signed out, only the token. */
     suspend fun watch(videoId: String, session: Session? = Account.active): Watch {
         val watch = WatchParser.watch(InnerTube.next(session, videoId = videoId))
-        return if (session == null) Watch(state = null, commentsToken = watch.commentsToken, heatmap = watch.heatmap) else watch
+        return if (session == null) Watch(state = null, commentsToken = watch.commentsToken, heatmap = watch.heatmap, chat = watch.chat) else watch
     }
 
     suspend fun rate(videoId: String, status: LikeStatus) {

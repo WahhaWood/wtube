@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -60,6 +61,7 @@ import dev.wahha.wtube.ui.components.VideoBadge
 import dev.wahha.wtube.ui.components.shareVideo
 import dev.wahha.wtube.ui.components.videoMeta
 import dev.wahha.wtube.ui.icon.Comment
+import dev.wahha.wtube.ui.icon.Forum
 import dev.wahha.wtube.ui.icon.PlaylistAdd
 import dev.wahha.wtube.ui.icon.Share
 import dev.wahha.wtube.ui.icon.ThumbDown
@@ -67,8 +69,8 @@ import dev.wahha.wtube.ui.icon.ThumbUp
 import dev.wahha.wtube.ui.icon.VideoLibrary
 import dev.wahha.wtube.ui.icon.WIcons
 
-/** What slides over the fullscreen video: comments on the right, or a shelf of more videos at the bottom. */
-enum class FullscreenPanel { Comments, MoreVideos }
+/** What slides over the fullscreen video: comments or the live chat on the right, or a shelf of more videos at the bottom. */
+enum class FullscreenPanel { Comments, Chat, MoreVideos }
 
 private val PanelShape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
 private val UprightPanelShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
@@ -97,6 +99,7 @@ internal fun FullscreenActions(vm: VideoViewModel, onPanel: (FullscreenPanel) ->
             if (details.likes >= 0) ActionPill(WIcons.ThumbUp, formatCompact(details.likes), onClick = null)
             if (vm.dislikes >= 0) ActionPill(WIcons.ThumbDown, formatCompact(vm.dislikes), onClick = null)
         }
+        if (vm.chat != null) ActionPill(WIcons.Forum, stringResource(R.string.chat_title)) { onPanel(FullscreenPanel.Chat) }
         ActionPill(WIcons.Comment, stringResource(R.string.video_comments)) { onPanel(FullscreenPanel.Comments) }
         if (state != null) ActionPill(WIcons.PlaylistAdd, stringResource(R.string.video_save)) { saving = true }
         ActionPill(WIcons.Share, stringResource(R.string.video_share)) { shareVideo(context, video) }
@@ -119,22 +122,24 @@ internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, onPan
         ) {
             MoreVideosShelf(vm, onClose = { onPanel(null) })
         }
-        AnimatedVisibility(
-            visible = panel == FullscreenPanel.Comments,
-            enter = if (upright) slideInVertically { it } else slideInHorizontally { it },
-            exit = if (upright) slideOutVertically { it } else slideOutHorizontally { it },
-            modifier = Modifier.align(if (upright) Alignment.BottomCenter else Alignment.CenterEnd),
-        ) {
-            CommentsPanel(
-                vm,
-                onSeek,
-                onClose = { onPanel(null) },
-                modifier = if (upright) {
-                    Modifier.fillMaxWidth().fillMaxHeight(0.65f).clip(UprightPanelShape)
+        val sideModifier = if (upright) {
+            Modifier.fillMaxWidth().fillMaxHeight(0.65f).clip(UprightPanelShape)
+        } else {
+            Modifier.fillMaxHeight().fillMaxWidth(0.45f).clip(PanelShape)
+        }
+        for (side in listOf(FullscreenPanel.Comments, FullscreenPanel.Chat)) {
+            AnimatedVisibility(
+                visible = panel == side,
+                enter = if (upright) slideInVertically { it } else slideInHorizontally { it },
+                exit = if (upright) slideOutVertically { it } else slideOutHorizontally { it },
+                modifier = Modifier.align(if (upright) Alignment.BottomCenter else Alignment.CenterEnd),
+            ) {
+                if (side == FullscreenPanel.Comments) {
+                    CommentsPanel(vm, onSeek, onClose = { onPanel(null) }, modifier = sideModifier)
                 } else {
-                    Modifier.fillMaxHeight().fillMaxWidth(0.45f).clip(PanelShape)
-                },
-            )
+                    ChatPanel(vm, onClose = { onPanel(null) }, modifier = sideModifier)
+                }
+            }
         }
     }
 }
@@ -155,6 +160,22 @@ private fun CommentsPanel(vm: VideoViewModel, onSeek: (Long) -> Unit, onClose: (
     ) {
         CommentsContent(vm, comments, onLink, listModifier = Modifier.weight(1f), onClose = onClose)
     }
+}
+
+/** The live chat over the fullscreen video. */
+@Composable
+private fun ChatPanel(vm: VideoViewModel, onClose: () -> Unit, modifier: Modifier) {
+    val chat = vm.chat ?: return
+    ChatContent(
+        chat,
+        onClose,
+        modifier
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .pointerInput(Unit) { }
+            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
+            .imePadding()
+            .padding(top = 8.dp),
+    )
 }
 
 /** YouTube's "more videos" shelf: related videos in a row at the bottom; a tap or a swipe down elsewhere closes it. */

@@ -7,7 +7,12 @@ import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube.toItems
 import dev.wahha.wtube.data.account.Cookies
 import dev.wahha.wtube.data.innertube.Channels
+import dev.wahha.wtube.data.innertube.ChatAction
+import dev.wahha.wtube.data.innertube.ChatRole
+import dev.wahha.wtube.data.innertube.ChatRun
 import dev.wahha.wtube.data.innertube.FeedParser
+import dev.wahha.wtube.data.innertube.LiveChatParser
+import dev.wahha.wtube.data.innertube.ResumeMark
 import dev.wahha.wtube.data.innertube.LikeStatus
 import dev.wahha.wtube.data.innertube.PlaylistOption
 import dev.wahha.wtube.data.innertube.VideoState
@@ -219,6 +224,56 @@ class InnerTubeTest {
         assertEquals(LocalDate.of(2015, 3, 18), about.joined)
         assertEquals("Франция", about.country)
         assertEquals(ChannelLinkView("Discord", "https://discord.com/invite/hUKvJnw"), about.links.first().let { ChannelLinkView(it.title, it.url) })
+    }
+
+    @Test
+    fun liveChatParsesMessagesModesAndNextPoll() {
+        val page = LiveChatParser.page(fixture("live_chat.json"))
+        val messages = page.actions.filterIsInstance<ChatAction.Add>().map { it.message }
+        assertTrue(messages.size >= 10)
+        assertTrue(messages.all { it.author.startsWith("@viewer") && it.id.isNotEmpty() && it.offsetMs == -1L })
+        assertTrue(messages.any { m -> m.runs.any { it is ChatRun.Emoji && it.text.isNotEmpty() } })
+        assertTrue(messages.any { it.role == ChatRole.OWNER })
+        assertTrue(page.actions.any { it is ChatAction.Remove })
+        assertNotNull(page.continuation)
+        assertEquals(10_000L, page.waitMs)
+        assertEquals(listOf("Top chat", "Live chat"), page.modes.map { it.title })
+        assertTrue(page.modes.first().selected)
+        // Signed out the input panel is only "Sign in to chat".
+        assertNull(page.input)
+    }
+
+    @Test
+    fun chatReplayCarriesOffsetsAndSeekToken() {
+        val page = LiveChatParser.page(fixture("live_chat_replay.json"))
+        val offsets = page.actions.filterIsInstance<ChatAction.Add>().map { it.message.offsetMs }
+        assertTrue(offsets.size >= 10)
+        assertTrue(offsets.all { it >= 0 })
+        assertEquals(offsets.sorted(), offsets)
+        assertNotNull(page.continuation)
+        assertNotNull(page.seekToken)
+    }
+
+    @Test
+    fun accountResumeMarksComeFromBothItemShapes() {
+        val response = JsonParser.`object`().from(
+            """
+            {"contents": {"items": [
+              {"videoRenderer": {"videoId": "aaaaaaaaaaa",
+                "navigationEndpoint": {"watchEndpoint": {"videoId": "aaaaaaaaaaa", "startTimeSeconds": 754}},
+                "thumbnailOverlays": [{"thumbnailOverlayResumePlaybackRenderer": {"percentDurationWatched": 40}}]}},
+              {"lockupViewModel": {"contentId": "bbbbbbbbbbb", "contentType": "LOCKUP_CONTENT_TYPE_VIDEO",
+                "contentImage": {"thumbnailViewModel": {"overlays": [{"thumbnailBottomOverlayViewModel": {"progressBar":
+                  {"thumbnailOverlayProgressBarViewModel": {"startPercent": 100}}}}]}},
+                "rendererContext": {"commandContext": {"onTap": {"innertubeCommand": {"watchEndpoint": {"videoId": "bbbbbbbbbbb"}}}}}}},
+              {"videoRenderer": {"videoId": "ccccccccccc", "navigationEndpoint": {"watchEndpoint": {"videoId": "ccccccccccc"}}}}
+            ]}}
+            """,
+        )
+        val marks = FeedParser.page(response, timeAgo).resume
+        assertEquals(ResumeMark(754, 40), marks["aaaaaaaaaaa"])
+        assertEquals(ResumeMark(0, 100), marks["bbbbbbbbbbb"])
+        assertFalse("ccccccccccc" in marks)
     }
 
     private data class ChannelLinkView(val title: String, val url: String)

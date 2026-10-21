@@ -5,6 +5,7 @@ import dev.wahha.wtube.data.ItemsPage
 import dev.wahha.wtube.data.PlaylistDetails
 import dev.wahha.wtube.data.PlaylistItem
 import dev.wahha.wtube.data.VideoItem
+import dev.wahha.wtube.data.WatchProgress
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.YouTube.toItems
 import dev.wahha.wtube.data.account.Account
@@ -50,7 +51,9 @@ object Feeds {
     /** The items of a browse response and the cursor of its next page. */
     internal fun itemsPage(response: JsonObject): ItemsPage {
         val parsed = FeedParser.page(response, timeAgoParser())
-        return ItemsPage(parsed.items.toItems(), parsed.continuation?.let { Page(CURSOR, it) })
+        val items = parsed.items.toItems()
+        WatchProgress.record(parsed.resume, items)
+        return ItemsPage(items, parsed.continuation?.let { Page(CURSOR, it) })
     }
 
     /** The account's playlists, without Watch later and Liked: the Library lists those on their own. */
@@ -65,6 +68,7 @@ object Feeds {
         val response = InnerTube.browse(session, browseId = "VL$id")
         val parsed = FeedParser.page(response, timeAgoParser())
         val items = parsed.items.toItems()
+        WatchProgress.record(parsed.resume, items)
         return PlaylistDetails(
             url = url,
             name = FeedParser.playlistTitle(response).orEmpty(),

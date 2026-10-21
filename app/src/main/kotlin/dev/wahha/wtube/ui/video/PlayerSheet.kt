@@ -31,6 +31,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -323,6 +327,16 @@ fun PlayerSheet(
     val videoFills = fullscreen || inPictureInPicture
     val miniMode by remember { derivedStateOf { sheet.progress > 0.5f } }
     val showMini = miniMode && !inPictureInPicture
+    // The chat polls only while it can be seen: on the page or beside the fullscreen video, with the app in front.
+    val chat = vm.chat
+    val chatVisible = (!miniMode || fullscreen) && !inPictureInPicture
+    val currentPlayer by rememberUpdatedState(player)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    if (chat != null && chatVisible) {
+        LaunchedEffect(chat, lifecycle) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { chat.follow { currentPlayer?.currentPosition ?: 0 } }
+        }
+    }
     val controlsShown by remember { derivedStateOf { sheet.progress == 0f && sheet.launch == 0f } }
     val density = LocalDensity.current
     val statusBar = WindowInsets.statusBars.getTop(density)

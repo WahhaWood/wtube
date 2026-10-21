@@ -100,6 +100,8 @@ class PlayerConnection(context: Context) {
 /** Remembers how far the current video got; near the end counts as finished, so it starts over next time. */
 fun Player.saveProgress() {
     val id = currentMediaItem?.mediaId ?: return
+    // A place in a live stream's moving window means nothing the next time.
+    if (isCurrentMediaItemLive) return
     val duration = duration
     val position = currentPosition
     if (duration == C.TIME_UNSET || duration <= 0) return
@@ -146,6 +148,10 @@ class PlayerState(private val player: Player) : Player.Listener {
     var videoSize by mutableStateOf(VideoSize.UNKNOWN)
         private set
 
+    /** A live stream: [duration] is then its DVR window and [position] the place in it. */
+    var live by mutableStateOf(false)
+        private set
+
     init {
         sync()
     }
@@ -169,6 +175,7 @@ class PlayerState(private val player: Player) : Player.Listener {
         parameters = player.trackSelectionParameters
         cues = player.currentCues.cues
         videoSize = player.videoSize
+        live = player.isCurrentMediaItemLive
         tick()
     }
 
