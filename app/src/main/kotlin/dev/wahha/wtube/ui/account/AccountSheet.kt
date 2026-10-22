@@ -40,6 +40,7 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Identity
 import dev.wahha.wtube.data.account.Session
+import dev.wahha.wtube.data.account.SignInException
 import dev.wahha.wtube.data.innertube.InnerTube
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.LocalNavigator
@@ -82,6 +83,7 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     // Null: list not asked for; empty while it loads.
     var identities by remember { mutableStateOf<List<Identity>?>(null) }
+    // The list loading or a switch under way: one request at a time.
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<Int?>(null) }
 
@@ -125,10 +127,22 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
             identities?.forEach { identity ->
                 val current = identity.authUser == session.authUser && identity.pageId == session.pageId
                 Row(
-                    Modifier.fillMaxWidth().clickable(enabled = !current) {
+                    Modifier.fillMaxWidth().clickable(enabled = !current && !loading) {
+                        loading = true
+                        error = null
                         scope.launch {
-                            Account.switchTo(identity)
-                            onDismiss()
+                            try {
+                                Account.switchTo(identity)
+                                onDismiss()
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: SignInException) {
+                                error = R.string.account_switch_failed
+                            } catch (e: Exception) {
+                                error = errorMessage(e)
+                            } finally {
+                                loading = false
+                            }
                         }
                     }.padding(start = 56.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,

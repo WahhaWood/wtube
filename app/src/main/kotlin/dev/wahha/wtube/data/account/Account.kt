@@ -93,14 +93,17 @@ object Account {
         save(candidate.copy(name = me.name, handle = me.byline, avatar = me.avatar))
     }
 
-    /** Acts as [identity] from now on: another account of the same browser session or a brand channel. */
-    suspend fun switchTo(identity: Identity) {
+    /**
+     * Acts as [identity] from now on: another account of the same browser session or a brand channel.
+     * Saved only once the account menu answered for it (that also gives its handle); throws otherwise and
+     * the old identity stays. An answer that comes after the session changed meanwhile is dropped.
+     */
+    suspend fun switchTo(identity: Identity, whoAmI: suspend (Session) -> Identity? = InnerTube::whoAmI) {
         val current = state.value ?: return
-        save(current.copy(authUser = identity.authUser, pageId = identity.pageId, name = identity.name, avatar = identity.avatar, handle = null))
-        // The handle comes only from the account menu; fill it in for the new identity.
-        InnerTube.whoAmI(state.value ?: return)?.let { me ->
-            state.value?.let { save(it.copy(handle = me.byline, avatar = me.avatar ?: it.avatar)) }
-        }
+        val candidate = current.copy(authUser = identity.authUser, pageId = identity.pageId, name = identity.name, avatar = identity.avatar, handle = null)
+        val me = whoAmI(candidate) ?: throw SignInException()
+        if (state.value != current) return
+        save(candidate.copy(handle = me.byline, avatar = me.avatar ?: identity.avatar))
     }
 
     suspend fun signOut() = save(null)

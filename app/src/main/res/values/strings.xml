@@ -148,6 +148,7 @@
     <string name="account_sign_in_again">Войти снова</string>
     <string name="account_sign_out">Выйти</string>
     <string name="account_switch">Сменить аккаунт</string>
+    <string name="account_switch_failed">YouTube не переключил на этот аккаунт. Попробуйте ещё раз.</string>
     <string name="account_expired">Сессия YouTube истекла</string>
     <string name="account_expired_body">Главная и подписки снова локальные. Войдите заново, чтобы вернуть ленты аккаунта.</string>
     <string name="login_title">Вход в Google</string>

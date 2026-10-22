@@ -67,6 +67,7 @@ import dev.wahha.wtube.ui.icon.History
 import dev.wahha.wtube.ui.icon.ThumbUp
 import dev.wahha.wtube.ui.icon.WIcons
 import dev.wahha.wtube.ui.icon.WatchLater
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 private val CardWidth = 160.dp
@@ -74,19 +75,25 @@ private val CardCorner = 12.dp
 private val CardShape = RoundedCornerShape(CardCorner)
 
 /** The account's playlists for the Library row; loaded once per account, when the tab is opened. */
-class LibraryViewModel : ViewModel() {
+class LibraryViewModel(
+    private val loadPlaylists: suspend () -> List<PlaylistItem> = { Feeds.playlists().items.filterIsInstance<PlaylistItem>() },
+) : ViewModel() {
     var playlists by mutableStateOf<List<PlaylistItem>>(emptyList())
         private set
     private var loadedFor: Any? = null
+    private var job: Job? = null
 
     fun sync(session: Session?) {
         val key = session?.takeUnless { it.expired }?.let { listOf(it.cookie, it.authUser, it.pageId) }
         if (key == loadedFor) return
         loadedFor = key
+        job?.cancel()
         playlists = emptyList()
         if (key == null) return
-        viewModelScope.launch {
-            playlists = runCatching { Feeds.playlists().items.filterIsInstance<PlaylistItem>() }.getOrDefault(emptyList())
+        job = viewModelScope.launch {
+            val loaded = runCatching { loadPlaylists() }.getOrDefault(emptyList())
+            // Switched or signed out while it loaded: the answer belongs to the previous account.
+            if (loadedFor == key) playlists = loaded
         }
     }
 }

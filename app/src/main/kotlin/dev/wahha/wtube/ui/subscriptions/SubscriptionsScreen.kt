@@ -47,6 +47,7 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.ChannelItem
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Item
+import dev.wahha.wtube.data.ItemsPage
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.account.Account
@@ -69,36 +70,46 @@ import dev.wahha.wtube.ui.icon.ChevronRight
 import dev.wahha.wtube.ui.icon.Subscriptions
 import dev.wahha.wtube.ui.icon.WIcons
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.schabi.newpipe.extractor.Page
 
 /** New videos from subscribed channels, with the channels themselves in a row above. */
-class SubscriptionsViewModel : ViewModel() {
-    val videos = PagedList(viewModelScope, Item::url) { page -> Feeds.feed(Feeds.SUBSCRIPTIONS, page) }
+class SubscriptionsViewModel(
+    private val feed: suspend (browseId: String, page: Page?) -> ItemsPage = Feeds::feed,
+) : ViewModel() {
+    val videos = PagedList(viewModelScope, Item::url) { page -> feed(Feeds.SUBSCRIPTIONS, page) }
 
     var channels by mutableStateOf<List<ChannelItem>>(emptyList())
         private set
 
     private var loadedFor: Any? = null
+    private var channelsJob: Job? = null
 
     fun sync(session: Session?) {
         val key = session?.takeUnless { it.expired }?.let { listOf(it.cookie, it.authUser, it.pageId) }
         if (key == loadedFor) return
         loadedFor = key
+        channelsJob?.cancel()
         if (key != null) reload()
     }
 
     fun reload(pullToRefresh: Boolean = false) {
         videos.refresh(pullToRefresh)
-        viewModelScope.launch {
+        val key = loadedFor
+        channelsJob?.cancel()
+        channelsJob = viewModelScope.launch {
             // The row is extra: without it the feed still works.
-            channels = try {
-                Feeds.feed(Feeds.CHANNELS).items.filterIsInstance<ChannelItem>()
+            val loaded = try {
+                feed(Feeds.CHANNELS, null).items.filterIsInstance<ChannelItem>()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("Subscriptions", "Channel list failed (${e.javaClass.simpleName})")
                 emptyList()
             }
+            // Switched or signed out while it loaded: the answer belongs to the previous account.
+            if (loadedFor == key) channels = loaded
         }
     }
 }
