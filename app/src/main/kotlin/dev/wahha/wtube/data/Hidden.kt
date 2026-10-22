@@ -1,17 +1,11 @@
 package dev.wahha.wtube.data
 
 import android.content.Context
-import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.io.File
 
 @Serializable
@@ -39,20 +33,14 @@ private fun channelKey(url: String) = url.substringAfter("youtube.com").trimEnd(
  */
 object Hidden {
     private const val MAX_VIDEOS = 300
-    private val json = Json { ignoreUnknownKeys = true }
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow(HiddenItems())
-    private var file: File? = null
+    private val disk = JsonFile("Hidden", HiddenItems.serializer()) { state.value }
 
     val items: StateFlow<HiddenItems> = state.asStateFlow()
 
     fun init(context: Context) {
-        val f = File(context.filesDir, "hidden.json").also { file = it }
-        scope.launch {
-            val fromFile = runCatching { if (f.exists()) json.decodeFromString<HiddenItems>(f.readText()) else HiddenItems() }
-                .onFailure { Log.e("Hidden", "Unreadable hidden list, starting fresh", it) }
-                .getOrDefault(HiddenItems())
-            state.update { current -> merge(current, fromFile) }
+        disk.load(File(context.filesDir, "hidden.json")) { fromFile ->
+            state.update { current -> merge(current, fromFile ?: HiddenItems()) }
         }
     }
 
@@ -75,14 +63,6 @@ object Hidden {
 
     private fun change(transform: (HiddenItems) -> HiddenItems) {
         state.update(transform)
-        val snapshot = state.value
-        val f = file ?: return
-        scope.launch {
-            runCatching {
-                val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(json.encodeToString(snapshot))
-                tmp.renameTo(f)
-            }.onFailure { Log.e("Hidden", "Could not save hidden list", it) }
-        }
+        disk.save()
     }
 }

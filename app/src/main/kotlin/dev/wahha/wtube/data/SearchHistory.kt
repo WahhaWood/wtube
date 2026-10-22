@@ -1,34 +1,25 @@
 package dev.wahha.wtube.data
 
 import android.content.Context
-import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import java.io.File
 
 /** Past search queries, newest first, in a small JSON file next to [History]; kept only while history is on. */
 object SearchHistory {
     private const val MAX_ENTRIES = 50
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow<List<String>>(emptyList())
-    private var file: File? = null
+    private val disk = JsonFile("SearchHistory", ListSerializer(String.serializer())) { state.value }
 
     val queries: StateFlow<List<String>> = state.asStateFlow()
 
     fun init(context: Context) {
-        val f = File(context.filesDir, "search_history.json").also { file = it }
-        scope.launch {
-            val fromFile = runCatching { if (f.exists()) Json.decodeFromString<List<String>>(f.readText()) else emptyList() }
-                .onFailure { Log.e("SearchHistory", "Unreadable search history, starting fresh", it) }
-                .getOrDefault(emptyList())
-            state.update { current -> (current + fromFile).distinctBy { it.lowercase() } }
+        disk.load(File(context.filesDir, "search_history.json")) { fromFile ->
+            state.update { current -> (current + fromFile.orEmpty()).distinctBy { it.lowercase() } }
         }
     }
 
@@ -53,14 +44,6 @@ object SearchHistory {
 
     private fun change(transform: (List<String>) -> List<String>) {
         state.update(transform)
-        val snapshot = state.value
-        val f = file ?: return
-        scope.launch {
-            runCatching {
-                val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(Json.encodeToString(snapshot))
-                tmp.renameTo(f)
-            }.onFailure { Log.e("SearchHistory", "Could not save search history", it) }
-        }
+        disk.save()
     }
 }

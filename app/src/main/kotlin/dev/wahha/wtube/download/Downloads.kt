@@ -5,6 +5,7 @@ import android.os.Environment
 import android.util.Log
 import androidx.core.content.ContextCompat
 import android.content.Intent
+import dev.wahha.wtube.data.JsonFile
 import dev.wahha.wtube.data.VideoItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 
 enum class DownloadState { QUEUED, RUNNING, DONE, FAILED }
@@ -49,23 +50,20 @@ data class Download(
  * [DownloadService] does the fetching; this object is only the list.
  */
 object Downloads {
-    private val json = Json { ignoreUnknownKeys = true }
+    private const val PROGRESS_SAVE_MS = 5_000L
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow<List<Download>>(emptyList())
-    private var file: File? = null
+    private val disk = JsonFile("Downloads", ListSerializer(Download.serializer())) { state.value }
     private var app: Context? = null
+    @Volatile private var progressSavedAt = 0L
 
     val entries: StateFlow<List<Download>> = state.asStateFlow()
 
     fun init(context: Context) {
         app = context.applicationContext
-        val f = File(context.filesDir, "downloads.json").also { file = it }
-        scope.launch {
-            val fromFile = runCatching { if (f.exists()) json.decodeFromString<List<Download>>(f.readText()) else emptyList() }
-                .onFailure { Log.e("Downloads", "Unreadable download list, starting fresh", it) }
-                .getOrDefault(emptyList())
+        disk.load(File(context.filesDir, "downloads.json")) { fromFile ->
             // A download that was running when the process died goes back to the queue and resumes.
-            state.update { current -> (current + fromFile.map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it }).distinctBy { it.key } }
+            state.update { current -> (current + fromFile.orEmpty().map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it }).distinctBy { it.key } }
             resume()
         }
     }
@@ -130,6 +128,19 @@ object Downloads {
 
     internal fun update(key: String, transform: (Download) -> Download) = change { list -> list.map { if (it.key == key) transform(it) else it } }
 
+    /**
+     * Moves the progress bar at once but reaches the disk at most every [PROGRESS_SAVE_MS]: after a restart
+     * the parts on disk say where to resume, the saved count only fills the bar until the first chunk.
+     */
+    internal fun progress(key: String, bytes: Long) {
+        state.update { list -> list.map { if (it.key == key) it.copy(bytes = bytes) else it } }
+        val now = System.currentTimeMillis()
+        if (now - progressSavedAt >= PROGRESS_SAVE_MS) {
+            progressSavedAt = now
+            disk.save()
+        }
+    }
+
     /** The finished file and the parts it is made from while downloading. */
     internal fun partsOf(download: Download): List<File> = File(download.file).let { listOf(it, File("${it.path}.video"), File("${it.path}.audio")) }
 
@@ -145,14 +156,6 @@ object Downloads {
 
     private fun change(transform: (List<Download>) -> List<Download>) {
         state.update(transform)
-        val snapshot = state.value
-        val f = file ?: return
-        scope.launch {
-            runCatching {
-                val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(json.encodeToString(snapshot))
-                tmp.renameTo(f)
-            }.onFailure { Log.e("Downloads", "Could not save the download list", it) }
-        }
+        disk.save()
     }
 }

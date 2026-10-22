@@ -1,17 +1,12 @@
 package dev.wahha.wtube.data
 
 import android.content.Context
-import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 
 /**
@@ -33,10 +28,8 @@ data class HistoryEntry(
  */
 object History {
     private const val MAX_ENTRIES = 300
-    private val json = Json { ignoreUnknownKeys = true }
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow<List<HistoryEntry>>(emptyList())
-    private var file: File? = null
+    private val disk = JsonFile("History", ListSerializer(HistoryEntry.serializer())) { state.value }
 
     val entries: StateFlow<List<HistoryEntry>> = state.asStateFlow()
 
@@ -46,13 +39,9 @@ object History {
     val loaded: StateFlow<Boolean> = loadedState.asStateFlow()
 
     fun init(context: Context) {
-        val f = File(context.filesDir, "history.json").also { file = it }
-        scope.launch {
-            val fromFile = runCatching { if (f.exists()) json.decodeFromString<List<HistoryEntry>>(f.readText()) else emptyList() }
-                .onFailure { Log.e("History", "Unreadable history, starting fresh", it) }
-                .getOrDefault(emptyList())
+        disk.load(File(context.filesDir, "history.json")) { fromFile ->
             // Entries recorded before the file finished loading go on top.
-            state.update { current -> (current + fromFile).distinctBy { it.video.id } }
+            state.update { current -> (current + fromFile.orEmpty()).distinctBy { it.video.id } }
             loadedState.value = true
         }
     }
@@ -81,14 +70,6 @@ object History {
 
     private fun change(transform: (List<HistoryEntry>) -> List<HistoryEntry>) {
         state.update(transform)
-        val snapshot = state.value
-        val f = file ?: return
-        scope.launch {
-            runCatching {
-                val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(json.encodeToString(snapshot))
-                tmp.renameTo(f)
-            }.onFailure { Log.e("History", "Could not save history", it) }
-        }
+        disk.save()
     }
 }

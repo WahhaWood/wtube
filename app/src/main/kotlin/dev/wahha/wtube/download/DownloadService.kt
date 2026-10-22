@@ -157,7 +157,7 @@ class DownloadService : Service() {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (Downloads.find(download.key) == null) throw CancellationException("Download removed")
         }) { position ->
-            Downloads.update(download.key) { it.copy(bytes = offset + position) }
+            Downloads.progress(download.key, offset + position)
             notify(download, total, offset + position, muxing = false)
         }
     }
