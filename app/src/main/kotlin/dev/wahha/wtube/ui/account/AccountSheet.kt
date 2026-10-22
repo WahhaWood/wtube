@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -22,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.data.History
+import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Identity
 import dev.wahha.wtube.data.account.Session
@@ -86,6 +92,7 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
     // The list loading or a switch under way: one request at a time.
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<Int?>(null) }
+    var confirmSignOut by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
@@ -156,15 +163,50 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
                     if (current) Icon(WIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            SheetRow(WIcons.Logout, stringResource(R.string.account_sign_out), Modifier.testTag("sign_out")) {
-                scope.launch {
-                    Account.signOut()
-                    clearWebSession()
-                    onDismiss()
+            SheetRow(WIcons.Logout, stringResource(R.string.account_sign_out), Modifier.testTag("sign_out")) { confirmSignOut = true }
+        }
+    }
+    if (confirmSignOut) {
+        SignOutDialog(onDismiss = { confirmSignOut = false }) { clearLocal ->
+            confirmSignOut = false
+            scope.launch {
+                Account.signOut()
+                clearWebSession()
+                // The device's own data stays by default: the app is personal, the history is the user's, not the account's.
+                if (clearLocal) {
+                    History.clear()
+                    SearchHistory.clear()
+                    Hidden.clear()
                 }
+                onDismiss()
             }
         }
     }
+}
+
+@Composable
+private fun SignOutDialog(onDismiss: () -> Unit, onSignOut: (clearLocal: Boolean) -> Unit) {
+    var clearLocal by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.account_sign_out_confirm)) },
+        text = {
+            Row(
+                Modifier.fillMaxWidth().clickable { clearLocal = !clearLocal },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Checkbox(checked = clearLocal, onCheckedChange = null)
+                Text(stringResource(R.string.account_sign_out_clear), style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSignOut(clearLocal) }, modifier = Modifier.testTag("confirm_sign_out")) {
+                Text(stringResource(R.string.account_sign_out))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) } },
+    )
 }
 
 @Composable

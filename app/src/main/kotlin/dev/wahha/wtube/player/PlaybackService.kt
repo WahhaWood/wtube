@@ -31,6 +31,7 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -360,12 +361,23 @@ class PlaybackService : MediaSessionService() {
     }
 
     private inner class Callback : MediaSession.Callback {
-        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
-            MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
-                .setAvailableSessionCommands(
-                    MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(StatsCommand).build(),
-                )
+        // The app itself, its notification, SystemUI (lock screen, quick settings) and Bluetooth hold
+        // MEDIA_CONTENT_CONTROL and get everything. Any other app may only play and pause: it does not
+        // learn what is playing, and cannot start videos.
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            if (controller.isTrusted || controller.packageName == packageName) {
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                    .setAvailableSessionCommands(
+                        MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(StatsCommand).build(),
+                    )
+                    .build()
+            }
+            Log.i(TAG, "Limited media controller: ${controller.packageName}")
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                .setAvailableSessionCommands(SessionCommands.EMPTY)
+                .setAvailablePlayerCommands(Player.Commands.Builder().addAll(Player.COMMAND_PLAY_PAUSE, Player.COMMAND_STOP).build())
                 .build()
+        }
 
         override fun onCustomCommand(
             session: MediaSession,

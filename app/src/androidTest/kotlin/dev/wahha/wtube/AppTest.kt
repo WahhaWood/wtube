@@ -13,6 +13,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -26,8 +27,11 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.VideoItem
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,6 +67,26 @@ class AppTest {
         compose.waitUntilExactlyOneExists(hasText("Подписки появятся после входа"), UI_TIMEOUT)
         compose.onNodeWithText("Главная").performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag("home_feed"), UI_TIMEOUT)
+    }
+
+    /** "Clear" on the history page asks first; only the confirm button empties the history. */
+    @Test
+    fun clearingHistoryAsksFirst() {
+        History.record(VideoItem("jNQXAC9IVRw", "Me at the zoo", null, "jawed", null, null, duration = 19, views = -1, uploaded = null, isLive = false))
+        try {
+            launch()
+            compose.onNodeWithText("Библиотека").performClick()
+            compose.waitUntilAtLeastOneExists(hasText("Все"), UI_TIMEOUT)
+            compose.onAllNodesWithText("Все")[0].performClick()
+            compose.waitUntilExactlyOneExists(hasText("Очистить"), UI_TIMEOUT)
+            compose.onNodeWithText("Очистить").performClick()
+            compose.waitUntilExactlyOneExists(hasTestTag("confirm_clear_history"), UI_TIMEOUT)
+            assertTrue(History.entries.value.isNotEmpty())
+            compose.onNodeWithTag("confirm_clear_history").performClick()
+            compose.waitUntil(UI_TIMEOUT) { History.entries.value.isEmpty() }
+        } finally {
+            History.clear()
+        }
     }
 
     @Test

@@ -53,6 +53,8 @@ object Hidden {
 
     fun showChannel(url: String) = change { it.copy(channels = it.channels.filterNot { c -> channelKey(c.url) == channelKey(url) }) }
 
+    fun clear() = change { HiddenItems() }
+
     /** Everything at once (a restored backup). */
     fun replace(items: HiddenItems) = change { merge(items, HiddenItems()) }
 

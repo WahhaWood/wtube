@@ -129,6 +129,7 @@
 
     <string name="library_history">История</string>
     <string name="library_history_clear">Очистить</string>
+    <string name="library_history_clear_confirm">Удалить всю историю просмотра? Рекомендации на главной начнутся заново.</string>
     <string name="library_history_empty">Здесь появятся видео, которые вы посмотрите</string>
 
     <string name="subscriptions_title">Подписки появятся после входа</string>
@@ -147,6 +148,8 @@
     <string name="account_sign_in">Войти</string>
     <string name="account_sign_in_again">Войти снова</string>
     <string name="account_sign_out">Выйти</string>
+    <string name="account_sign_out_confirm">Выйти из аккаунта?</string>
+    <string name="account_sign_out_clear">Очистить историю, поиск и скрытое на этом устройстве</string>
     <string name="account_switch">Сменить аккаунт</string>
     <string name="account_switch_failed">YouTube не переключил на этот аккаунт. Попробуйте ещё раз.</string>
     <string name="account_expired">Сессия YouTube истекла</string>
