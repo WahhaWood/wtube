@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.provider.Settings as SystemSettings
 import android.view.OrientationEventListener
 import android.view.View
+import android.view.WindowManager
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.areSystemBarsVisible
@@ -81,13 +82,17 @@ internal fun ImmersiveDialog() {
     }
 }
 
-/** Keeps the screen awake while [on], as the YouTube app does while a video plays. */
+/**
+ * Keeps the screen awake while [on], as the YouTube app does while a video plays. Through the window
+ * flag, not View.keepScreenOn: a view's flag reaches the window only on its next layout pass, and on a
+ * still screen (a video ended in fullscreen) there is none, so the screen stayed on all night.
+ */
 @Composable
 internal fun KeepScreenOn(on: Boolean) {
-    val view = LocalView.current
-    DisposableEffect(view, on) {
-        view.keepScreenOn = on
-        onDispose { view.keepScreenOn = false }
+    val window = (LocalContext.current as? Activity)?.window ?: return
+    DisposableEffect(window, on) {
+        if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 }
 

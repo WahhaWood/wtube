@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.core.app.NotificationManagerCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
@@ -28,6 +29,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.text.TextRenderer
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -121,12 +123,22 @@ class PlaybackService : MediaSessionService() {
 
     // Wi-Fi ↔ mobile switches move the quality cap mid-video.
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        // Only a real comeback resumes: capabilities also change with every bit of signal strength, and
+        // retrying a dead stream on each of those could keep the phone busy all night on a weak network.
+        private var offline = false
+
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
             val online = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            val cameBack = online && offline
+            offline = !online
             scope.launch {
                 applyTrackPreferences()
-                if (online) resumeAfterOutage()
+                if (cameBack) resumeAfterOutage()
             }
+        }
+
+        override fun onLost(network: Network) {
+            offline = true
         }
     }
 
@@ -291,11 +303,19 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    // Swiping the app away from recents closes it for good: playback stops and the notification goes, as
+    // the user expects of "closed". Home or the power button keep playing in the background.
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = session?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0 || player.playbackState == Player.STATE_ENDED) {
-            stopSelf()
+        session?.player?.saveProgress()
+        pauseAllPlayersAndStopSelf()
+        // The system kills the process right after the task goes, often before onDestroy: release the
+        // session now, or its notification stays behind without an app.
+        session?.run {
+            player.release()
+            release()
         }
+        session = null
+        NotificationManagerCompat.from(this).cancel(DefaultMediaNotificationProvider.DEFAULT_NOTIFICATION_ID)
     }
 
     override fun onDestroy() {

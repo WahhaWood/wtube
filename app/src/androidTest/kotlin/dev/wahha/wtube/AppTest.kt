@@ -3,6 +3,7 @@ package dev.wahha.wtube
 import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -29,11 +30,13 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.VideoItem
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -179,7 +182,9 @@ class AppTest {
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
         launchVideo()
         val video = compose.onNodeWithTag("video_player")
-        video.performTouchInput { click(center) }
+        if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
+            video.performTouchInput { click(Offset(width * 0.1f, centerY)) }
+        }
         compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
         compose.onNodeWithContentDescription("Во весь экран").performClick()
         compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
@@ -187,6 +192,29 @@ class AppTest {
         video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.2f), durationMillis = 300) }
         compose.waitForIdle()
         assertEquals(before, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+    }
+
+    /** A video that ends in fullscreen lets the screen sleep: the window manager must drop KEEP_SCREEN_ON. */
+    @Test
+    fun endedVideoInFullscreenLetsScreenSleep() {
+        launchVideo()
+        // Off-centre: the controls may be up already, and the centre is the pause button.
+        if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
+            compose.onNodeWithTag("video_player").performTouchInput { click(Offset(width * 0.1f, centerY)) }
+        }
+        compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
+        compose.onNodeWithContentDescription("Во весь экран").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
+        // "Me at the zoo" is 19 s long.
+        compose.waitUntil(LOAD_TIMEOUT) { playerState() == "ended" }
+        val deadline = System.currentTimeMillis() + UI_TIMEOUT
+        while (keepScreenOnInWindowManager() && System.currentTimeMillis() < deadline) Thread.sleep(250)
+        assertFalse("KEEP_SCREEN_ON still set after the video ended", keepScreenOnInWindowManager())
+    }
+
+    private fun keepScreenOnInWindowManager(): Boolean {
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("dumpsys window windows")
+        return ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }.contains("KEEP_SCREEN_ON")
     }
 
     private fun launchVideo() {
