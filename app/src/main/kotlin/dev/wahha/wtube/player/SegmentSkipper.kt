@@ -27,6 +27,7 @@ class SegmentSkipper(private val context: Context, private val scope: CoroutineS
     private var tick: Job? = null
     private var previous = -1L
     private var muted = false
+    private var volumeBeforeMute = 1f
 
     init {
         scope.launch {
@@ -83,7 +84,8 @@ class SegmentSkipper(private val context: Context, private val scope: CoroutineS
     private fun setMuted(mute: Boolean) {
         if (mute == muted) return
         muted = mute
-        player.volume = if (mute) 0f else 1f
+        if (mute) volumeBeforeMute = player.volume
+        player.volume = if (mute) 0f else volumeBeforeMute
     }
 
     private companion object {

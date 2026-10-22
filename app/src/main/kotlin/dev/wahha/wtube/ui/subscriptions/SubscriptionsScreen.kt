@@ -6,13 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -65,6 +61,8 @@ import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.ScreenHeader
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.AccountCircle
 import dev.wahha.wtube.ui.icon.ChevronRight
 import dev.wahha.wtube.ui.icon.Subscriptions
@@ -140,8 +138,8 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("subscriptions_feed"),
             contentPadding = PaddingValues(
-                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+                top = systemTop(),
+                bottom = systemBottom() + LocalBottomInset.current,
             ),
         ) {
             item(key = "header") { ScreenHeader(stringResource(R.string.tab_subscriptions)) }

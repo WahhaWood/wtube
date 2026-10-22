@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.MediaFormat as StreamFormat
@@ -38,6 +39,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.VideoStream
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -98,19 +100,45 @@ class DownloadService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * Android 15 gives a data-sync service a time budget. At its end: stop cleanly, leave the unfinished
+     * download queued (its parts on disk are resumed) and offer to continue from a notification.
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        scope.coroutineContext.cancelChildren()
+        running = false
+        Downloads.pauseRunning()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        val resume = PendingIntent.getForegroundService(
+            this, 1, Intent(this, DownloadService::class.java), PendingIntent.FLAG_IMMUTABLE,
+        )
+        notifications.notify(
+            NOTIFICATION_ID + 1,
+            NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(R.drawable.ic_launcher_monochrome)
+                .setContentTitle(getString(R.string.downloads_title))
+                .setContentText(getString(R.string.downloads_paused))
+                .setAutoCancel(true)
+                .setContentIntent(resume)
+                .addAction(0, getString(R.string.downloads_continue), resume)
+                .build(),
+        )
+        stopSelf()
+    }
+
     private suspend fun work() {
         while (true) {
             val download = Downloads.next() ?: break
             try {
-                Downloads.update(download.key) { it.copy(state = DownloadState.RUNNING, error = null) }
+                Downloads.update(download) { it.copy(state = DownloadState.RUNNING, error = null) }
                 fetch(download)
-                Downloads.update(download.key) { it.copy(state = DownloadState.DONE, bytes = it.total) }
+                Downloads.update(download) { it.copy(state = DownloadState.DONE, bytes = it.total) }
             } catch (e: CancellationException) {
-                // Removed from the list meanwhile: nothing to report.
-                if (Downloads.find(download.key) != null) throw e
+                // Removed or queued again meanwhile: nothing to report, the queue goes on.
+                if (Downloads.isCurrent(download)) throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Download failed: ${errorDetail(e)}")
-                Downloads.update(download.key) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
+                Downloads.update(download) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
             }
         }
         running = false
@@ -127,7 +155,7 @@ class DownloadService : Service() {
             val audio = bestAudio(info) ?: throw IOException("No AAC sound for this video")
             val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw IOException("No H.264 stream")
             val total = length(audio) + (video?.let(::length) ?: 0)
-            Downloads.update(download.key) { it.copy(total = total, quality = video?.height ?: it.quality) }
+            Downloads.update(download) { it.copy(total = total, quality = video?.height ?: it.quality) }
             try {
                 video?.let { part(download, it.content, length(it), videoPart, offset = 0, total) }
                 part(download, audio.content, length(audio), audioPart, offset = video?.let(::length) ?: 0, total)
@@ -155,48 +183,11 @@ class DownloadService : Service() {
     private suspend fun part(download: Download, url: String, length: Long, target: File, offset: Long, total: Long) {
         downloadRange(Http.client, url, length, target, CHUNK_BYTES, YoutubeRequests::rangeRequest, ensureAlive = {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            if (Downloads.find(download.key) == null) throw CancellationException("Download removed")
+            if (!Downloads.isCurrent(download)) throw CancellationException("Download removed")
         }) { position ->
-            Downloads.progress(download.key, offset + position)
+            Downloads.progress(download, offset + position)
             notify(download, total, offset + position, muxing = false)
         }
-    }
-
-    /** Copies the samples of the picture and sound files into one MP4, as they are: no re-encoding. */
-    private fun mux(video: File, audio: File, out: File) {
-        val tmp = File(out.path + ".tmp")
-        val muxer = MediaMuxer(tmp.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val sources = listOf(video, audio).map { file -> MediaExtractor().apply { setDataSource(file.path) } }
-        try {
-            val tracks = sources.map { extractor ->
-                extractor.selectTrack(0)
-                muxer.addTrack(extractor.getTrackFormat(0))
-            }
-            val maxSample = sources.maxOf { ex ->
-                ex.getTrackFormat(0).let { if (it.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) it.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 0 }
-            }
-            val buffer = ByteBuffer.allocate(maxOf(maxSample, 4 * 1024 * 1024))
-            val info = MediaCodec.BufferInfo()
-            muxer.start()
-            sources.forEachIndexed { index, extractor ->
-                while (true) {
-                    val size = extractor.readSampleData(buffer, 0)
-                    if (size < 0) break
-                    val key = extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0
-                    info.set(0, size, extractor.sampleTime, if (key) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
-                    muxer.writeSampleData(tracks[index], buffer, info)
-                    extractor.advance()
-                }
-            }
-            muxer.stop()
-        } catch (e: Exception) {
-            tmp.delete()
-            throw e
-        } finally {
-            sources.forEach { it.release() }
-            muxer.release()
-        }
-        if (!tmp.renameTo(out)) throw IOException("Could not move the finished file")
     }
 
     private fun notify(download: Download, total: Long, bytes: Long, muxing: Boolean) {
@@ -242,13 +233,52 @@ class DownloadService : Service() {
     }
 }
 
+/** Copies the samples of the picture and sound files into one MP4, as they are: no re-encoding. */
+internal fun mux(video: File, audio: File, out: File) {
+    val tmp = File(out.path + ".tmp")
+    val muxer = MediaMuxer(tmp.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    val sources = listOf(video, audio).map { file -> MediaExtractor().apply { setDataSource(file.path) } }
+    try {
+        val tracks = sources.map { extractor ->
+            extractor.selectTrack(0)
+            muxer.addTrack(extractor.getTrackFormat(0))
+        }
+        val maxSample = sources.maxOf { ex ->
+            ex.getTrackFormat(0).let { if (it.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) it.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 0 }
+        }
+        val buffer = ByteBuffer.allocate(maxOf(maxSample, 4 * 1024 * 1024))
+        val info = MediaCodec.BufferInfo()
+        muxer.start()
+        // Picture and sound interleaved by time, the earlier sample first: players read the file front to back.
+        while (true) {
+            val index = sources.indices.filter { sources[it].sampleTime >= 0 }.minByOrNull { sources[it].sampleTime } ?: break
+            val extractor = sources[index]
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            val key = extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0
+            info.set(0, size, extractor.sampleTime, if (key) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+            muxer.writeSampleData(tracks[index], buffer, info)
+            extractor.advance()
+        }
+        muxer.stop()
+    } catch (e: Exception) {
+        tmp.delete()
+        throw e
+    } finally {
+        sources.forEach { it.release() }
+        muxer.release()
+    }
+    if (!tmp.renameTo(out)) throw IOException("Could not move the finished file")
+}
+
 /** The stream URL is no longer accepted (googlevideo answered 403). */
 internal class ExpiredException : IOException("Stream URL expired")
 
 /**
  * Appends bytes of [url] to [target] until it holds [length] of them, in requests of up to [chunk] bytes,
  * continuing from what [target] already holds. [onProgress] gets the size after each request; [ensureAlive]
- * throws to stop. A longer [target] is a stale leftover and is started over.
+ * throws to stop. A longer [target] is a stale leftover and is started over. An answer that does not
+ * start at the asked position (a server ignoring the range) is skipped into place or refused, never appended.
  */
 internal suspend fun downloadRange(
     client: OkHttpClient,
@@ -270,7 +300,9 @@ internal suspend fun downloadRange(
             client.newCall(request(url, position, end)).execute().use { response ->
                 if (response.code == 403) throw ExpiredException()
                 if (!response.isSuccessful) throw IOException("googlevideo: HTTP ${response.code}")
-                val body = response.body.byteStream()
+                val source = response.body.source()
+                source.skip(bytesBefore(response, position, end - position, length))
+                val body = source.inputStream()
                 val buffer = ByteArray(64 * 1024)
                 while (got < end - position) {
                     val read = body.read(buffer, 0, minOf(buffer.size.toLong(), end - position - got).toInt())
@@ -285,5 +317,26 @@ internal suspend fun downloadRange(
             position += got
             onProgress(position)
         }
+    }
+}
+
+/**
+ * How many leading bytes of [response] lie before [position]. googlevideo takes the range as a query
+ * parameter and answers 200 with just the [wanted] bytes; a 206 must say it starts at [position]; a 200
+ * of the whole [length] means the range was ignored. Anything else would put wrong bytes into the part.
+ */
+private fun bytesBefore(response: Response, position: Long, wanted: Long, length: Long): Long {
+    if (response.code == 206) {
+        val range = response.header("Content-Range")
+        val start = range?.let { Regex("""bytes (\d+)-""").find(it)?.groupValues?.get(1)?.toLongOrNull() }
+        if (start != position) throw IOException("googlevideo: Content-Range $range for a range from $position")
+        return 0
+    }
+    val size = response.body.contentLength()
+    return when {
+        size == wanted || size == 0L -> 0
+        size == length -> position
+        size == -1L && position == 0L -> 0
+        else -> throw IOException("googlevideo: $size bytes for a range of $wanted")
     }
 }

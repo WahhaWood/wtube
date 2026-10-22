@@ -2,12 +2,8 @@ package dev.wahha.wtube.ui.feed
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,6 +32,8 @@ import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.ui.components.PagedList
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.ArrowBack
 import dev.wahha.wtube.ui.icon.History
 import dev.wahha.wtube.ui.icon.WIcons
@@ -69,8 +67,8 @@ fun FeedScreen(browseId: String) {
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+            top = systemTop(),
+            bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
         item(key = "header") {

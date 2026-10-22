@@ -41,6 +41,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -258,7 +260,8 @@ private fun LiquidGlassTab(tab: GlassTab, selected: Boolean, width: Dp, onClick:
             .width(width)
             .fillMaxHeight()
             .clip(CapsuleShape)
-            .clickable(interactionSource = null, indication = null, role = Role.Tab, onClick = onClick),
+            .clickable(interactionSource = null, indication = null, role = Role.Tab, onClick = onClick)
+            .semantics { this.selected = selected },
         verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

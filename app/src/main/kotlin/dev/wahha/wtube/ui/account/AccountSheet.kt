@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,7 +72,8 @@ fun AccountButton() {
         if (current?.avatar == null) {
             Icon(WIcons.AccountCircle, contentDescription = stringResource(R.string.account), tint = MaterialTheme.colorScheme.onSurface)
         } else {
-            Box {
+            val label = stringResource(R.string.account)
+            Box(Modifier.semantics { contentDescription = label }) {
                 Avatar(current.avatar, 28.dp)
                 if (current.expired) {
                     Box(Modifier.align(Alignment.TopEnd).size(9.dp).background(MaterialTheme.colorScheme.error, CircleShape))

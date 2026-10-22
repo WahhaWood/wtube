@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -75,6 +76,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import dev.wahha.wtube.LocalPictureInPicture
+import dev.wahha.wtube.R
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.LocalPlayerConnection
@@ -331,6 +333,7 @@ fun PlayerSheet(
     val videoFills = fullscreen || inPictureInPicture
     val miniMode by remember { derivedStateOf { sheet.progress > 0.5f } }
     val showMini = miniMode && !inPictureInPicture
+    val sheetState = stringResource(if (sheet.expanded) R.string.sheet_expanded else R.string.sheet_collapsed)
     // The chat polls only while it can be seen: on the page or beside the fullscreen video, with the app in front.
     val chat = vm.chat
     val chatVisible = (!miniMode || fullscreen) && !inPictureInPicture
@@ -442,6 +445,7 @@ fun PlayerSheet(
                                 onNext = vm::playNext.takeIf { vm.hasNext },
                                 modifier = videoModifier,
                                 showControls = controlsShown && !inPictureInPicture && panel != FullscreenPanel.MoreVideos,
+                                loadFailed = vm.error != null,
                                 fullscreenActions = { FullscreenActions(vm, onPanel = { panel = it }) },
                             )
                         } else {
@@ -498,7 +502,7 @@ fun PlayerSheet(
                 .pointerInput(sheet) { miniPlayerDrags(sheet, onClose) }
                 .pointerInput(sheet) { detectTapGestures { if (sheet.progress > 0.5f) sheet.expand() } }
                 .testTag("player_sheet")
-                .semantics { stateDescription = if (sheet.expanded) "expanded" else "collapsed" },
+                .semantics { stateDescription = sheetState },
         ) { (glassLayer, background, info, video, mini), constraints ->
             val p = progress()
             val videoBox = geometry.video(p, videoFills).let { page ->

@@ -110,9 +110,40 @@ class DownloadRangeTest {
         try { run(); fail() } catch (e: IOException) { assertTrue(e.message!!.contains("503")) }
     }
 
-    @Test fun serverIgnoringTheRangeCannotOverfillThePart() {
+    @Test fun serverIgnoringTheRangeStillGivesTheRightBytes() {
         serve { _, _, _ -> MockResponse().setBody(okio.Buffer().write(data)) } // always the whole thing
         run(chunk = 4_000)
-        assertEquals(data.size.toLong(), target.length())
+        assertArrayEquals(data, target.readBytes())
+    }
+
+    @Test fun serverIgnoringTheRangeOnResumeStillGivesTheRightBytes() {
+        target.writeBytes(data.copyOf(5_000))
+        serve { _, _, _ -> MockResponse().setBody(okio.Buffer().write(data)) }
+        run()
+        assertArrayEquals(data, target.readBytes())
+    }
+
+    @Test fun partialAnswerFromTheWrongPlaceFails() {
+        target.writeBytes(data.copyOf(5_000))
+        serve { _, to, _ ->
+            slice(0, to - 5_000).setResponseCode(206).setHeader("Content-Range", "bytes 0-${to - 5_001}/${data.size}")
+        }
+        try { run(); fail() } catch (e: IOException) { assertTrue(e.message!!, e.message!!.contains("Content-Range")) }
+        assertArrayEquals(data.copyOf(5_000), target.readBytes())
+    }
+
+    @Test fun partialAnswerFromTheRightPlaceIsTaken() {
+        serve { from, to, _ ->
+            slice(from, to).setResponseCode(206).setHeader("Content-Range", "bytes $from-${to - 1}/${data.size}")
+        }
+        run()
+        assertArrayEquals(data, target.readBytes())
+    }
+
+    @Test fun answerOfAnUnexpectedSizeFails() {
+        target.writeBytes(data.copyOf(5_000))
+        serve { _, _, _ -> slice(0, 1_234) }
+        try { run(); fail() } catch (e: IOException) { assertTrue(e.message!!, e.message!!.contains("1234")) }
+        assertArrayEquals(data.copyOf(5_000), target.readBytes())
     }
 }

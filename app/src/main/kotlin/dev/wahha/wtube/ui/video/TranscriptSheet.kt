@@ -7,12 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +52,7 @@ import dev.wahha.wtube.data.TranscriptLine
 import dev.wahha.wtube.data.formatClock
 import dev.wahha.wtube.player.LocalPlayerState
 import dev.wahha.wtube.ui.components.ErrorState
+import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.icon.Close
 import dev.wahha.wtube.ui.icon.ExpandMore
 import dev.wahha.wtube.ui.icon.Search
@@ -147,7 +145,7 @@ private fun TranscriptList(lines: List<TranscriptLine>, query: String, positionM
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 56.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = systemBottom() + 56.dp),
         ) {
             itemsIndexed(shown) { index, line ->
                 TranscriptRow(line, current = !searching && index == current) {
@@ -160,7 +158,7 @@ private fun TranscriptList(lines: List<TranscriptLine>, query: String, positionM
             FilledTonalButton(
                 onClick = { follow = true },
                 modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 8.dp),
+                    .padding(bottom = systemBottom() + 8.dp),
             ) {
                 Text(stringResource(R.string.transcript_follow), color = LocalContentColor.current)
             }

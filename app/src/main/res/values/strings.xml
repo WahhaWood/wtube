@@ -92,6 +92,17 @@
     <string name="player_sleep_end_of_video">До конца видео</string>
     <string name="player_loop">Повтор видео</string>
     <string name="player_audio_only">Только звук</string>
+    <string name="player_state_playing">Воспроизводится</string>
+    <string name="player_state_paused">Пауза</string>
+    <string name="player_state_buffering">Загрузка</string>
+    <string name="player_state_ended">Видео закончилось</string>
+    <string name="player_state_error">Ошибка</string>
+    <string name="sheet_expanded">Развёрнут</string>
+    <string name="sheet_collapsed">Свёрнут</string>
+    <string name="switch_on">Вкл.</string>
+    <string name="switch_off">Выкл.</string>
+    <string name="player_seek_bar">Полоса перемотки</string>
+    <string name="player_seek_state">%1$s из %2$s</string>
     <string name="player_autoplay">Автовоспроизведение</string>
     <string name="player_stats">Статистика для сисадминов</string>
     <string name="player_stats_video">Видео</string>
@@ -222,6 +233,7 @@
     <string name="update_title">Доступна версия %1$s</string>
     <string name="update_download">Скачать</string>
     <string name="update_later">Позже</string>
+    <string name="settings_licenses">Лицензии</string>
     <string name="settings_version">Версия</string>
     <string name="settings_extractor">NewPipeExtractor</string>
 
@@ -302,6 +314,8 @@
     <string name="downloads_playlist_hint">Где такого качества нет, скачается лучшее из меньших. Уже скачанное пропускается.</string>
     <string name="downloads_playlist_queued">В очереди на скачивание: %1$s</string>
     <string name="downloads_playlist_nothing">Всё из списка уже скачано</string>
+    <string name="downloads_paused">Система остановила загрузку. Продолжить?</string>
+    <string name="downloads_continue">Продолжить</string>
     <string name="downloads_muxing">Склеиваем видео и звук…</string>
     <string name="queue_title">Очередь</string>
     <string name="queue_count">Очередь · %1$d</string>

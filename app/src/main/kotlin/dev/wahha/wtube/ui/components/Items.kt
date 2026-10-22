@@ -137,10 +137,10 @@ private val ThumbnailCorner = 12.dp
 private val ThumbnailShape = RoundedCornerShape(ThumbnailCorner)
 
 @Composable
-fun ItemView(item: Item, compact: Boolean = false, progress: Float = 0f) {
+fun ItemView(item: Item, compact: Boolean = false, progress: Float = 0f, recommended: Boolean = false) {
     val nav = LocalNavigator.current
     when (item) {
-        is VideoItem -> if (compact) VideoRow(item, progress) { nav.openVideo(item.id, it) } else VideoCard(item) { nav.openVideo(item.id, it) }
+        is VideoItem -> if (compact) VideoRow(item, progress, recommended) { nav.openVideo(item.id, it) } else VideoCard(item, recommended) { nav.openVideo(item.id, it) }
         is ChannelItem -> ChannelRow(item) { nav.openChannel(item.url) }
         is PlaylistItem -> PlaylistRow(item) { nav.openPlaylist(item.url) }
     }
@@ -148,7 +148,7 @@ fun ItemView(item: Item, compact: Boolean = false, progress: Float = 0f) {
 
 /** Full-width card for feeds: edge-to-edge thumbnail, then avatar, title and meta, like the YouTube app. */
 @Composable
-fun VideoCard(video: VideoItem, onClick: (VideoOrigin?) -> Unit) {
+fun VideoCard(video: VideoItem, recommended: Boolean = false, onClick: (VideoOrigin?) -> Unit) {
     val nav = LocalNavigator.current
     val anchor = remember { ThumbnailAnchor(0.dp) }
     Column(Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(bottom = 12.dp)) {
@@ -177,17 +177,17 @@ fun VideoCard(video: VideoItem, onClick: (VideoOrigin?) -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            VideoMenu(video, Modifier.offset(x = 8.dp, y = (-8).dp))
+            VideoMenu(video, recommended, Modifier.offset(x = 8.dp, y = (-8).dp))
         }
     }
 }
 
 /**
  * "⋮" on a video: the queue, the way to its channel, saving with an account, downloading, sharing, and
- * keeping it or its channel out of recommendations.
+ * and, where the list is a recommendation (the only place the filter applies), keeping it or its channel out of it.
  */
 @Composable
-fun VideoMenu(video: VideoItem, modifier: Modifier = Modifier) {
+fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modifier) {
     val nav = LocalNavigator.current
     val context = LocalContext.current
     // With nothing playing there is nothing to queue after: the video just starts.
@@ -276,7 +276,7 @@ fun VideoMenu(video: VideoItem, modifier: Modifier = Modifier) {
                     shareVideo(context, video)
                 },
             )
-            DropdownMenuItem(
+            if (recommended) DropdownMenuItem(
                 text = { Text(stringResource(R.string.item_not_interested)) },
                 leadingIcon = { Icon(WIcons.VisibilityOff, contentDescription = null) },
                 onClick = {
@@ -285,7 +285,7 @@ fun VideoMenu(video: VideoItem, modifier: Modifier = Modifier) {
                     Notices.show(R.string.hidden_video_done)
                 },
             )
-            video.channelUrl?.let { url ->
+            video.channelUrl?.takeIf { recommended }?.let { url ->
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.item_dont_recommend)) },
                     leadingIcon = { Icon(WIcons.Block, contentDescription = null) },
@@ -331,7 +331,7 @@ private fun BoxScope.WatchedBar(fraction: Float) {
 
 /** Dense row for related videos, playlists, channels and history. */
 @Composable
-fun VideoRow(video: VideoItem, progress: Float = 0f, onClick: (VideoOrigin?) -> Unit) {
+fun VideoRow(video: VideoItem, progress: Float = 0f, recommended: Boolean = false, onClick: (VideoOrigin?) -> Unit) {
     val anchor = remember { ThumbnailAnchor(ThumbnailCorner) }
     Row(
         Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -354,7 +354,7 @@ fun VideoRow(video: VideoItem, progress: Float = 0f, onClick: (VideoOrigin?) -> 
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        VideoMenu(video, Modifier.offset(x = 8.dp, y = (-6).dp))
+        VideoMenu(video, recommended, Modifier.offset(x = 8.dp, y = (-6).dp))
     }
 }
 

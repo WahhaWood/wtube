@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -77,6 +74,7 @@ import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.ui.components.PagedList
+import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.glass.CapsuleShape
 import dev.wahha.wtube.ui.icon.Close
 import dev.wahha.wtube.ui.icon.History
@@ -250,7 +248,7 @@ private fun Suggestions(
         Modifier.fillMaxSize().imePadding(),
         state = listState,
         contentPadding = PaddingValues(
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+            bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
         items(history, key = { "history_$it" }) { text ->
@@ -302,7 +300,7 @@ private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
     OnScrollEffect(listState, onScroll)
     LaunchedEffect(vm.submitted) { listState.scrollToItem(0) }
 
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current
+    val bottom = systemBottom() + LocalBottomInset.current
     when {
         vm.submitted == null -> MessageState(WIcons.Search, stringResource(R.string.search_start))
         results.initialLoading -> FeedSkeleton(Modifier.padding(top = 8.dp))
@@ -313,7 +311,7 @@ private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
             modifier = Modifier.fillMaxSize().testTag("search_results"),
             contentPadding = PaddingValues(top = 8.dp, bottom = bottom),
         ) {
-            items(results.items.filter(hidden::allows), key = { it.url }) { ItemView(it) }
+            items(results.items.filter(hidden::allows), key = { it.url }) { ItemView(it, recommended = true) }
             item(key = "footer") { ListFooter(results.loading, results.error, results::retry) }
             item { Spacer(Modifier.height(8.dp)) }
         }

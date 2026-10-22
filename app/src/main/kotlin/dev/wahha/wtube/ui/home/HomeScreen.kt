@@ -2,12 +2,8 @@ package dev.wahha.wtube.ui.home
 
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -55,6 +51,8 @@ import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.ScreenHeader
 import dev.wahha.wtube.ui.icon.Home
 import dev.wahha.wtube.ui.icon.WIcons
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 
 private const val MAX_SEEDS = 30
 
@@ -149,8 +147,8 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("home_feed"),
             contentPadding = PaddingValues(
-                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+                top = systemTop(),
+                bottom = systemBottom() + LocalBottomInset.current,
             ),
         ) {
             item(key = "header") { ScreenHeader(stringResource(R.string.app_name), leading = { LogoMark() }) }
@@ -168,7 +166,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 vm.hasSource == null || feed.initialLoading -> item(key = "skeleton") { FeedSkeleton() }
                 feed.items.isEmpty() && feed.error != null -> item(key = "error") { ErrorState(feed.error!!, feed::retry) }
                 else -> {
-                    items(feed.items.filter(hidden::allows), key = { it.url }) { ItemView(it) }
+                    items(feed.items.filter(hidden::allows), key = { it.url }) { ItemView(it, recommended = true) }
                     item(key = "footer") { ListFooter(feed.loading, feed.error, feed::retry) }
                 }
             }

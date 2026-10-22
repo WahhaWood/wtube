@@ -73,12 +73,18 @@ object Downloads {
         if (state.value.any { it.state == DownloadState.QUEUED }) startService()
     }
 
-    /** Queues [video] (or its sound) at [quality] and starts the service; an earlier copy is replaced. */
+    /**
+     * Queues [video] (or its sound) at [quality] and starts the service; an earlier copy is replaced. Its
+     * files are deleted before the new one is listed, so the service never resumes from the old parts.
+     */
     fun enqueue(video: VideoItem, audioOnly: Boolean, quality: Int) {
         val download = newDownload(video, audioOnly, quality, System.currentTimeMillis()) ?: return
-        remove(download.key)
-        change { listOf(download) + it }
-        startService()
+        change { list -> list.filterNot { it.key == download.key } }
+        scope.launch {
+            partsOf(download).forEach { it.delete() }
+            change { list -> listOf(download) + list.filterNot { it.key == download.key } }
+            startService()
+        }
     }
 
     /**
@@ -122,18 +128,26 @@ object Downloads {
         find(Download.key(videoId, audioOnly))?.takeIf { it.state == DownloadState.DONE && File(it.file).exists() }
 
     /** The queued download added first. */
+    /** Puts the running download back in the queue, parts kept: the service was stopped by the system. */
+    internal fun pauseRunning() = change { list -> list.map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it } }
+
     internal fun next(): Download? = state.value.filter { it.state == DownloadState.QUEUED }.minByOrNull { it.addedAt }
 
     internal fun find(key: String): Download? = state.value.firstOrNull { it.key == key }
 
-    internal fun update(key: String, transform: (Download) -> Download) = change { list -> list.map { if (it.key == key) transform(it) else it } }
+    /** Whether [download] is still listed, and not replaced by a newer copy of the same video. */
+    internal fun isCurrent(download: Download): Boolean = find(download.key)?.addedAt == download.addedAt
+
+    /** Changes [download] if it is still the listed one: a replaced download's late news is dropped. */
+    internal fun update(download: Download, transform: (Download) -> Download) =
+        change { list -> list.map { if (it.key == download.key && it.addedAt == download.addedAt) transform(it) else it } }
 
     /**
      * Moves the progress bar at once but reaches the disk at most every [PROGRESS_SAVE_MS]: after a restart
      * the parts on disk say where to resume, the saved count only fills the bar until the first chunk.
      */
-    internal fun progress(key: String, bytes: Long) {
-        state.update { list -> list.map { if (it.key == key) it.copy(bytes = bytes) else it } }
+    internal fun progress(download: Download, bytes: Long) {
+        state.update { list -> list.map { if (it.key == download.key && it.addedAt == download.addedAt) it.copy(bytes = bytes) else it } }
         val now = System.currentTimeMillis()
         if (now - progressSavedAt >= PROGRESS_SAVE_MS) {
             progressSavedAt = now

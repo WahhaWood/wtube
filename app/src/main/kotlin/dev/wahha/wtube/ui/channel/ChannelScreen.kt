@@ -39,14 +39,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -88,6 +84,8 @@ import dev.wahha.wtube.ui.components.SubscribeButton
 import dev.wahha.wtube.ui.components.VerifiedBadge
 import dev.wahha.wtube.ui.components.launchAction
 import dev.wahha.wtube.ui.components.subscribersText
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 
@@ -236,7 +234,7 @@ fun ChannelScreen(url: String) {
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+                    bottom = systemBottom() + LocalBottomInset.current,
                 ),
             ) {
                 item(key = "header") { Header(details, vm.subscribed, vm::subscribe) }
@@ -314,7 +312,7 @@ fun ChannelScreen(url: String) {
 
 @Composable
 private fun Header(details: ChannelDetails, subscribed: Boolean?, onSubscribe: (Boolean) -> Unit) {
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val top = systemTop()
     Column {
         if (details.banner != null) {
             AsyncImage(

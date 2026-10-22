@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.4.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.4.1)" variant="all" version="9.4.1">
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 36"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="19"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="AppBundleLocaleChanges"
+        message="Found dynamic locale changes, but did not find corresponding Play Core library calls for downloading languages and splitting by language is not disabled in the `bundle` configuration"
+        errorLine1="        applyOverrideConfiguration(Configuration().apply { setLocale(AppLocale) })"
+        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/MainActivity.kt"
+            line="63"
+            column="60"/>
+    </issue>
+
+    <issue
+        id="AppLinkWarning"
+        message="This intent filter has the format of an Android App Link but is missing the `autoVerify` attribute; add `android:autoVerify=&quot;true&quot;` to ensure your domain will be validated and enable App Link-related Lint warnings. If you do not want clicked URLs to bring the user to your app, remove the `android.intent.category.BROWSABLE` category, or set `android:autoVerify=&quot;false&quot;` to make it clear this is not intended to be an Android App Link."
+        errorLine1="            &lt;intent-filter>"
+        errorLine2="             ~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="30"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="AppLinkWarning"
+        message="This intent filter has the format of an Android App Link but is missing the `autoVerify` attribute; add `android:autoVerify=&quot;true&quot;` to ensure your domain will be validated and enable App Link-related Lint warnings. If you do not want clicked URLs to bring the user to your app, remove the `android.intent.category.BROWSABLE` category, or set `android:autoVerify=&quot;false&quot;` to make it clear this is not intended to be an Android App Link."
+        errorLine1="            &lt;intent-filter>"
+        errorLine2="             ~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="49"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="PictureInPictureIssue"
+        message="An activity in this app supports picture-in-picture and the targetSdkVersion is 31 or above; it is therefore strongly recommended to call both `setAutoEnterEnabled(true)` and `setSourceRectHint(...)`"
+        errorLine1="    &lt;application"
+        errorLine2="     ~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="11"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 9.8.1 is available: 9.8.2"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.1-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/projects/wtube/gradle/wrapper/gradle-wrapper.properties"
+            line="4"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.datastore:datastore-preferences than 1.2.1 is available: 1.3.0"
+        errorLine1="datastore = &quot;1.2.1&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="$HOME/projects/wtube/gradle/libs.versions.toml"
+            line="22"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-serialization-json than 1.11.0 is available: 1.12.0"
+        errorLine1="serialization = &quot;1.11.0&quot;"
+        errorLine2="                ~~~~~~~~">
+        <location
+            file="$HOME/projects/wtube/gradle/libs.versions.toml"
+            line="9"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.squareup.okhttp3:mockwebserver than 5.5.0 is available: 5.5.1"
+        errorLine1="okhttp = &quot;5.5.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="$HOME/projects/wtube/gradle/libs.versions.toml"
+            line="19"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.squareup.okhttp3:okhttp than 5.5.0 is available: 5.5.1"
+        errorLine1="okhttp = &quot;5.5.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="$HOME/projects/wtube/gradle/libs.versions.toml"
+            line="19"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.ExperimentalApi` or `@OptIn(markerClass = androidx.media3.common.util.ExperimentalApi.class)`"
+        errorLine1="        out.add(TextRenderer(output, outputLooper).apply { experimentalSetLegacyDecodingEnabled(true) })"
+        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/player/PlaybackService.kt"
+            line="451"
+            column="60"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    val qualityOverridden = parameters.overrides.keys.any { it.type == C.TRACK_TYPE_VIDEO }"
+        errorLine2="                                                               ~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/PlayerSettingsSheet.kt"
+            line="91"
+            column="64"/>
+    </issue>
+
+    <issue
+        id="ContextCastToActivity"
+        message="LocalContext should not be cast to Activity, use LocalActivity instead"
+        errorLine1="    val activity = LocalContext.current as? Activity ?: return"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/Fullscreen.kt"
+            line="46"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="ContextCastToActivity"
+        message="LocalContext should not be cast to Activity, use LocalActivity instead"
+        errorLine1="    val window = (LocalContext.current as? Activity)?.window ?: return"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/Fullscreen.kt"
+            line="92"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+        errorLine1="                error = context.getString(errorMessage(e)) + &quot;\n&quot; + reason"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/account/LoginScreen.kt"
+            line="96"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+        errorLine1="            events.collect { Toast.makeText(context, context.getString(it.text, it.arg), Toast.LENGTH_SHORT).show() }"
+        errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/components/Notices.kt"
+            line="27"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="LocalContextGetResourceValueCall"
+        message="Querying resource values using LocalContext.current is not configuration-aware and may return stale values if the Configuration changes"
+        errorLine1="    val kbps = { bits: Number -> context.getString(R.string.player_stats_kbps, (bits.toLong() / 1000).toInt()) }"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/PlayerOverlays.kt"
+            line="155"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be named modifier"
+        errorLine1="    listModifier: Modifier = Modifier,"
+        errorLine2="    ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/VideoExtras.kt"
+            line="186"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StateFlowValueCalledInComposition"
+        message="StateFlow.value should not be called within composition"
+        errorLine1="            SeekIcon(forward = burst.forward, seconds = Settings.current.value.doubleTapSeconds, size = 24.dp)"
+        errorLine2="                                                                         ~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/VideoPlayer.kt"
+            line="758"
+            column="74"/>
+    </issue>
+
+    <issue
+        id="ExportedService"
+        message="Exported service does not require permission"
+        errorLine1="        &lt;service"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="69"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="DataExtractionRules"
+        message="The attribute `android:allowBackup` is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute `android:dataExtractionRules` specifying an `@xml` resource which configures cloud backups and device transfers on Android 12 and higher."
+        errorLine1="        android:allowBackup=&quot;false&quot;"
+        errorLine2="                             ~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="13"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 26"
+        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/download/DownloadService.kt"
+            line="198"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `Downloads` which has field `app` pointing to `Context`); this is a memory leak"
+        errorLine1="/**"
+        errorLine2="^">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/download/Downloads.kt"
+            line="47"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields; this is a memory leak"
+        errorLine1="    private var app: Context? = null"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/download/Downloads.kt"
+            line="57"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.video_related` appears to be unused"
+        errorLine1="    &lt;string name=&quot;video_related&quot;>Похожие видео&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="43"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.video_description` appears to be unused"
+        errorLine1="    &lt;string name=&quot;video_description&quot;>Описание&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="44"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.video_open_youtube` appears to be unused"
+        errorLine1="    &lt;string name=&quot;video_open_youtube&quot;>Открыть в YouTube&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="46"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.player_up_next` appears to be unused"
+        errorLine1="    &lt;string name=&quot;player_up_next&quot;>Далее&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="105"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.library_youtube` appears to be unused"
+        errorLine1="    &lt;string name=&quot;library_youtube&quot;>YouTube&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="140"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.list_empty` appears to be unused"
+        errorLine1="    &lt;string name=&quot;list_empty&quot;>Здесь пока пусто&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="229"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.queue_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;queue_title&quot;>Очередь&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="308"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseOfNonLambdaOffsetOverload"
+        message="State backed values should use the lambda overload of Modifier.offset"
+        errorLine1="                Modifier.offset(x = knob).size(20.dp).clip(CircleShape).background(if (on) colors.onSurface else colors.onSurfaceVariant),"
+        errorLine2="                         ~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/VideoPlayer.kt"
+            line="707"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UseOfNonLambdaOffsetOverload"
+        message="State backed values should use the lambda overload of Modifier.offset"
+        errorLine1="                .offset(x = with(density) { (widthPx * fraction).toDp() } - thumb / 2)"
+        errorLine2="                 ~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/VideoPlayer.kt"
+            line="861"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.get` instead?"
+        errorLine1="        AndroidColor.colorToHSV(bitmap.getPixel(x, y), hsv)"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/theme/CoverAccent.kt"
+            line="65"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="    val uri = Uri.parse(url)"
+        errorLine2="              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/account/LoginScreen.kt"
+            line="164"
+            column="15"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        return item(details, Uri.parse(watchUrl(details.id)))"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/player/PlaybackService.kt"
+            line="344"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        prefs.edit().putLong(&quot;checked&quot;, now).apply()"
+        errorLine2="        ~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/data/Updates.kt"
+            line="42"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        state.value?.let { context.applicationContext.getSharedPreferences(&quot;updates&quot;, Context.MODE_PRIVATE).edit().putString(&quot;dismissed&quot;, it.version).apply() }"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/data/Updates.kt"
+            line="49"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val uri = Uri.parse(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/ui/video/VideoExtras.kt"
+            line="86"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))"
+        errorLine2="                                                                 ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/player/YoutubeMediaSourceFactory.kt"
+            line="113"
+            column="66"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            parser.parse(Uri.parse(stream.content), xml.byteInputStream())"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/player/YoutubeMediaSourceFactory.kt"
+            line="147"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            .setUri(Uri.parse(videoplaybackUrl(original, dataSpec.position, dataSpec.length, requestNumber.getAndIncrement())))"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/kotlin/dev/wahha/wtube/player/YoutubeRequests.kt"
+            line="31"
+            column="21"/>
+    </issue>
+
+</issues>

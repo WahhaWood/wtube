@@ -23,13 +23,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -65,6 +61,8 @@ import dev.wahha.wtube.ui.components.LoadMoreEffect
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.Thumbnail
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import kotlinx.coroutines.CancellationException
 
 class PlaylistViewModel(private val url: String) : ViewModel() {
@@ -101,21 +99,42 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
         list.refresh()
     }
 
-    /** Queues every video of the playlist for download, all pages of it, not only the ones scrolled to. */
+    /** Every video of the playlist, all pages of it (up to [MAX_VIDEOS]), not only the ones scrolled to. */
+    private suspend fun allVideos(): List<VideoItem> {
+        val first = details?.firstPage ?: return emptyList()
+        val items = first.items.toMutableList()
+        var next = first.next
+        while (next != null && items.size < MAX_VIDEOS) {
+            val page = if (Feeds.isCursor(next)) Feeds.more(next) else YouTube.playlistMore(url, next)
+            items += page.items
+            next = page.next
+        }
+        return items.filterIsInstance<VideoItem>()
+    }
+
+    /** Queues every video of the playlist for download. */
     fun download(audioOnly: Boolean, quality: Int) {
         viewModelScope.launch {
             try {
-                val first = details?.firstPage ?: return@launch
-                val items = first.items.toMutableList()
-                var next = first.next
-                while (next != null && items.size < MAX_DOWNLOAD) {
-                    val page = if (Feeds.isCursor(next)) Feeds.more(next) else YouTube.playlistMore(url, next)
-                    items += page.items
-                    next = page.next
-                }
-                val videos = items.filterIsInstance<VideoItem>().filter { !it.isLive && it.duration > 0 }
+                val videos = allVideos().filter { !it.isLive && it.duration > 0 }
                 val queued = Downloads.enqueueAll(videos, audioOnly, quality)
                 if (queued > 0) Notices.show(R.string.downloads_playlist_queued, queued.toString()) else Notices.show(R.string.downloads_playlist_nothing)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Notices.failed(e)
+            }
+        }
+    }
+
+    /** The whole playlist goes to the queue, the first video starts; [open] is called with it. */
+    fun playAll(shuffle: Boolean, open: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val videos = allVideos().let { if (shuffle) it.shuffled() else it }
+                val first = videos.firstOrNull() ?: return@launch
+                PlayQueue.replace(videos.drop(1))
+                open(first.id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -126,7 +145,7 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
 }
 
 // A safety cap: Watch later can hold thousands.
-private const val MAX_DOWNLOAD = 500
+private const val MAX_VIDEOS = 500
 
 @Composable
 fun PlaylistScreen(url: String) {
@@ -135,13 +154,7 @@ fun PlaylistScreen(url: String) {
     val details = vm.details
     val listState = rememberLazyListState()
     val nav = LocalNavigator.current
-    // What is loaded so far goes to the queue; the first video starts now.
-    fun playAll(shuffle: Boolean) {
-        val videos = list.items.filterIsInstance<VideoItem>().let { if (shuffle) it.shuffled() else it }
-        val first = videos.firstOrNull() ?: return
-        PlayQueue.replace(videos.drop(1))
-        nav.openVideo(first.id)
-    }
+    fun playAll(shuffle: Boolean) = vm.playAll(shuffle) { nav.openVideo(it) }
     var downloading by remember { mutableStateOf(false) }
     if (downloading) PlaylistDownloadSheet(onPick = vm::download, onDismiss = { downloading = false })
     LoadMoreEffect(listState) { list.loadMore() }
@@ -154,8 +167,8 @@ fun PlaylistScreen(url: String) {
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp,
-                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+                    top = systemTop() + 56.dp,
+                    bottom = systemBottom() + LocalBottomInset.current,
                 ),
             ) {
                 item(key = "header") {

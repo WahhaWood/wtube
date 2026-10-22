@@ -33,15 +33,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -112,6 +108,8 @@ import dev.wahha.wtube.ui.components.SubscribeButton
 import dev.wahha.wtube.ui.components.launchAction
 import dev.wahha.wtube.ui.icon.PlaylistAdd
 import dev.wahha.wtube.ui.icon.ThumbDown
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import org.schabi.newpipe.extractor.Page
@@ -448,7 +446,7 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
 internal fun AmbientGlow(thumbnail: String?) {
     if (thumbnail == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
     val background = MaterialTheme.colorScheme.background
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val top = systemTop()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val height = top + maxWidth * 9f / 16f + 240.dp
         Box(Modifier.fillMaxWidth().height(height)) {
@@ -496,7 +494,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
     if (transcriptOpen) TranscriptSheet(video.id, details.captions, onSeek, onDismiss = { transcriptOpen = false })
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp),
+        contentPadding = PaddingValues(bottom = systemBottom() + 16.dp),
     ) {
         item(key = "title") {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -578,7 +576,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
         }
         item(key = "comments") { CommentsPreview(comments, onOpen = { commentsOpen = true }) }
         item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
-        items(details.related.filter(hidden::allows), key = { "related_" + it.url }) { ItemView(it) }
+        items(details.related.filter(hidden::allows), key = { "related_" + it.url }) { ItemView(it, recommended = true) }
     }
 }
 

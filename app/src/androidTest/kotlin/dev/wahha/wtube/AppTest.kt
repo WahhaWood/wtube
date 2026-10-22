@@ -114,7 +114,7 @@ class AppTest {
 
         // Back tucks the video into the mini player; the watched video seeds the home feed under it.
         scenario?.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.waitUntil(UI_TIMEOUT) { sheetState() == "collapsed" }
+        compose.waitUntil(UI_TIMEOUT) { sheetState() == str(R.string.sheet_collapsed) }
         compose.waitUntil(LOAD_TIMEOUT) {
             compose.onAllNodesWithTag("home_feed").fetchSemanticsNodes().firstOrNull()?.children?.let { it.size > 3 } == true
         }
@@ -126,18 +126,18 @@ class AppTest {
         launchVideo()
 
         compose.onNodeWithTag("video_player").performTouchInput { swipeDown(startY = centerY, endY = centerY + 1200f, durationMillis = 250) }
-        compose.waitUntil(UI_TIMEOUT) { sheetState() == "collapsed" }
+        compose.waitUntil(UI_TIMEOUT) { sheetState() == str(R.string.sheet_collapsed) }
         compose.waitUntilExactlyOneExists(hasTestTag("mini_player"), UI_TIMEOUT)
-        compose.waitUntil(LOAD_TIMEOUT) { playerState() == "playing" }
+        compose.waitUntil(LOAD_TIMEOUT) { playerState() == str(R.string.player_state_playing) }
         // The page under the sheet is the one it was opened over.
         compose.waitUntilAtLeastOneExists(hasTestTag("home_feed"), UI_TIMEOUT)
 
         compose.onNodeWithTag("mini_player").performTouchInput { swipeUp(startY = centerY, endY = centerY - 900f, durationMillis = 250) }
-        compose.waitUntil(UI_TIMEOUT) { sheetState() == "expanded" }
+        compose.waitUntil(UI_TIMEOUT) { sheetState() == str(R.string.sheet_expanded) }
         compose.waitUntilDoesNotExist(hasTestTag("mini_player"), UI_TIMEOUT)
 
         scenario?.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.waitUntil(UI_TIMEOUT) { sheetState() == "collapsed" }
+        compose.waitUntil(UI_TIMEOUT) { sheetState() == str(R.string.sheet_collapsed) }
         compose.waitUntilExactlyOneExists(hasTestTag("mini_player"), UI_TIMEOUT)
         compose.onNodeWithTag("mini_player").performTouchInput { swipeLeft(startX = centerX, endX = centerX - 900f, durationMillis = 200) }
         compose.waitUntilDoesNotExist(hasTestTag("player_sheet"), UI_TIMEOUT)
@@ -206,7 +206,7 @@ class AppTest {
         compose.onNodeWithContentDescription("Во весь экран").performClick()
         compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
         // "Me at the zoo" is 19 s long.
-        compose.waitUntil(LOAD_TIMEOUT) { playerState() == "ended" }
+        compose.waitUntil(LOAD_TIMEOUT) { playerState() == str(R.string.player_state_ended) }
         val deadline = System.currentTimeMillis() + UI_TIMEOUT
         while (keepScreenOnInWindowManager() && System.currentTimeMillis() < deadline) Thread.sleep(250)
         assertFalse("KEEP_SCREEN_ON still set after the video ended", keepScreenOnInWindowManager())
@@ -222,9 +222,11 @@ class AppTest {
             ApplicationProvider.getApplicationContext<android.content.Context>().packageName,
         ))
         compose.waitUntilExactlyOneExists(hasText("Me at the zoo"), LOAD_TIMEOUT)
-        compose.waitUntil(LOAD_TIMEOUT) { playerState() == "playing" }
-        compose.waitUntil(UI_TIMEOUT) { sheetState() == "expanded" }
+        compose.waitUntil(LOAD_TIMEOUT) { playerState() == str(R.string.player_state_playing) }
+        compose.waitUntil(UI_TIMEOUT) { sheetState() == str(R.string.sheet_expanded) }
     }
+
+    private fun str(id: Int): String = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
     private fun playerState(): String? = stateOf("video_player")
 

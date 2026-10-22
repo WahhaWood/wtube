@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import dev.wahha.wtube.data.Chapter
+import dev.wahha.wtube.data.formatDuration
 import dev.wahha.wtube.ui.icon.ClosedCaption
 import dev.wahha.wtube.ui.icon.SkipNext
 import dev.wahha.wtube.ui.icon.SkipPrevious
@@ -26,6 +27,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -34,6 +36,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,7 +78,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -160,6 +167,8 @@ fun VideoPlayer(
     fullscreenActions: @Composable () -> Unit = {},
     // Off in picture-in-picture: the window is too small to touch, the system draws its own buttons.
     showControls: Boolean = true,
+    // The video could not be opened at all (the page shows why): nothing is loading, so no spinner.
+    loadFailed: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val settings by Settings.current.collectAsStateWithLifecycle()
@@ -179,7 +188,7 @@ fun VideoPlayer(
     var hint by remember { mutableIntStateOf(0) }
     val ended = state.playbackState == Player.STATE_ENDED
     val buffering = state.playbackState == Player.STATE_BUFFERING ||
-        (state.playbackState == Player.STATE_IDLE && state.playWhenReady && state.error == null)
+        (state.playbackState == Player.STATE_IDLE && state.playWhenReady && state.error == null && !loadFailed)
     val audioOnly = C.TRACK_TYPE_VIDEO in state.parameters.disabledTrackTypes
     val step = settings.doubleTapSeconds
 
@@ -206,13 +215,15 @@ fun VideoPlayer(
         onDispose { fill = false }
     }
 
-    val description = when {
-        state.error != null -> "error"
-        ended -> "ended"
-        buffering -> "buffering"
-        state.isPlaying -> "playing"
-        else -> "paused"
-    }
+    val description = stringResource(
+        when {
+            state.error != null -> R.string.player_state_error
+            ended -> R.string.player_state_ended
+            buffering -> R.string.player_state_buffering
+            state.isPlaying -> R.string.player_state_playing
+            else -> R.string.player_state_paused
+        },
+    )
     BoxWithConstraints(
         modifier.background(colors.scrim).testTag("video_player").semantics { stateDescription = description },
     ) {
@@ -475,8 +486,13 @@ private fun Controls(
     val colors = MaterialTheme.colorScheme
     val scrim = colors.scrim
     val settings by Settings.current.collectAsStateWithLifecycle()
-    // Fullscreen hides the system bars, but a camera cutout still eats into the edge.
-    val edges = if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal = 12.dp) else Modifier
+    // Fullscreen hides the system bars, but a camera cutout still eats into the edge, and the edge swipes
+    // (back, home) would catch buttons placed there.
+    val edges = if (fullscreen) {
+        Modifier.windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.systemGestures)).padding(horizontal = 12.dp)
+    } else {
+        Modifier
+    }
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(scrim.copy(alpha = 0.25f)))
         Box(
@@ -535,11 +551,12 @@ private fun Controls(
                     Settings.set(Settings.Subtitles, !captionsOn)
                     onInteraction()
                 }) {
+                    val captionsState = stringResource(if (captionsOn) R.string.switch_on else R.string.switch_off)
                     Icon(
                         WIcons.ClosedCaption,
                         contentDescription = stringResource(R.string.player_subtitles),
                         tint = if (captionsOn) colors.onSurface else colors.onSurface.copy(alpha = 0.55f),
-                        modifier = Modifier.semantics { stateDescription = if (captionsOn) "on" else "off" },
+                        modifier = Modifier.semantics { stateDescription = captionsState },
                     )
                 }
             }
@@ -644,7 +661,7 @@ private fun Controls(
                 scrub = scrub,
                 onScrub = onScrub,
                 onSeek = { player.seekTo(it) },
-                modifier = Modifier.padding(end = 12.dp),
+                modifier = Modifier.padding(end = 12.dp).systemGestureExclusion(),
             )
             if (fullscreen) fullscreenActions()
         }
@@ -683,10 +700,11 @@ private fun AutoplaySwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val knob by animateDpAsState(if (on) 16.dp else 0.dp, label = "autoplay")
     val label = stringResource(R.string.player_autoplay)
+    val state = stringResource(if (on) R.string.switch_on else R.string.switch_off)
     Box(
         Modifier.size(48.dp).clip(CircleShape).clickable { onChange(!on) }.semantics {
             contentDescription = label
-            stateDescription = if (on) "on" else "off"
+            stateDescription = state
         },
         contentAlignment = Alignment.Center,
     ) {
@@ -783,12 +801,22 @@ private fun SeekBar(
     val thumb by animateDpAsState(if (scrub != null) 18.dp else 13.dp, label = "thumb")
     val graph by animateFloatAsState(if (scrub != null && heatmap.size > 1) 1f else 0f, label = "heatmap")
     val density = LocalDensity.current
+    val seekLabel = stringResource(R.string.player_seek_bar)
+    val seekState = stringResource(R.string.player_seek_state, formatDuration(position / 1000), formatDuration(duration / 1000))
 
     Box(
         modifier
             .fillMaxWidth()
             .height(28.dp)
             .onSizeChanged { widthPx = it.width.toFloat() }
+            .semantics {
+                contentDescription = seekLabel
+                stateDescription = seekState
+                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+                setProgress { target ->
+                    if (duration <= 0) false else true.also { onSeek((target.coerceIn(0f, 1f) * duration).toLong()) }
+                }
+            }
             .pointerInput(duration) {
                 detectTapGestures { offset -> if (duration > 0) onSeek((offset.x / size.width * duration).toLong()) }
             }

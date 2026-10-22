@@ -17,8 +17,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 24
-        versionName = "0.15.2"
+        versionCode = 25
+        versionName = "0.16.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -62,15 +62,17 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    // Findings that existed when lint joined CI; new ones fail the build.
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
+    // The license texts live in docs/licenses; the app shows them under Settings > About.
+    sourceSets["main"].assets.srcDir("../docs/licenses")
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
-}
-
-// GitHub's runners get YouTube's bot checks, so CI builds skip the network smoke tests (-PofflineTests);
-// a nightly job runs them on their own.
-tasks.withType<Test>().configureEach {
-    if (providers.gradleProperty("offlineTests").isPresent) filter.excludeTestsMatching("*SmokeTest")
 }
 
 dependencies {
@@ -123,6 +125,7 @@ dependencies {
 }
 
 // `-Poffline` runs only the tests that need no internet (the smoke tests talk to YouTube).
+// GitHub's runners get YouTube's bot checks, so CI uses it too; a nightly job runs the smoke tests on their own.
 if (providers.gradleProperty("offline").isPresent) {
     tasks.withType<Test>().configureEach { exclude("**/*SmokeTest*") }
 }

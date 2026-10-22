@@ -10,15 +10,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -40,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -62,14 +59,16 @@ import dev.wahha.wtube.data.HiddenItems
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.Settings
-import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.data.SponsorBlock
+import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.player.sponsorCategoryLabel
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.Notices
 import dev.wahha.wtube.ui.components.Thumbnail
+import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.glass.GlassSupported
 import dev.wahha.wtube.ui.icon.ArrowBack
 import dev.wahha.wtube.ui.icon.Check
@@ -87,6 +86,7 @@ fun SettingsScreen() {
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf<SettingsSheet?>(null) }
     var clearOpen by rememberSaveable { mutableStateOf(false) }
+    var licensesOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Settings, history and searches to a JSON file the user picks, and back.
@@ -114,8 +114,8 @@ fun SettingsScreen() {
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + LocalBottomInset.current,
+            top = systemTop(),
+            bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
         item {
@@ -238,6 +238,7 @@ fun SettingsScreen() {
         item { ValueRow(stringResource(R.string.settings_backup_import), stringResource(R.string.settings_backup_import_summary)) { importFile.launch(arrayOf("application/json", "text/*", "application/octet-stream")) } }
 
         item { SectionHeader(stringResource(R.string.settings_about)) }
+        item { ValueRow(stringResource(R.string.settings_licenses), null) { licensesOpen = true } }
         item { ValueRow(stringResource(R.string.settings_version), "${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})", onClick = null) }
         item {
             SwitchRow(stringResource(R.string.settings_update_check), stringResource(R.string.settings_update_check_summary), settings.updateCheck, Settings.UpdateCheck)
@@ -297,6 +298,7 @@ fun SettingsScreen() {
             ChoiceSheet(stringResource(R.string.settings_text_size), TextSizeNames.indices.toList(), settings.textSize, { stringResource(TextSizeNames[it]) }, Settings.TextSize, dismiss)
         null -> Unit
     }
+    if (licensesOpen) LicensesSheet { licensesOpen = false }
     if (clearOpen) {
         AlertDialog(
             onDismissRequest = { clearOpen = false },
@@ -379,6 +381,23 @@ private fun SponsorCategoriesSheet(selected: Set<String>, onDismiss: () -> Unit)
 }
 
 /** Hidden channels and "Not interested" videos, each with a way back into recommendations. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LicensesSheet(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val text = remember {
+        listOf("Third-party.txt", "Inter-OFL.txt", "Montserrat-OFL.txt").joinToString("\n\n----\n\n") { name ->
+            runCatching { context.assets.open(name).bufferedReader().use { it.readText() } }.getOrDefault("")
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxHeight(0.85f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Text(stringResource(R.string.settings_licenses), style = MaterialTheme.typography.titleMedium)
+            Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp, bottom = 16.dp))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HiddenSheet(hidden: HiddenItems, onDismiss: () -> Unit) {

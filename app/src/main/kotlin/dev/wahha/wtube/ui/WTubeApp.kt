@@ -23,9 +23,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -85,8 +93,8 @@ import androidx.core.net.toUri
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.LinkTarget
-import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.LocalPlayerState
 import dev.wahha.wtube.player.rememberPlayerState
@@ -96,6 +104,7 @@ import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.Navigator
 import dev.wahha.wtube.ui.components.Notices
+import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.downloads.DownloadsScreen
 import dev.wahha.wtube.ui.feed.FeedScreen
 import dev.wahha.wtube.ui.glass.BarHeight
@@ -120,8 +129,8 @@ import dev.wahha.wtube.ui.playlist.PlaylistScreen
 import dev.wahha.wtube.ui.search.SearchScreen
 import dev.wahha.wtube.ui.settings.SettingsScreen
 import dev.wahha.wtube.ui.subscriptions.SubscriptionsScreen
-import dev.wahha.wtube.ui.video.MiniPlayerHeight
 import dev.wahha.wtube.ui.theme.CoverAccent
+import dev.wahha.wtube.ui.video.MiniPlayerHeight
 import dev.wahha.wtube.ui.video.PlayerSheet
 import dev.wahha.wtube.ui.video.PlayerSheetState
 import dev.wahha.wtube.ui.video.VideoViewModel
@@ -315,7 +324,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
         BoxWithConstraints(Modifier.fillMaxSize().background(background)) {
             val capsuleBudget = maxWidth - BarEdgePadding * 2 - SearchGap - SearchSize
             val rowWidth = liquidTabBarWidth(TabRoutes.size, capsuleBudget) + SearchGap + SearchSize
-            val barSpace = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomPadding + BarHeight
+            val barSpace = systemBottom() + BarBottomPadding + BarHeight
 
             val axisShift = with(LocalDensity.current) { AxisShift.roundToPx() }
             // The backdrop source; the bar and the sheet below are its siblings, never its children.
@@ -323,6 +332,10 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                 NavHost(
                     navController = navController,
                     startDestination = Home,
+                    // Landscape: a side navigation bar or the camera cutout must not cover the pages.
+                    modifier = Modifier.windowInsetsPadding(
+                        WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
+                    ),
                     enterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageSlideIn() },
                     exitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageSlideOut() },
                     popEnterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageBackIn(axisShift) },
@@ -340,6 +353,12 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                     composable<DownloadsRoute> { Page { DownloadsScreen() } }
                     composable<HistoryRoute> { Page { HistoryScreen() } }
                 }
+                // Keeps the clock and icons readable over text scrolling beneath the transparent status bar.
+                Box(
+                    Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout))
+                        .background(Brush.verticalGradient(listOf(background.copy(alpha = 0.7f), background.copy(alpha = 0f)))),
+                )
                 // Registered after NavHost's own predictive handler, so it wins: pages go back on release, while
                 // the expanded video sheet keeps following the gesture with its own handler.
                 BackHandler(enabled = canGoBack && !sheet.expanded) {
@@ -373,7 +392,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                         sheet = sheet,
                         miniWidth = rowWidth,
                         // With the bar away the mini player takes its place at the bottom.
-                        miniBottom = lerp(barSpace, WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomPadding, barAway) + MiniPlayerGap,
+                        miniBottom = lerp(barSpace, systemBottom() + BarBottomPadding, barAway) + MiniPlayerGap,
                         backdrop = backdrop,
                         luminance = { luminance.value },
                         onClose = {
