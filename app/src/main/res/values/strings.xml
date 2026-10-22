@@ -229,6 +229,7 @@
     <string name="settings_update_check">Проверять обновления</string>
     <string name="settings_update_check_summary">При запуске смотреть новые версии на GitHub</string>
     <string name="settings_update_now">Проверить обновления</string>
+    <string name="settings_update_available_summary">Нажмите, чтобы скачать</string>
     <string name="settings_update_none">Установлена последняя версия</string>
     <string name="update_title">Доступна версия %1$s</string>
     <string name="update_download">Скачать</string>

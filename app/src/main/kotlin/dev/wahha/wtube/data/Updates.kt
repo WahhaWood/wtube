@@ -17,19 +17,32 @@ data class Release(val version: String, val url: String, val notes: String)
 /** Looks for a newer WTube on GitHub Releases. Nothing is installed by itself: the browser downloads the APK. */
 object Updates {
     private const val LATEST = "https://api.github.com/repos/WahhaWood/wtube/releases/latest"
-    private const val EVERY_MS = 12 * 60 * 60 * 1000L
+    private const val EVERY_MS = 60 * 60 * 1000L
 
     private val state = MutableStateFlow<Release?>(null)
 
-    /** The newer release to offer, until it is dismissed or the app restarts. */
+    /** The newer release to offer; "later" hides it until the next launch, never for good. */
     val available: StateFlow<Release?> = state.asStateFlow()
 
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("updates", Context.MODE_PRIVATE)
+
+    /** Offers the release found earlier right away (no network), so the notice shows on every launch until the app is updated. */
+    fun restore(context: Context, installed: String) {
+        val prefs = prefs(context)
+        val version = prefs.getString("version", null) ?: return
+        if (!isNewer(version, installed)) {
+            prefs.edit().remove("version").remove("url").remove("notes").apply()
+            return
+        }
+        state.value = Release(version, prefs.getString("url", "").orEmpty(), prefs.getString("notes", "").orEmpty())
+    }
+
     /**
-     * Asks GitHub at most every 12 hours unless [force]; a version the user has dismissed is not offered again.
-     * Returns the newer release found (even a dismissed one when [force]), or null; network errors count as none.
+     * Asks GitHub at most once an hour unless [force]. Returns the newer release found, or null; network errors count as none.
+     * A found release is remembered and offered by [restore] on later launches.
      */
     suspend fun check(context: Context, installed: String, force: Boolean = false): Release? {
-        val prefs = context.applicationContext.getSharedPreferences("updates", Context.MODE_PRIVATE)
+        val prefs = prefs(context)
         val now = System.currentTimeMillis()
         if (!force && now - prefs.getLong("checked", 0) < EVERY_MS) return null
         val release = try {
@@ -40,13 +53,18 @@ object Updates {
             return null
         }
         prefs.edit().putLong("checked", now).apply()
-        if (release == null || !isNewer(release.version, installed)) return null
-        if (force || prefs.getString("dismissed", null) != release.version) state.value = release
+        if (release == null || !isNewer(release.version, installed)) {
+            prefs.edit().remove("version").remove("url").remove("notes").apply()
+            state.value = null
+            return null
+        }
+        prefs.edit().putString("version", release.version).putString("url", release.url).putString("notes", release.notes).apply()
+        state.value = release
         return release
     }
 
-    fun dismiss(context: Context) {
-        state.value?.let { context.applicationContext.getSharedPreferences("updates", Context.MODE_PRIVATE).edit().putString("dismissed", it.version).apply() }
+    /** Hides the offer until the next launch. */
+    fun dismiss() {
         state.value = null
     }
 

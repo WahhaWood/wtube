@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.Preferences
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
@@ -84,6 +85,7 @@ fun SettingsScreen() {
     val nav = LocalNavigator.current
     val settings by Settings.current.collectAsStateWithLifecycle()
     val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val availableUpdate by Updates.available.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf<SettingsSheet?>(null) }
     var clearOpen by rememberSaveable { mutableStateOf(false) }
     var licensesOpen by rememberSaveable { mutableStateOf(false) }
@@ -242,6 +244,13 @@ fun SettingsScreen() {
         item { ValueRow(stringResource(R.string.settings_version), "${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})", onClick = null) }
         item {
             SwitchRow(stringResource(R.string.settings_update_check), stringResource(R.string.settings_update_check_summary), settings.updateCheck, Settings.UpdateCheck)
+        }
+        availableUpdate?.let { found ->
+            item {
+                ValueRow(stringResource(R.string.update_title, found.version), stringResource(R.string.settings_update_available_summary)) {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, found.url.toUri()))
+                }
+            }
         }
         item {
             ValueRow(stringResource(R.string.settings_update_now), null) {

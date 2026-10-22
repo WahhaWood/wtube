@@ -512,27 +512,29 @@ private fun GlassBottomBar(
     }
 }
 
-/** Checks GitHub for a newer release once the app starts (at most every 12 hours) and offers it in a dialog. */
+/** Offers a newer release in a dialog on every launch: the one found earlier at once, then a fresh check (at most hourly). */
 @Composable
 private fun UpdateOffer() {
     val context = LocalContext.current
     val settings by Settings.current.collectAsStateWithLifecycle()
     val release by Updates.available.collectAsStateWithLifecycle()
     LaunchedEffect(settings.updateCheck) {
-        if (settings.updateCheck) Updates.check(context, BuildConfig.VERSION_NAME)
+        if (!settings.updateCheck) return@LaunchedEffect
+        Updates.restore(context, BuildConfig.VERSION_NAME)
+        Updates.check(context, BuildConfig.VERSION_NAME)
     }
     release?.let { found ->
         AlertDialog(
-            onDismissRequest = { Updates.dismiss(context) },
+            onDismissRequest = { Updates.dismiss() },
             title = { Text(stringResource(R.string.update_title, found.version)) },
             text = { if (found.notes.isNotEmpty()) Text(found.notes.take(600)) },
             confirmButton = {
                 TextButton(onClick = {
                     context.startActivity(Intent(Intent.ACTION_VIEW, found.url.toUri()))
-                    Updates.dismiss(context)
+                    Updates.dismiss()
                 }) { Text(stringResource(R.string.update_download)) }
             },
-            dismissButton = { TextButton(onClick = { Updates.dismiss(context) }) { Text(stringResource(R.string.update_later)) } },
+            dismissButton = { TextButton(onClick = { Updates.dismiss() }) { Text(stringResource(R.string.update_later)) } },
         )
     }
 }
