@@ -8,6 +8,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import dev.wahha.wtube.data.PageOf
@@ -107,7 +108,9 @@ fun LoadMoreEffect(listState: LazyListState, threshold: Int = 6, onLoadMore: () 
             info.totalItemsCount > 0 && last >= info.totalItemsCount - threshold
         }
     }
+    // The list behind the same state can change (a channel tab or sort): always page the current one.
+    val loadMore by rememberUpdatedState(onLoadMore)
     LaunchedEffect(listState) {
-        snapshotFlow { nearEnd }.filter { it }.collect { onLoadMore() }
+        snapshotFlow { nearEnd }.filter { it }.collect { loadMore() }
     }
 }
