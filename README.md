@@ -75,7 +75,7 @@ DI написан вручную, модуль один (`app`) плюс `baseli
 
 ## Установка
 
-Готовые подписанные APK всех версий лежат в [Releases](https://github.com/WahhaWood/wtube/releases). Последняя — 0.13.0. Релизы собирает и подписывает GitHub Actions по тегу `v*`.
+Готовые подписанные APK всех версий лежат в [Releases](https://github.com/WahhaWood/wtube/releases). Релизы собирает и подписывает GitHub Actions по тегу `v*`.
 Скачайте файл и поставьте на телефон (Android 8.0+) или выполните `adb install -r WTube-<версия>.apk`.
 Все версии подписаны одним ключом, поэтому ставятся поверх друг друга. SHA-256 сертификата:
 `7176fdd0e04f6dabef40d308596f3152e76d09f86ef2ae0d742a9600b1ee7948`.
