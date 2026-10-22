@@ -222,7 +222,7 @@ internal fun UpNextOverlay(upcoming: Upcoming, onPlay: () -> Unit, onCancel: () 
     }
 }
 
-/** A pill in the middle of the video: the 2x while held, volume or brightness while swiping, zoom mode. */
+/** A pill in the middle of the video: the 2x while held, zoom mode. */
 @Composable
 internal fun GestureBadge(icon: ImageVector?, text: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
@@ -233,22 +233,6 @@ internal fun GestureBadge(icon: ImageVector?, text: String, modifier: Modifier =
     ) {
         if (icon != null) Icon(icon, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(20.dp))
         Text(text, style = MaterialTheme.typography.labelLarge, color = colors.onSurface)
-    }
-}
-
-/** A level bar for volume and brightness swipes, [level] in 0..1. */
-@Composable
-internal fun LevelBadge(icon: ImageVector, level: Float, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        modifier.clip(RoundedCornerShape(50)).background(colors.scrim.copy(alpha = 0.6f)).padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(20.dp))
-        Box(Modifier.width(120.dp).height(4.dp).clip(RoundedCornerShape(50)).background(colors.onSurface.copy(alpha = 0.3f))) {
-            Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).height(4.dp).background(colors.primary))
-        }
     }
 }
 

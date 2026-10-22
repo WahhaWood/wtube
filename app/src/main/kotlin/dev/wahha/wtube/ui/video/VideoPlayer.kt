@@ -12,9 +12,6 @@ import dev.wahha.wtube.ui.icon.SkipPrevious
 import androidx.compose.foundation.Canvas
 import dev.wahha.wtube.data.Segment
 import dev.wahha.wtube.data.SponsorBlock
-import android.app.Activity
-import android.media.AudioManager
-import android.provider.Settings.System as SystemSettings
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -69,13 +66,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -102,7 +97,6 @@ import dev.wahha.wtube.player.Autoplay
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.PlayerState
 import dev.wahha.wtube.ui.components.errorMessage
-import dev.wahha.wtube.ui.icon.BrightnessMedium
 import dev.wahha.wtube.ui.icon.ExpandMore
 import dev.wahha.wtube.ui.icon.FastForward
 import dev.wahha.wtube.ui.icon.Fullscreen
@@ -111,7 +105,6 @@ import dev.wahha.wtube.ui.icon.Pause
 import dev.wahha.wtube.ui.icon.PlayArrow
 import dev.wahha.wtube.ui.icon.Replay
 import dev.wahha.wtube.ui.icon.Settings
-import dev.wahha.wtube.ui.icon.VolumeUp
 import dev.wahha.wtube.ui.icon.WIcons
 import kotlinx.coroutines.delay
 import org.schabi.newpipe.extractor.stream.Frameset
@@ -131,16 +124,16 @@ private const val BOOST_SPEED = 2f
 /** Consecutive double taps on one side add up: "+10 с", "+20 с"... */
 private class SeekBurst(val forward: Boolean, val seconds: Int, val key: Int)
 
-private enum class DragMode { Seek, Volume, Brightness, Pinch }
+private enum class DragMode { Seek, Pinch }
 
 /**
  * The video surface with our own controls, after the YouTube app: gradients top and bottom instead of a
  * flat dim, round buttons in the middle, a hairline of progress while the controls are hidden.
  *
  * Gestures: tap toggles the controls, double tap on either half seeks by the step from Settings, a long
- * press plays at 2x while held, a horizontal drag seeks with a storyboard preview. In fullscreen a vertical
- * drag on the left third sets brightness, on the right third volume, and a pinch switches fit / fill.
- * Vertical drags elsewhere are left to the sheet (collapse, fullscreen) in [PlayerSheet].
+ * press plays at 2x while held, a horizontal drag seeks with a storyboard preview, and in fullscreen a pinch
+ * switches fit / fill. Vertical drags are left to the sheet (collapse, fullscreen) in [PlayerSheet]; no
+ * volume or brightness swipes, the user found them getting in the way.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -169,7 +162,6 @@ fun VideoPlayer(
     showControls: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
-    val context = LocalContext.current
     val settings by Settings.current.collectAsStateWithLifecycle()
     val upcoming by Autoplay.upcoming.collectAsStateWithLifecycle()
     var controlsVisible by remember { mutableStateOf(true) }
@@ -182,8 +174,6 @@ fun VideoPlayer(
     var statsOpen by remember { mutableStateOf(false) }
     var boosting by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    // Volume or brightness while a swipe changes it.
-    var level by remember { mutableStateOf<Pair<ImageVector, Float>?>(null) }
     var fill by remember { mutableStateOf(false) }
     // A short message in the middle (zoom, autoplay), as a string resource; 0 when none.
     var hint by remember { mutableIntStateOf(0) }
@@ -211,14 +201,9 @@ fun VideoPlayer(
             hint = 0
         }
     }
-    // Brightness set by a swipe and the fill zoom only last while fullscreen.
+    // The fill zoom only lasts while fullscreen.
     DisposableEffect(fullscreen) {
-        onDispose {
-            fill = false
-            (context as? Activity)?.window?.let { window ->
-                window.attributes = window.attributes.apply { screenBrightness = -1f }
-            }
-        }
+        onDispose { fill = false }
     }
 
     val description = when {
@@ -292,14 +277,12 @@ fun VideoPlayer(
                         )
                     }
                     .pointerInput(player, fullscreen) {
-                        val audio = context.getSystemService(AudioManager::class.java)
-                        val window = (context as? Activity)?.window
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             var total = Offset.Zero
                             var mode: DragMode? = null
-                            // Decide whose drag it is once it passes the touch slop; vertical drags outside
-                            // the fullscreen side strips stay unconsumed for the sheet.
+                            // Decide whose drag it is once it passes the touch slop; vertical drags stay
+                            // unconsumed for the sheet.
                             while (mode == null) {
                                 val event = awaitPointerEvent()
                                 if (event.changes.count { it.pressed } >= 2) {
@@ -314,8 +297,6 @@ fun VideoPlayer(
                                     val horizontal = abs(total.x) > abs(total.y)
                                     mode = when {
                                         horizontal && state.duration > 0 && player.isCurrentMediaItemSeekable -> DragMode.Seek
-                                        !horizontal && fullscreen && down.position.x < size.width / 3f && window != null -> DragMode.Brightness
-                                        !horizontal && fullscreen && down.position.x > size.width * 2f / 3f -> DragMode.Volume
                                         else -> return@awaitEachGesture
                                     }
                                     change.consume()
@@ -336,31 +317,6 @@ fun VideoPlayer(
                                     if (completed) player.seekTo((fraction * duration).toLong())
                                     scrub = null
                                     interaction++
-                                }
-                                DragMode.Volume -> {
-                                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                    var value = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
-                                    level = WIcons.VolumeUp to value
-                                    drag(down.id) { change ->
-                                        value = (value - change.positionChange().y / (size.height * 0.8f)).coerceIn(0f, 1f)
-                                        audio.setStreamVolume(AudioManager.STREAM_MUSIC, (value * max).roundToInt(), 0)
-                                        level = WIcons.VolumeUp to value
-                                        change.consume()
-                                    }
-                                    level = null
-                                }
-                                DragMode.Brightness -> {
-                                    val w = checkNotNull(window)
-                                    var value = w.attributes.screenBrightness.takeIf { it >= 0f }
-                                        ?: (SystemSettings.getInt(context.contentResolver, SystemSettings.SCREEN_BRIGHTNESS, 128) / 255f)
-                                    level = WIcons.BrightnessMedium to value
-                                    drag(down.id) { change ->
-                                        value = (value - change.positionChange().y / (size.height * 0.8f)).coerceIn(0.01f, 1f)
-                                        w.attributes = w.attributes.apply { screenBrightness = value }
-                                        level = WIcons.BrightnessMedium to value
-                                        change.consume()
-                                    }
-                                    level = null
                                 }
                                 DragMode.Pinch -> {
                                     var zoom = 1f
@@ -450,7 +406,6 @@ fun VideoPlayer(
         if (showControls) {
             when {
                 boosting -> GestureBadge(WIcons.FastForward, "2x", Modifier.align(Alignment.TopCenter).padding(top = 16.dp))
-                level != null -> level?.let { (icon, value) -> LevelBadge(icon, value, Modifier.align(Alignment.Center)) }
                 hint != 0 -> GestureBadge(null, stringResource(hint), Modifier.align(Alignment.Center))
             }
         }

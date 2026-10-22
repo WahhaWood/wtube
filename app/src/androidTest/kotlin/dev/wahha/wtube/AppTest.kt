@@ -1,6 +1,7 @@
 package dev.wahha.wtube
 
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeUp
@@ -31,6 +33,7 @@ import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.VideoItem
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -166,6 +169,24 @@ class AppTest {
         compose.waitUntilExactlyOneExists(hasText("1,5x"), UI_TIMEOUT)
         compose.onNodeWithText("Субтитры").assertExists()
         Settings.set(Settings.Speed, 1f)
+    }
+
+    /** In fullscreen a vertical swipe on the right edge no longer changes the volume (the user found it in the way). */
+    @Test
+    fun fullscreenSwipeLeavesVolumeAlone() {
+        val audio = ApplicationProvider.getApplicationContext<android.content.Context>().getSystemService(AudioManager::class.java)
+        val before = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) / 2
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
+        launchVideo()
+        val video = compose.onNodeWithTag("video_player")
+        video.performTouchInput { click(center) }
+        compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
+        compose.onNodeWithContentDescription("Во весь экран").performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
+        compose.waitForIdle()
+        video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.2f), durationMillis = 300) }
+        compose.waitForIdle()
+        assertEquals(before, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
     }
 
     private fun launchVideo() {
