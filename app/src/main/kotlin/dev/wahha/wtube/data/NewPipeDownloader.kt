@@ -19,7 +19,7 @@ class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
             values.forEach { builder.addHeader(name, it) }
         }
 
-        client.newCall(builder.build()).execute().use { response ->
+        (clientOverride.get() ?: client).newCall(builder.build()).execute().use { response ->
             if (response.code == 429) throw ReCaptchaException("reCaptcha Challenge requested", request.url())
             return Response(
                 response.code,
@@ -29,5 +29,10 @@ class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
                 response.request.url.toString(),
             )
         }
+    }
+
+    companion object {
+        /** Set around a blocking extractor call to send its requests another way (the bypass checking a route). */
+        val clientOverride = ThreadLocal<OkHttpClient?>()
     }
 }

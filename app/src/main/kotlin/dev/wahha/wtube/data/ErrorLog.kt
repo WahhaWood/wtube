@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Process
 import dev.wahha.wtube.BuildConfig
+import dev.wahha.wtube.dpi.Dpi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -42,15 +43,23 @@ object ErrorLog {
             val command = listOf("logcat", "-d", "-v", "threadtime", "--pid=${Process.myPid()}") + LogcatFilter
             ProcessBuilder(command).redirectErrorStream(true).start().inputStream.bufferedReader().use { it.readText() }
         }.getOrElse { "logcat unavailable: $it" }
+        // byedpi lives in processes of its own; its lines are found by tag (only this app's are readable).
+        val bypass = runCatching {
+            val command = listOf("logcat", "-d", "-v", "threadtime", "-t", "300", "-s", "proxy:I", "DpiService:V", "Dpi:V")
+            ProcessBuilder(command).redirectErrorStream(true).start().inputStream.bufferedReader().use { it.readText() }
+        }.getOrElse { "logcat unavailable: $it" }
         val text = buildString {
             appendLine("WTube ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.BUILD_TYPE}), extractor ${BuildConfig.EXTRACTOR_VERSION}")
             appendLine("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("Written ${timestamp()}")
+            appendLine("Bypass: ${Dpi.describe()}")
             appendLine()
             appendLine("== Crashes ==")
             appendLine(crashes?.takeIf { it.exists() }?.readText()?.ifBlank { null } ?: "none")
             appendLine("== This run ==")
             append(logcat)
+            appendLine("== Bypass ==")
+            append(bypass)
         }
         File(context.cacheDir, "logs").apply { mkdirs() }.resolve("wtube-log.txt").apply { writeText(redact(text)) }
     }

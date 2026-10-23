@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.wahha.wtube.R
+import dev.wahha.wtube.dpi.Dpi
+import androidx.core.content.ContextCompat
+import androidx.webkit.ProxyConfig
+import androidx.webkit.ProxyController
+import androidx.webkit.WebViewFeature
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Cookies
 import dev.wahha.wtube.data.account.SignInException
@@ -154,10 +160,26 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
                 }
                 // Start from a clean browser: no half-finished sign-in or other account left from before.
                 WebStorage.getInstance().deleteAllData()
-                CookieManager.getInstance().removeAllCookies { loadUrl(LOGIN_URL) }
+                CookieManager.getInstance().removeAllCookies {
+                    // Through the blocking bypass when it runs: the WebView does not use the app's OkHttp.
+                    val proxy = Dpi.webViewProxy()
+                    if (proxy != null && WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+                        val config = ProxyConfig.Builder().addProxyRule(proxy).build()
+                        ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) { loadUrl(LOGIN_URL) }
+                    } else {
+                        loadUrl(LOGIN_URL)
+                    }
+                }
             }
         },
     )
+    DisposableEffect(Unit) {
+        onDispose {
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+                ProxyController.getInstance().clearProxyOverride({}, {})
+            }
+        }
+    }
 }
 
 private fun isYouTubeHome(url: String): Boolean {

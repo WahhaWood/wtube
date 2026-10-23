@@ -18,6 +18,7 @@ import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
+import dev.wahha.wtube.dpi.Dpi
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.PlayerConnection
 import dev.wahha.wtube.ui.WTubeApp
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
     /** A YouTube link opened with the app (VIEW) or shared to it as text (SEND). */
     private fun linkOf(intent: Intent?): LinkTarget? {
         val text = when (intent?.action) {
+            Dpi.ACTION_OPEN -> return LinkTarget.Bypass
             Intent.ACTION_VIEW -> intent.dataString
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             else -> null

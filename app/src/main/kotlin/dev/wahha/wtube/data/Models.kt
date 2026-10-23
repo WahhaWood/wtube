@@ -131,6 +131,8 @@ sealed interface LinkTarget {
     data class Channel(val url: String) : LinkTarget
     /** A channel's live page (`/@name/live`): its current stream, else the channel; see [YouTube.liveVideoId]. */
     data class Live(val url: String) : LinkTarget
+    /** Not a YouTube link: the bypass notification opens its settings. */
+    data object Bypass : LinkTarget
 }
 
 fun watchUrl(id: String) = "https://www.youtube.com/watch?v=$id"

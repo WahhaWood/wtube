@@ -16,11 +16,16 @@ import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.download.Downloads
+import dev.wahha.wtube.dpi.Dpi
+import android.os.Build
+import java.io.File
 import java.util.Locale
 
 class WTubeApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        // The byedpi processes (dpi/DpiService) run the native proxy and nothing of the app.
+        if (processName().contains(":dpi")) return
         ErrorLog.init(this)
         YouTube.init(Locale.getDefault().country)
         Settings.init(this)
@@ -30,7 +35,12 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
         Hidden.init(this)
         Downloads.init(this)
         Account.init(this)
+        Dpi.init(this)
     }
+
+    private fun processName(): String =
+        if (Build.VERSION.SDK_INT >= 28) getProcessName()
+        else runCatching { File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrDefault("")
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)

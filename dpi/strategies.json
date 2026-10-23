@@ -1,0 +1,306 @@
+{
+ "version": 1,
+ "minApp": 30,
+ "strategies": [
+  {
+   "id": "bb01",
+   "args": "-f-200 -Qr -s3:5+sm -a1 -As -d1 -s4+sm -s8+s -f-300 -d6+s -a1 -At,r,s -o2 -f-30 -As -r5 -Mh -r6+s -f-250 -s2:7+s -s3:6+sm -a1 -At,r,s -s3:5+sm -s6+s -s7:9+s -q30+sm -a1",
+   "note": "ByeByeDPI proxytest #1"
+  },
+  {
+   "id": "bb02",
+   "args": "-d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -r1+s -S -a1 -As -d1 -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -S -a1",
+   "note": "ByeByeDPI proxytest #2"
+  },
+  {
+   "id": "bb03",
+   "args": "-q2 -s2 -s3+s -r3 -s4 -r4 -s5+s -r5+s -s6 -s7+s -r8 -s9+s -Qr -Mh,d,r -a1 -At,r -s2+s -r2 -d2 -s3 -r3 -r4 -s4 -d5+s -r5 -d6 -s7+s -d7 -a1",
+   "note": "ByeByeDPI proxytest #3"
+  },
+  {
+   "id": "bb04",
+   "args": "-o1 -d1 -a1 -At,r,s -s1 -d1 -s5+s -s10+s -s15+s -s20+s -r1+s -S -a1 -As -s1 -d1 -s5+s -s10+s -s15+s -s20+s -S -a1",
+   "note": "ByeByeDPI proxytest #4"
+  },
+  {
+   "id": "bb05",
+   "args": "-n {sni} -Qr -f-204 -s1:5+sm -a1 -As -d1 -s3+s -s5+s -q7 -a1 -As -o2 -f-43 -a1 -As -r5 -Mh -s1:5+s -s3:7+sm -a1",
+   "note": "ByeByeDPI proxytest #5"
+  },
+  {
+   "id": "bb06",
+   "args": "-n {sni} -Qr -f-205 -a1 -As -s1:3+sm -a1 -As -s5:8+sm -a1 -As -d3 -q7 -o2 -f-43 -f-85 -f-165 -r5 -Mh -a1",
+   "note": "ByeByeDPI proxytest #6"
+  },
+  {
+   "id": "bb07",
+   "args": "-d1+s -s50+s -a1 -As -f20 -r2+s -a1 -At -d2 -s1+s -s5+s -s10+s -s15+s -s25+s -s35+s -s50+s -s60+s -a1",
+   "note": "ByeByeDPI proxytest #7"
+  },
+  {
+   "id": "bb08",
+   "args": "-o1 -a1 -At,r,s -f-1 -a1 -At,r,s -d1:11+sm -S -a1 -At,r,s -n {sni} -Qr -f1 -d1:11+sm -s1:11+sm -S -a1",
+   "note": "ByeByeDPI proxytest #8"
+  },
+  {
+   "id": "bb09",
+   "args": "-d1 -s1 -q1 -a1 -Ar -s5 -o1+s -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -a1",
+   "note": "ByeByeDPI proxytest #9"
+  },
+  {
+   "id": "bb10",
+   "args": "-f1+nm -t6 -a1 -As -n {sni} -Qr -s1:6+sm -a1 -As -s5:12+sm -a1 -As -d3 -q7 -r6 -Mh -a1",
+   "note": "ByeByeDPI proxytest #10"
+  },
+  {
+   "id": "bb11",
+   "args": "-d1 -s1+s -d3+s -s6+s -d9+s -s12+s -d15+s -s20+s -d25+s -s30+s -d35+s -a1",
+   "note": "ByeByeDPI proxytest #11"
+  },
+  {
+   "id": "bb12",
+   "args": "-d1 -s1+s -d1+s -s3+s -d6+s -s12+s -d14+s -s20+s -d24+s -s30+s -a1",
+   "note": "ByeByeDPI proxytest #12"
+  },
+  {
+   "id": "bb13",
+   "args": "-o1 -a1 -At,r,s -f-1 -a1 -Ar,s -o1 -a1 -At -r1+s -f-1 -t6 -a1",
+   "note": "ByeByeDPI proxytest #13"
+  },
+  {
+   "id": "bb14",
+   "args": "-d1 -s1+s -s3+s -s6+s -s9+s -s12+s -s15+s -s20+s -s30+s -a1",
+   "note": "ByeByeDPI proxytest #14"
+  },
+  {
+   "id": "bb15",
+   "args": "-d1 -d3+s -s6+s -d6+s -s7+s -d8+s -s10+s -a1 -t12 -At,s -r3",
+   "note": "ByeByeDPI proxytest #15"
+  },
+  {
+   "id": "bb16",
+   "args": "-f1 -t5 -n {sni} -q3+h -Qr -f2 -q1 -r1+s -t15 -q1 -o2 -a1",
+   "note": "ByeByeDPI proxytest #16"
+  },
+  {
+   "id": "bb17",
+   "args": "-n {sni} -d2:5:2+h -f-3 -r2+sm -o2 -o50+s -r2+s -f-4 -a1",
+   "note": "ByeByeDPI proxytest #17"
+  },
+  {
+   "id": "bb18",
+   "args": "-f-1 -Qr -s1+sm -d3+s -s5+sm -o2 -a1 -As -r1+s -d8+s -a1",
+   "note": "ByeByeDPI proxytest #18"
+  },
+  {
+   "id": "bb19",
+   "args": "-r-1+s -o20+sm -s3:7+sm -d5:3+sm -f300+s -Qr -f-1 -a1",
+   "note": "ByeByeDPI proxytest #19"
+  },
+  {
+   "id": "bb20",
+   "args": "-o2 -O4 -s1 -q1 -a1 -Ar -s5 -o1+s -f1+s -r20+s -a1",
+   "note": "ByeByeDPI proxytest #20"
+  },
+  {
+   "id": "bb21",
+   "args": "-o1 -r-5+se -a1 -At,r,s -d1 -n {sni} -Qr -f-1 -a1",
+   "note": "ByeByeDPI proxytest #21"
+  },
+  {
+   "id": "bb22",
+   "args": "--fake -1 --ttl 8 --split 1+s --disorder 3+s -a1",
+   "note": "ByeByeDPI proxytest #22"
+  },
+  {
+   "id": "bb23",
+   "args": "-n {sni} -Qr -f6+nr -d2 -d11 -f9+hm -o3 -t7 -a1",
+   "note": "ByeByeDPI proxytest #23"
+  },
+  {
+   "id": "bb24",
+   "args": "-r5+s -s25+s -a1 -At,r,s -s50 -r5+s -s50+s -a1",
+   "note": "ByeByeDPI proxytest #24"
+  },
+  {
+   "id": "bb25",
+   "args": "-d1 -d3+s -s6+s -d9+s -s20+s -d25+s -s30+s -a1",
+   "note": "ByeByeDPI proxytest #25"
+  },
+  {
+   "id": "bb26",
+   "args": "-d9+s -q20+s -s25+s -t5 -a1 -At,r,s -r1+h -a1",
+   "note": "ByeByeDPI proxytest #26"
+  },
+  {
+   "id": "bb27",
+   "args": "-q1+s -s29+s -s30+s -s14+s -o5+s -f-1 -S -a1",
+   "note": "ByeByeDPI proxytest #27"
+  },
+  {
+   "id": "bb28",
+   "args": "-d1 -s1+s -r1+s -e1 -m1 -o1+s -f-1 -t2 -a1",
+   "note": "ByeByeDPI proxytest #28"
+  },
+  {
+   "id": "bb29",
+   "args": "-d1 -o1 -a1 -Ar -o1 -a1 -At -f-1 -r1+s -a1",
+   "note": "ByeByeDPI proxytest #29"
+  },
+  {
+   "id": "bb30",
+   "args": "-d1 -s4 -d8 -s1+s -d5+s -s10+s -d20+s -a1",
+   "note": "ByeByeDPI proxytest #30"
+  },
+  {
+   "id": "bb31",
+   "args": "-f-1 -n {sni} -Qr -s2+s -r3 -o20 -t4 -a1",
+   "note": "ByeByeDPI proxytest #31"
+  },
+  {
+   "id": "bb32",
+   "args": "-n {sni} -Qr -d5+sm -f3+sm -o2 -t4 -a1",
+   "note": "ByeByeDPI proxytest #32"
+  },
+  {
+   "id": "bb33",
+   "args": "-o1 -a1 -Ar -q1 -a1 -At -f-1 -r1+s -a1",
+   "note": "ByeByeDPI proxytest #33"
+  },
+  {
+   "id": "bb34",
+   "args": "-q1 -a1 -Ar -o1 -a1 -At -f-1 -r1+s -a1",
+   "note": "ByeByeDPI proxytest #34"
+  },
+  {
+   "id": "bb35",
+   "args": "-s4+s -r9+s -Qr -n {sni} -S -a1",
+   "note": "ByeByeDPI proxytest #35"
+  },
+  {
+   "id": "bb36",
+   "args": "-o1 -d1 -r1+s -S -s1+s -d3+s -a1",
+   "note": "ByeByeDPI proxytest #36"
+  },
+  {
+   "id": "bb37",
+   "args": "-q1+s -s29+s -o5+s -f-1 -S -a1",
+   "note": "ByeByeDPI proxytest #37"
+  },
+  {
+   "id": "bb38",
+   "args": "-n {sni} -Qr -m2 -f-1 -d7 -a1",
+   "note": "ByeByeDPI proxytest #38"
+  },
+  {
+   "id": "bb39",
+   "args": "-d1 -s1+s -r1+s -f-1 -t8 -a1",
+   "note": "ByeByeDPI proxytest #39"
+  },
+  {
+   "id": "bb40",
+   "args": "-o1 -a1 -An -f1+nm -t6 -a1",
+   "note": "ByeByeDPI proxytest #40"
+  },
+  {
+   "id": "bb41",
+   "args": "-n {sni} -Qr -f-1 -r1+s -a1",
+   "note": "ByeByeDPI proxytest #41"
+  },
+  {
+   "id": "bb42",
+   "args": "-n {sni} -Qr -d1:3 -f-1 -a1",
+   "note": "ByeByeDPI proxytest #42"
+  },
+  {
+   "id": "bb43",
+   "args": "-s1 -d3+s -a1 -At -r1+s -a1",
+   "note": "ByeByeDPI proxytest #43"
+  },
+  {
+   "id": "bb44",
+   "args": "-f-1 -t8 -n {sni} -s1+s -a1",
+   "note": "ByeByeDPI proxytest #44"
+  },
+  {
+   "id": "bb45",
+   "args": "-n {sni} -Qr -d1 -f-1 -a1",
+   "note": "ByeByeDPI proxytest #45"
+  },
+  {
+   "id": "bb46",
+   "args": "-f64+se -n {sni} -t5 -a1",
+   "note": "ByeByeDPI proxytest #46"
+  },
+  {
+   "id": "bb47",
+   "args": "-o1 -a1 -At,r,s -d1 -a1",
+   "note": "ByeByeDPI proxytest #47"
+  },
+  {
+   "id": "bb48",
+   "args": "-d1+s -o2 -s5 -r5 -a1",
+   "note": "ByeByeDPI proxytest #48"
+  },
+  {
+   "id": "bb49",
+   "args": "-r8 -o2 -s7 -q4+s -a1",
+   "note": "ByeByeDPI proxytest #49"
+  },
+  {
+   "id": "bb50",
+   "args": "-o1 -f-1 -r-5+se -a1",
+   "note": "ByeByeDPI proxytest #50"
+  },
+  {
+   "id": "bb51",
+   "args": "-d6+s -q4+hm -o2 -a1",
+   "note": "ByeByeDPI proxytest #51"
+  },
+  {
+   "id": "bb52",
+   "args": "-s5+s -s35+s -m4 -a1",
+   "note": "ByeByeDPI proxytest #52"
+  },
+  {
+   "id": "bb53",
+   "args": "-f-1+sm -t7 -m2 -a1",
+   "note": "ByeByeDPI proxytest #53"
+  },
+  {
+   "id": "bb54",
+   "args": "-o1 -r-5+se -a1",
+   "note": "ByeByeDPI proxytest #54"
+  },
+  {
+   "id": "bb55",
+   "args": "-o1+s -d3+s -a1",
+   "note": "ByeByeDPI proxytest #55"
+  },
+  {
+   "id": "bb56",
+   "args": "-o1 -s4 -s6 -a1",
+   "note": "ByeByeDPI proxytest #56"
+  },
+  {
+   "id": "bb57",
+   "args": "-q1 -r25+s -a1",
+   "note": "ByeByeDPI proxytest #57"
+  },
+  {
+   "id": "bb58",
+   "args": "-d1 -s3+s -a1",
+   "note": "ByeByeDPI proxytest #58"
+  },
+  {
+   "id": "bb59",
+   "args": "-o3 -d7 -a1",
+   "note": "ByeByeDPI proxytest #59"
+  },
+  {
+   "id": "bb60",
+   "args": "-d7 -s2 -a1",
+   "note": "ByeByeDPI proxytest #60"
+  }
+ ]
+}

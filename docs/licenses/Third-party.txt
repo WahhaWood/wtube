@@ -10,6 +10,11 @@ Libraries
 - Backdrop (Kyant0) - Apache-2.0 - https://github.com/Kyant0/AndroidLiquidGlass
 - MaterialKolor (jordond) - MIT - https://github.com/jordond/MaterialKolor
 - Android desugar_jdk_libs - GPL-2.0 with Classpath Exception (Google)
+- AndroidX WebKit - Apache-2.0
+
+Blocking bypass
+- byedpi (hufrea) - MIT - https://github.com/hufrea/byedpi (bundled as native code; the full text follows)
+- ByeByeDPI (romanvht) - GPL-3.0 - https://github.com/romanvht/ByeByeDPI - the JNI entry for byedpi and the starting list of strategies.
 
 Interface ideas
 - SimpMusic (GPL-3.0) - the tab bar and design language are ported from it.

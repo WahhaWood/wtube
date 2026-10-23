@@ -195,6 +195,15 @@ fun SettingsScreen() {
             )
         }
 
+        item { SectionHeader(stringResource(R.string.settings_network)) }
+        item {
+            ValueRow(
+                stringResource(R.string.dpi_title),
+                stringResource(if (settings.dpiBypass) R.string.settings_dpi_on else R.string.dpi_off),
+                onClick = nav.openBypass,
+            )
+        }
+
         item { SectionHeader(stringResource(R.string.settings_extensions)) }
         item {
             SwitchRow(stringResource(R.string.settings_sponsorblock), stringResource(R.string.settings_sponsorblock_summary), settings.sponsorBlock, Settings.SponsorBlockOn)
@@ -397,7 +406,7 @@ private fun SponsorCategoriesSheet(selected: Set<String>, onDismiss: () -> Unit)
 private fun LicensesSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val text = remember {
-        listOf("Third-party.txt", "Inter-OFL.txt", "Montserrat-OFL.txt").joinToString("\n\n----\n\n") { name ->
+        listOf("Third-party.txt", "byedpi-MIT.txt", "Inter-OFL.txt", "Montserrat-OFL.txt").joinToString("\n\n----\n\n") { name ->
             runCatching { context.assets.open(name).bufferedReader().use { it.readText() } }.getOrDefault("")
         }
     }
@@ -493,7 +502,7 @@ private fun <T> ChoiceSheet(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+internal fun SectionHeader(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
@@ -503,7 +512,7 @@ private fun SectionHeader(text: String) {
 }
 
 @Composable
-private fun SwitchRow(title: String, summary: String, checked: Boolean, key: Preferences.Key<Boolean>, enabled: Boolean = true) {
+internal fun SwitchRow(title: String, summary: String, checked: Boolean, key: Preferences.Key<Boolean>, enabled: Boolean = true) {
     Row(
         Modifier.fillMaxWidth()
             .clickable(enabled = enabled) { Settings.set(key, !checked) }
@@ -520,7 +529,7 @@ private fun SwitchRow(title: String, summary: String, checked: Boolean, key: Pre
 }
 
 @Composable
-private fun ValueRow(title: String, value: String?, onClick: (() -> Unit)?) {
+internal fun ValueRow(title: String, value: String?, onClick: (() -> Unit)?) {
     Column(
         Modifier.fillMaxWidth()
             .clickable(enabled = onClick != null) { onClick?.invoke() }

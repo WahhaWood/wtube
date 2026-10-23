@@ -63,6 +63,8 @@ data class AppSettings(
     val deArrow: Boolean = false,
     /** Look for a newer release on GitHub at start. */
     val updateCheck: Boolean = true,
+    /** Send YouTube through byedpi (dpi/) where it is blocked or throttled. */
+    val dpiBypass: Boolean = false,
 )
 
 /** User settings in DataStore, mirrored into [current] so the player and UI read them synchronously. */
@@ -93,6 +95,7 @@ object Settings {
     val CoverAccent = booleanPreferencesKey("cover_accent")
     val UpdateCheck = booleanPreferencesKey("update_check")
     val DeArrowOn = booleanPreferencesKey("dearrow")
+    val DpiBypass = booleanPreferencesKey("dpi_bypass")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -151,6 +154,7 @@ object Settings {
             prefs[CoverAccent] = settings.coverAccent
             prefs[UpdateCheck] = settings.updateCheck
             prefs[DeArrowOn] = settings.deArrow
+            prefs[DpiBypass] = settings.dpiBypass
         }
     }
 
@@ -183,6 +187,7 @@ object Settings {
             coverAccent = this[CoverAccent] ?: defaults.coverAccent,
             updateCheck = this[UpdateCheck] ?: defaults.updateCheck,
             deArrow = this[DeArrowOn] ?: defaults.deArrow,
+            dpiBypass = this[DpiBypass] ?: defaults.dpiBypass,
         )
     }
 }

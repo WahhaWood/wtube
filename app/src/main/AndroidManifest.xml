@@ -74,6 +74,23 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+        <!-- byedpi for the blocking bypass, one process per slot (dpi/DpiService): the main proxy and three for testing. -->
+        <service
+            android:name=".dpi.DpiMainService"
+            android:exported="false"
+            android:process=":dpi" />
+        <service
+            android:name=".dpi.DpiProbe1Service"
+            android:exported="false"
+            android:process=":dpiprobe1" />
+        <service
+            android:name=".dpi.DpiProbe2Service"
+            android:exported="false"
+            android:process=":dpiprobe2" />
+        <service
+            android:name=".dpi.DpiProbe3Service"
+            android:exported="false"
+            android:process=":dpiprobe3" />
         <!-- Hands the error log to the app picked in "Share log". -->
         <provider
             android:name="androidx.core.content.FileProvider"

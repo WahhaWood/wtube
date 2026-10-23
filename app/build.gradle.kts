@@ -12,13 +12,15 @@ kotlin {
 android {
     namespace = "dev.wahha.wtube"
     compileSdk = 37
+    // byedpi for the blocking bypass (app/src/main/cpp).
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 29
-        versionName = "0.19.1"
+        versionCode = 30
+        versionName = "0.20.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -38,6 +40,8 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // The phone and the x86_64 emulator.
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         }
         release {
             signingConfig = signingConfigs.findByName("release")
@@ -71,6 +75,15 @@ android {
 
     // The license texts live in docs/licenses; the app shows them under Settings > About.
     sourceSets["main"].assets.srcDir("../docs/licenses")
+    // The bypass presets (dpi/strategies.json): bundled, and fetched from the repository when newer.
+    sourceSets["main"].assets.srcDir("../dpi")
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -104,6 +117,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.webkit)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

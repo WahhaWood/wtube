@@ -98,6 +98,8 @@ class Navigator(
     val openHistory: () -> Unit,
     /** How long videos were watched, per day, channel and video. */
     val openStats: () -> Unit,
+    /** Settings of the YouTube blocking bypass. */
+    val openBypass: () -> Unit,
     val back: () -> Unit,
 ) {
     /** [from] is the tapped card's thumbnail, for the page to grow out of. */
@@ -111,6 +113,7 @@ class Navigator(
             is LinkTarget.Channel -> openChannel(target.url)
             is LinkTarget.Live -> runCatching { YouTube.liveVideoId(target.url) }.getOrNull()?.let(::openVideo)
                 ?: openChannel(target.url.removeSuffix("/").removeSuffix("/live"))
+            LinkTarget.Bypass -> openBypass()
         }
     }
 }
