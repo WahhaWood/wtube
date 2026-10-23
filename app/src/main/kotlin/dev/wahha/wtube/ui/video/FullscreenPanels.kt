@@ -1,8 +1,6 @@
 package dev.wahha.wtube.ui.video
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -44,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -111,16 +110,20 @@ internal fun FullscreenActions(vm: VideoViewModel, onPanel: (FullscreenPanel) ->
 
 /** The open [panel] over the fullscreen video; [onPanel] with null closes it. */
 @Composable
-internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, onPanel: (FullscreenPanel?) -> Unit, onSeek: (Long) -> Unit) {
+internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, shelfProgress: () -> Float, onShelfDrag: (Float) -> Unit, onShelfEnd: (open: Boolean) -> Unit, onPanel: (FullscreenPanel?) -> Unit, onSeek: (Long) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // A vertical video is fullscreen upright: there the comments come up from the bottom instead.
         val upright = maxWidth < maxHeight
-        AnimatedVisibility(
-            visible = panel == FullscreenPanel.MoreVideos,
-            enter = fadeIn() + slideInVertically { it / 3 },
-            exit = fadeOut() + slideOutVertically { it / 3 },
-        ) {
-            MoreVideosShelf(vm, onClose = { onPanel(null) })
+        if (shelfProgress() > 0f) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    val p = shelfProgress()
+                    alpha = p
+                    translationY = (1 - p) * size.height / 3
+                },
+            ) {
+                MoreVideosShelf(vm, onClose = { onPanel(null) }, onDrag = onShelfDrag, onDragEnd = onShelfEnd)
+            }
         }
         val sideModifier = if (upright) {
             Modifier.fillMaxWidth().fillMaxHeight(0.65f).clip(UprightPanelShape)
@@ -180,10 +183,11 @@ private fun ChatPanel(vm: VideoViewModel, onClose: () -> Unit, modifier: Modifie
 
 /** YouTube's "more videos" shelf: related videos in a row at the bottom; a tap or a swipe down elsewhere closes it. */
 @Composable
-private fun MoreVideosShelf(vm: VideoViewModel, onClose: () -> Unit) {
+private fun MoreVideosShelf(vm: VideoViewModel, onClose: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: (open: Boolean) -> Unit) {
     val videos = vm.details?.related.orEmpty().filterIsInstance<VideoItem>()
     val colors = MaterialTheme.colorScheme
     val threshold = with(LocalDensity.current) { 48.dp.toPx() }
+    val range = with(LocalDensity.current) { 160.dp.toPx() }
     Box(
         Modifier.fillMaxSize()
             .background(Brush.verticalGradient(listOf(colors.scrim.copy(alpha = 0.3f), colors.scrim.copy(alpha = 0.9f))))
@@ -192,10 +196,13 @@ private fun MoreVideosShelf(vm: VideoViewModel, onClose: () -> Unit) {
                 var total = 0f
                 detectVerticalDragGestures(
                     onDragStart = { total = 0f },
-                    onDragEnd = { if (total > threshold) onClose() },
+                    onDragEnd = { onDragEnd(total <= threshold) },
+                    onDragCancel = { onDragEnd(true) },
                 ) { change, dy ->
                     change.consume()
                     total += dy
+                    // The shelf follows the finger down; letting go past the threshold closes it.
+                    onDrag((1 - total / range).coerceIn(0f, 1f))
                 }
             },
     ) {

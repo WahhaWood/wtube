@@ -40,19 +40,51 @@ fun String.sameLanguage(other: String) = substringBefore('-').equals(other.subst
 
 private const val EMPTY_VTT = "WEBVTT\n"
 
-/** The whole caption file, or an empty WebVTT when YouTube refuses it (machine translations often get a 429). */
-fun fetchSubtitles(url: String): String = runCatching {
-    val request = Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
-    Http.client.newCall(request).execute().use { response ->
-        val body = response.body.string()
-        if (response.isSuccessful && body.startsWith("WEBVTT")) body else {
-            Log.w("WTubeSubtitles", "Caption track refused: HTTP ${response.code}")
+/** Tries per caption file, with a growing pause: a machine translation often answers 429 once and then goes through. */
+private const val FETCH_ATTEMPTS = 3
+
+/**
+ * The whole caption file, or an empty WebVTT when YouTube refuses it. Its own machine translation
+ * (`tlang`) answers 429 without a PO token, so a translated track is the original one translated
+ * on the device ([translateOnDevice]); finished translations are kept for the next time the track is picked.
+ */
+fun fetchSubtitles(url: String): String {
+    val target = Regex("[?&]tlang=([^&]*)").find(url)?.groupValues?.get(1) ?: return fetchTrack(url)
+    translations[url]?.let { return it }
+    val source = Regex("[?&]lang=([^&]*)").find(url)?.groupValues?.get(1) ?: return EMPTY_VTT
+    val original = fetchTrack(url.replace(Regex("&tlang=[^&]*"), ""))
+    if (original == EMPTY_VTT) return EMPTY_VTT
+    return runCatching { translateOnDevice(original, source, target) }
+        .onSuccess { translations[url] = it }
+        .getOrElse {
+            Log.w("WTubeSubtitles", "Translating the caption track failed", it)
             EMPTY_VTT
         }
+}
+
+private val translations = object : LinkedHashMap<String, String>(4, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > 3
+}
+
+private fun fetchTrack(url: String): String {
+    repeat(FETCH_ATTEMPTS) { attempt ->
+        if (attempt > 0) Thread.sleep(1_000L * attempt)
+        val vtt = runCatching {
+            val request = Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
+            Http.client.newCall(request).execute().use { response ->
+                val body = response.body.string().trimStart('\uFEFF')
+                if (response.isSuccessful && body.startsWith("WEBVTT")) body else {
+                    Log.w("WTubeSubtitles", "Caption track refused (try ${attempt + 1}): HTTP ${response.code}, ${body.length} chars: ${body.take(60).replace('\n', ' ')}")
+                    null
+                }
+            }
+        }.getOrElse {
+            Log.w("WTubeSubtitles", "Caption track failed (try ${attempt + 1})", it)
+            null
+        }
+        if (vtt != null) return vtt
     }
-}.getOrElse {
-    Log.w("WTubeSubtitles", "Caption track failed", it)
-    EMPTY_VTT
+    return EMPTY_VTT
 }
 
 /**

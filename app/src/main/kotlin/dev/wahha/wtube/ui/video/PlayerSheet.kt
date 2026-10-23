@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.media3.common.Player
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -42,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -96,6 +98,10 @@ private val SettleSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
 private val LaunchSpec = tween<Float>(durationMillis = 380, easing = FastOutSlowInEasing)
 private val FlingVelocity = 400.dp
 private val FullscreenSwipe = 48.dp
+/** How far up a fullscreen swipe pulls the shelf of more videos all the way in. */
+private val ShelfDragRange = 160.dp
+/** Fullscreen swipes that start this close to the top or bottom edge belong to the system bars. */
+private val FullscreenSystemEdge = 40.dp
 
 /** "Previous" restarts the video when it has played longer than this. */
 private const val RESTART_MS = 3_000L
@@ -297,6 +303,10 @@ fun PlayerSheet(
     }
     var panel by remember { mutableStateOf<FullscreenPanel?>(null) }
     LaunchedEffect(fullscreen) { if (!fullscreen) panel = null }
+    // How far the shelf of more videos is in: follows a swipe up, then settles; the panel state says where it stays.
+    val scope = rememberCoroutineScope()
+    val shelf = remember { Animatable(0f) }
+    LaunchedEffect(panel) { shelf.animateTo(if (panel == FullscreenPanel.MoreVideos) 1f else 0f) }
     val pictureInPicture = LocalPictureInPicture.current
     val inPictureInPicture = pictureInPicture?.active == true
     val settings by Settings.current.collectAsStateWithLifecycle()
@@ -421,9 +431,17 @@ fun PlayerSheet(
                                 shape = RoundedCornerShape(MiniVideoRadius * progress())
                                 clip = true
                             }
-                            .pointerInputVideoDrag(sheet, fullscreen, inPictureInPicture, toggleFullscreen) {
-                                panel = FullscreenPanel.MoreVideos
-                            }
+                            .pointerInputVideoDrag(
+                                sheet,
+                                fullscreen,
+                                inPictureInPicture,
+                                toggleFullscreen,
+                                onShelfDrag = { scope.launch { shelf.snapTo(it) } },
+                                onShelfEnd = { open ->
+                                    if (open) panel = FullscreenPanel.MoreVideos
+                                    scope.launch { shelf.animateTo(if (open) 1f else 0f) }
+                                },
+                            )
                         if (player != null && state != null) {
                             VideoPlayer(
                                 player = player,
@@ -463,6 +481,12 @@ fun PlayerSheet(
                         if (fullscreen && !inPictureInPicture) FullscreenPanels(
                             vm,
                             panel,
+                            shelfProgress = { shelf.value },
+                            onShelfDrag = { scope.launch { shelf.snapTo(it) } },
+                            onShelfEnd = { open ->
+                                if (!open) panel = null
+                                scope.launch { shelf.animateTo(if (open) 1f else 0f) }
+                            },
                             onPanel = { panel = it },
                             onSeek = { ms -> player?.run { seekTo(ms); play() } },
                         )
@@ -593,15 +617,20 @@ private fun Modifier.pointerInputVideoDrag(
     fullscreen: Boolean,
     inPictureInPicture: Boolean,
     toggleFullscreen: () -> Unit,
-    onMoreVideos: () -> Unit,
+    onShelfDrag: (Float) -> Unit,
+    onShelfEnd: (open: Boolean) -> Unit,
 ): Modifier = pointerInput(sheet, fullscreen, inPictureInPicture) {
     if (inPictureInPicture) return@pointerInput
     val threshold = FullscreenSwipe.toPx()
+    val edge = FullscreenSystemEdge.toPx()
+    val shelfRange = ShelfDragRange.toPx()
     val tracker = VelocityTracker()
     awaitEachGesture {
         // The player's own tap detector consumes the down; drags still belong to us.
         val down = awaitFirstDown(requireUnconsumed = false)
         if (sheet.progress > 0.5f) return@awaitEachGesture
+        // A swipe from the top or bottom edge in fullscreen is the user pulling the system bars in.
+        if (fullscreen && (down.position.y < edge || down.position.y > size.height - edge)) return@awaitEachGesture
         var total = 0f
         val start = awaitVerticalTouchSlopOrCancellation(down.id) { change, over ->
             change.consume()
@@ -617,6 +646,8 @@ private fun Modifier.pointerInputVideoDrag(
             change.consume()
             total += dy
             tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+            // The shelf of more videos follows the finger up, not only opens after release.
+            if (fullscreen) onShelfDrag((-total / shelfRange).coerceIn(0f, 1f))
             if (!fullscreen && (moving || total > 0f)) {
                 moving = true
                 sheet.dragBy(dy)
@@ -624,8 +655,8 @@ private fun Modifier.pointerInputVideoDrag(
         }
         when {
             moving -> sheet.settle(if (completed) tracker.calculateVelocity().y else 0f)
-            fullscreen && total > threshold -> toggleFullscreen()
-            fullscreen && total < -threshold -> onMoreVideos()
+            fullscreen && total > threshold -> { onShelfEnd(false); toggleFullscreen() }
+            fullscreen -> onShelfEnd(completed && total < -threshold)
             !fullscreen && total < -threshold -> toggleFullscreen()
         }
     }

@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.media3.common.C
+import dev.wahha.wtube.download.AudioChoice
+import dev.wahha.wtube.player.LocalPlayerState
+import org.schabi.newpipe.extractor.stream.AudioTrackType
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,19 +47,37 @@ import dev.wahha.wtube.ui.icon.Audiotrack
 import dev.wahha.wtube.ui.icon.Download
 import dev.wahha.wtube.ui.icon.WIcons
 
+/** The audio track selected in the player right now, if it is playing [videoId]: the download keeps that dub. */
+@Composable
+private fun pickedAudio(videoId: String): AudioChoice? {
+    val state = LocalPlayerState.current ?: return null
+    if (state.mediaId != videoId) return null
+    val format = state.tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+        .firstNotNullOfOrNull { group -> (0 until group.length).firstOrNull { group.isTrackSelected(it) }?.let(group::getTrackFormat) }
+    val language = format?.language?.takeIf { it.isNotEmpty() && it != C.LANGUAGE_UNDETERMINED } ?: return null
+    val kind = when {
+        format.roleFlags and C.ROLE_FLAG_DUB != 0 -> AudioTrackType.DUBBED
+        format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> AudioTrackType.DESCRIPTIVE
+        format.roleFlags and C.ROLE_FLAG_MAIN != 0 -> AudioTrackType.ORIGINAL
+        else -> null
+    }
+    return AudioChoice(language, kind?.name)
+}
+
 /** What to save of [video]: each H.264 quality with its size, or the sound alone. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadSheet(video: VideoItem, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val audio = pickedAudio(video.id)
     var options by remember { mutableStateOf<List<DownloadOption>?>(null) }
     var error by remember { mutableStateOf<Throwable?>(null) }
     LaunchedEffect(video.id) {
-        runCatching { downloadOptions(YouTube.streamInfo(video.id)) }.onSuccess { options = it }.onFailure { error = it }
+        runCatching { downloadOptions(YouTube.streamInfo(video.id), audio) }.onSuccess { options = it }.onFailure { error = it }
     }
     var picked by remember { mutableStateOf<DownloadOption?>(null) }
     fun start(option: DownloadOption) {
-        Downloads.enqueue(video, option.audioOnly, option.height)
+        Downloads.enqueue(video, option.audioOnly, option.height, audio)
         Notices.show(R.string.downloads_started)
         onDismiss()
     }

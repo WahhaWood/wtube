@@ -21,6 +21,10 @@ import java.io.File
 
 enum class DownloadState { QUEUED, RUNNING, DONE, FAILED }
 
+/** The audio track picked in the player when the download was started: its language and kind (an `AudioTrackType` name). */
+@Serializable
+data class AudioChoice(val language: String, val kind: String?)
+
 /**
  * One saved video or its sound. [quality] is the video height picked (0 for audio); [file] is where the
  * finished file lives; [bytes] of [total] counts every part being fetched, for the progress bar.
@@ -36,6 +40,7 @@ data class Download(
     val total: Long = 0,
     val error: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
+    val audio: AudioChoice? = null,
 ) {
     val key: String get() = key(video.id, audioOnly)
 
@@ -77,8 +82,8 @@ object Downloads {
      * Queues [video] (or its sound) at [quality] and starts the service; an earlier copy is replaced. Its
      * files are deleted before the new one is listed, so the service never resumes from the old parts.
      */
-    fun enqueue(video: VideoItem, audioOnly: Boolean, quality: Int) {
-        val download = newDownload(video, audioOnly, quality, System.currentTimeMillis()) ?: return
+    fun enqueue(video: VideoItem, audioOnly: Boolean, quality: Int, audio: AudioChoice? = null) {
+        val download = newDownload(video, audioOnly, quality, System.currentTimeMillis(), audio) ?: return
         change { list -> list.filterNot { it.key == download.key } }
         scope.launch {
             partsOf(download).forEach { it.delete() }
@@ -104,11 +109,11 @@ object Downloads {
         return fresh.size
     }
 
-    private fun newDownload(video: VideoItem, audioOnly: Boolean, quality: Int, addedAt: Long): Download? {
+    private fun newDownload(video: VideoItem, audioOnly: Boolean, quality: Int, addedAt: Long, audio: AudioChoice? = null): Download? {
         val context = app ?: return null
         val folder = context.getExternalFilesDir(if (audioOnly) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES) ?: context.filesDir
         val name = safeName(video.title).ifEmpty { video.id } + " [${video.id}]" + if (audioOnly) ".m4a" else ".mp4"
-        return Download(video, audioOnly, quality, File(File(folder, "WTube"), name).absolutePath, addedAt = addedAt)
+        return Download(video, audioOnly, quality, File(File(folder, "WTube"), name).absolutePath, addedAt = addedAt, audio = audio)
     }
 
     /** Stops (the service notices) and deletes [key] with its files. */

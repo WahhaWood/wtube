@@ -21,6 +21,7 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.player.VideoCodec
+import dev.wahha.wtube.player.sameLanguage
 import dev.wahha.wtube.player.YoutubeRequests
 import dev.wahha.wtube.ui.components.errorDetail
 import kotlinx.coroutines.CancellationException
@@ -40,6 +41,7 @@ import org.schabi.newpipe.extractor.stream.VideoStream
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import dev.wahha.wtube.player.sameLanguage
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -52,8 +54,8 @@ data class DownloadOption(val audioOnly: Boolean, val height: Int, val bytes: Lo
  * What can be saved of a video: H.264 qualities (every phone plays them and MediaMuxer puts them in MP4
  * without re-encoding) and the original AAC sound. Only streams of known length: they download by range.
  */
-fun downloadOptions(info: StreamInfo): List<DownloadOption> {
-    val audio = bestAudio(info) ?: return emptyList()
+fun downloadOptions(info: StreamInfo, choice: AudioChoice? = null): List<DownloadOption> {
+    val audio = bestAudio(info.audioStreams, choice) ?: return emptyList()
     val video = info.videoOnlyStreams.filter(::downloadable).filter { VideoCodec.AVC.matches(it.codec) }
         .groupBy { it.height }.values.map { it.maxBy { s -> s.fps } }
         .sortedByDescending { it.height }
@@ -61,10 +63,19 @@ fun downloadOptions(info: StreamInfo): List<DownloadOption> {
     return video + DownloadOption(true, 0, length(audio))
 }
 
-private fun bestAudio(info: StreamInfo): AudioStream? = info.audioStreams.filter(::downloadable)
-    .filter { it.format == StreamFormat.M4A && it.itagItem?.isDrc != true }
-    .filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL }
-    .maxByOrNull { it.averageBitrate }
+/**
+ * The AAC track to save: the one the user had picked in the player ([choice]: language and kind), else
+ * the original. A pick the video does not have (or has no AAC for) falls back to the original.
+ */
+internal fun bestAudio(streams: List<AudioStream>, choice: AudioChoice? = null): AudioStream? {
+    val aac = streams.filter(::downloadable).filter { it.format == StreamFormat.M4A && it.itagItem?.isDrc != true }
+    fun language(stream: AudioStream) = stream.audioLocale?.language ?: stream.audioTrackId?.substringBefore('.')
+    val picked = choice?.let { c ->
+        aac.filter { s -> language(s)?.sameLanguage(c.language) == true && (c.kind == null || (s.audioTrackType ?: AudioTrackType.ORIGINAL).name == c.kind) }
+    }.orEmpty()
+    return picked.ifEmpty { aac.filter { it.audioTrackType == null || it.audioTrackType == AudioTrackType.ORIGINAL } }
+        .maxByOrNull { it.averageBitrate }
+}
 
 /** The H.264 stream at [height], else the best one below it (a playlist is saved "up to" a quality), else the lowest. */
 private fun videoFor(info: StreamInfo, height: Int): VideoStream? {
@@ -152,7 +163,7 @@ class DownloadService : Service() {
         var info = YouTube.streamInfo(download.video.id)
         var refreshed = false
         while (true) {
-            val audio = bestAudio(info) ?: throw IOException("No AAC sound for this video")
+            val audio = bestAudio(info.audioStreams, download.audio) ?: throw IOException("No AAC sound for this video")
             val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw IOException("No H.264 stream")
             val total = length(audio) + (video?.let(::length) ?: 0)
             Downloads.update(download) { it.copy(total = total, quality = video?.height ?: it.quality) }

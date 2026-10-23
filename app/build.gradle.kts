@@ -17,8 +17,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 28
-        versionName = "0.19.0"
+        versionCode = 29
+        versionName = "0.19.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -44,6 +44,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // ML Kit translation ships 12-17 MB of native code per ABI; phones are arm64.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
 
@@ -86,6 +88,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.guava)
+    implementation(libs.mlkit.translate)
     implementation(libs.kyant.backdrop)
     implementation(libs.material.kolor)
 
