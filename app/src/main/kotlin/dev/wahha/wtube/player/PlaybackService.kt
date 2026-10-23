@@ -40,7 +40,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.wahha.wtube.MainActivity
 import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Hidden
-import dev.wahha.wtube.dpi.BypassSelector
+import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.WatchProgress
@@ -50,6 +50,7 @@ import dev.wahha.wtube.data.qualityCap
 import dev.wahha.wtube.data.watchUrl
 import dev.wahha.wtube.download.Downloads
 import java.io.File
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -254,13 +255,14 @@ class PlaybackService : MediaSessionService() {
     private inner class PlayerListener(private val player: Player) : Player.Listener {
         // The video whose links were last refreshed and when, so a link that keeps failing is refreshed only once.
         private var refreshed: Pair<String, Long>? = null
+        private var stall: Job? = null
 
         /** Stream links expire after some hours: refetch them once and go on from the same spot, without a button. */
         override fun onPlayerError(error: PlaybackException) {
             val id = player.currentMediaItem?.mediaId ?: return
             // Into the app's own event file: on some phones the shared logcat is nearly empty.
             val causes = generateSequence(error.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}" }
-            ErrorLog.note("[player] ${error.errorCodeName} on $id, route ${BypassSelector.proxy ?: "direct"}: $causes")
+            ErrorLog.note("[player] ${error.errorCodeName} on $id, route ${Http.route ?: "direct"}: $causes")
             if (!error.isExpiredLink()) return
             val now = SystemClock.elapsedRealtime()
             refreshed?.let { (lastId, at) -> if (lastId == id && now - at < REFRESH_AGAIN_MS) return }
@@ -284,6 +286,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            watchStall(playbackState)
             if (playbackState != Player.STATE_ENDED) {
                 Autoplay.cancel()
                 return
@@ -292,6 +295,18 @@ class PlaybackService : MediaSessionService() {
                 SleepTimer.cancel()
             } else {
                 scheduleNext(player)
+            }
+        }
+
+        /** A throttled stream trickles instead of failing, so no error ever says why; a long wait is noted too. */
+        private fun watchStall(playbackState: Int) {
+            stall?.cancel()
+            if (playbackState != Player.STATE_BUFFERING) return
+            stall = scope.launch {
+                delay(STALL_NOTE_MS)
+                if (!player.playWhenReady) return@launch
+                val buffered = (player.bufferedPosition - player.currentPosition) / 1000
+                ErrorLog.note("[player] buffering ${STALL_NOTE_MS / 1000} s on ${player.currentMediaItem?.mediaId} (${buffered} s ahead), route ${Http.route ?: "direct"}")
             }
         }
 
@@ -431,6 +446,7 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "PlaybackService"
         private const val REFRESH_AGAIN_MS = 10 * 60_000L
+        private const val STALL_NOTE_MS = 15_000L
         const val AUTOPLAY_DELAY_MS = 8_000L
         val StatsCommand = SessionCommand("dev.wahha.wtube.STATS", Bundle.EMPTY)
         const val STAT_VIDEO = "video"

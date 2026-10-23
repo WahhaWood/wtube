@@ -44,7 +44,7 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { Http.client })) }
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { Http.calls })) }
             .crossfade(true)
             .build()
 }

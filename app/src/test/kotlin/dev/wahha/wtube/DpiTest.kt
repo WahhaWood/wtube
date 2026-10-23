@@ -79,7 +79,8 @@ class DpiTest {
             assertFalse(host, isBypassHost(host))
         }
         val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", 1080))
-        assertEquals(listOf(proxy, Proxy.NO_PROXY), route("rr1.googlevideo.com", proxy))
+        // Never direct as a second choice: OkHttp would race it against the proxy.
+        assertEquals(listOf(proxy), route("rr1.googlevideo.com", proxy))
         assertEquals(listOf(Proxy.NO_PROXY), route("api.github.com", proxy))
         assertEquals(listOf(Proxy.NO_PROXY), route("www.youtube.com", null))
     }

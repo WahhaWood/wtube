@@ -43,7 +43,7 @@ object YouTube {
      */
     fun init(country: String) {
         val region = country.takeIf { it.length == 2 } ?: "US"
-        NewPipe.init(NewPipeDownloader(Http.client), Localization("en", region), ContentCountry(region))
+        NewPipe.init(NewPipeDownloader { Http.client }, Localization("en", region), ContentCountry(region))
     }
 
     suspend fun kiosk(id: String, page: Page? = null): ItemsPage = io {

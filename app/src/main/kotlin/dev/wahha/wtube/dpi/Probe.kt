@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.EventListener
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -57,6 +58,9 @@ class Probe(
 
     /** [proxy] null = directly. */
     suspend fun check(proxy: Proxy?): ProbeResult = withContext(Dispatchers.IO) { checkOn(clientFor(proxy)) }
+
+    /** The way the app's own requests go: its route choice per host, not one proxy set by hand. */
+    suspend fun checkRouted(): ProbeResult = withContext(Dispatchers.IO) { checkOn(limits(Http.client.newBuilder().dispatcher(Dispatcher()))) }
 
     private suspend fun checkOn(client: OkHttpClient): ProbeResult {
         try {
@@ -119,8 +123,9 @@ class Probe(
         private const val STREAM_URL_TIMEOUT_MS = 60_000L
 
         /** A client of its own for one route: an explicit proxy, a fresh pool, short timeouts, no error watching. */
-        fun clientFor(proxy: Proxy?): OkHttpClient = Http.client.newBuilder()
-            .proxy(proxy ?: Proxy.NO_PROXY)
+        fun clientFor(proxy: Proxy?): OkHttpClient = limits(Http.base.newBuilder().proxy(proxy ?: Proxy.NO_PROXY))
+
+        private fun limits(builder: OkHttpClient.Builder): OkHttpClient = builder
             .connectionPool(ConnectionPool())
             .eventListener(EventListener.NONE)
             .connectTimeout(5, TimeUnit.SECONDS)

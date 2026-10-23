@@ -38,7 +38,7 @@ import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.VideoStream
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import okhttp3.Request
 import okhttp3.Response
 import dev.wahha.wtube.player.sameLanguage
@@ -192,7 +192,7 @@ class DownloadService : Service() {
 
     /** Appends bytes of [url] to [target] until it holds [length] of them; [offset] places them in the overall progress. */
     private suspend fun part(download: Download, url: String, length: Long, target: File, offset: Long, total: Long) {
-        downloadRange(Http.client, url, length, target, CHUNK_BYTES, YoutubeRequests::rangeRequest, ensureAlive = {
+        downloadRange(Http.calls, url, length, target, CHUNK_BYTES, YoutubeRequests::rangeRequest, ensureAlive = {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (!Downloads.isCurrent(download)) throw CancellationException("Download removed")
         }) { position ->
@@ -292,7 +292,7 @@ internal class ExpiredException : IOException("Stream URL expired")
  * start at the asked position (a server ignoring the range) is skipped into place or refused, never appended.
  */
 internal suspend fun downloadRange(
-    client: OkHttpClient,
+    client: Call.Factory,
     url: String,
     length: Long,
     target: File,

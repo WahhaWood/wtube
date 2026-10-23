@@ -113,10 +113,19 @@ object Settings {
     private var store: DataStore<Preferences>? = null
 
     val current: StateFlow<AppSettings> = state.asStateFlow()
+    private val mutableLoaded = MutableStateFlow(false)
+
+    /** Whether [current] holds the stored settings yet, not the defaults. */
+    val loaded: StateFlow<Boolean> = mutableLoaded.asStateFlow()
 
     fun init(context: Context) {
         val store = context.applicationContext.dataStore.also { store = it }
-        scope.launch { store.data.collect { state.value = it.toSettings() } }
+        scope.launch {
+            store.data.collect {
+                state.value = it.toSettings()
+                mutableLoaded.value = true
+            }
+        }
     }
 
     fun <T> set(key: Preferences.Key<T>, value: T) {

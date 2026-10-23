@@ -13,26 +13,33 @@ private val BypassDomains = listOf(
     "googleusercontent.com", "googleapis.com", "google.com", "gstatic.com",
 )
 
-fun isBypassHost(host: String): Boolean {
+/** The [BypassDomains] entry [host] belongs to, or null. */
+fun bypassDomain(host: String): String? {
     val name = host.lowercase().trimEnd('.')
-    return BypassDomains.any { name == it || name.endsWith(".$it") }
+    return BypassDomains.firstOrNull { name == it || name.endsWith(".$it") }
 }
 
-/**
- * Routes [isBypassHost] requests through [proxy] when one is set, the rest directly. Direct is the second
- * choice for bypass hosts too: OkHttp falls back to it if the local proxy is gone (its process died).
- */
-object BypassSelector : ProxySelector() {
-    @Volatile
-    var proxy: Proxy? = null
+fun isBypassHost(host: String): Boolean = bypassDomain(host) != null
 
+/**
+ * Routes [isBypassHost] requests through [proxy] when one is set, the rest directly. One instance per route
+ * (see [dev.wahha.wtube.data.Http.setRoute]).
+ */
+class BypassSelector(val proxy: Proxy?) : ProxySelector() {
     override fun select(uri: URI): List<Proxy> = route(uri.host, proxy)
 
     override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) = Unit
 }
 
+/**
+ * The proxy alone for bypass hosts, never direct as a second choice: OkHttp races its routes (fast fallback
+ * starts the next one when the first has not connected in 250 ms, and byedpi answers only after its own DNS
+ * lookup and connect). A direct connection to googlevideo that wins gets through the handshake, then the
+ * censor throttles it, and the pooled connection stalls every video after it (0.20.1 on LTE in Russia).
+ * If the proxy's process dies, [Dpi] routes directly by itself until it is back.
+ */
 fun route(host: String?, proxy: Proxy?): List<Proxy> =
-    if (proxy != null && host != null && isBypassHost(host)) listOf(proxy, Proxy.NO_PROXY) else listOf(Proxy.NO_PROXY)
+    if (proxy != null && host != null && isBypassHost(host)) listOf(proxy) else listOf(Proxy.NO_PROXY)
 
 /** The local byedpi proxy on [port]. */
 fun localSocks(port: Int) = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port))

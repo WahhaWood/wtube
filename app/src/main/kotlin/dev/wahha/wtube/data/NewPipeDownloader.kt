@@ -8,7 +8,7 @@ import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 
 /** NewPipeExtractor's HTTP hook on OkHttp, as in NewPipe's DownloaderImpl (minus cookies until login). */
-class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
+class NewPipeDownloader(private val client: () -> OkHttpClient) : Downloader() {
     override fun execute(request: Request): Response {
         val builder = okhttp3.Request.Builder()
             .method(request.httpMethod(), request.dataToSend()?.toRequestBody())
@@ -19,7 +19,7 @@ class NewPipeDownloader(private val client: OkHttpClient) : Downloader() {
             values.forEach { builder.addHeader(name, it) }
         }
 
-        (clientOverride.get() ?: client).newCall(builder.build()).execute().use { response ->
+        (clientOverride.get() ?: client()).newCall(builder.build()).execute().use { response ->
             if (response.code == 429) throw ReCaptchaException("reCaptcha Challenge requested", request.url())
             return Response(
                 response.code,

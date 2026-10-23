@@ -46,6 +46,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.Proxy
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** What the bypass is doing, for Settings and the log. */
 sealed interface DpiState {
@@ -70,7 +72,7 @@ sealed interface DpiState {
 
 /**
  * The YouTube blocking bypass: byedpi as a local SOCKS5 proxy in a process of its own ([DpiService]), which
- * [BypassSelector] puts in front of YouTube's hosts in [Http.client]. Off, nothing runs and nothing is loaded.
+ * [Http.setRoute] puts in front of YouTube's hosts. Off, nothing runs and nothing is loaded.
  * On, the strategy is picked per network: one remembered for it, else a search through the presets
  * ([StrategySearch]); a run of failed YouTube requests triggers a quick re-check of the recent strategies.
  */
@@ -84,6 +86,7 @@ object Dpi {
     private const val FAILURE_WINDOW_MS = 60_000L
     private const val RECHECK_EVERY_MS = 5 * 60_000L
     private const val RESTART_DELAY_MS = 5_000L
+    private const val FIRST_ROUTE_WAIT_MS = 10_000L
     const val ACTION_OPEN = "dev.wahha.wtube.action.OPEN_DPI"
 
     private lateinit var app: Context
@@ -104,6 +107,7 @@ object Dpi {
     private val failures = ArrayDeque<Long>()
     private var lastRecheck = 0L
     private var recheck: Job? = null
+    private val firstRoute = CountDownLatch(1)
 
     val state: StateFlow<DpiState> = mutableState.asStateFlow()
     val presets: StateFlow<StrategyList> = mutablePresets.asStateFlow()
@@ -141,6 +145,8 @@ object Dpi {
         }
         scope.launch {
             store.migrate()
+            // The defaults say "off": deciding on them would let the first requests go directly.
+            Settings.loaded.first { it }
             combine(Settings.current, store.memory, network, mutablePresets, requests) { settings, memory, key, presets, request ->
                 Inputs(settings.dpiBypass, memory.customArgs, memory.customProxy, key, key?.let { memory.networks[it] }, presets, request)
             }.distinctUntilChanged().collectLatest { apply(it) }
@@ -154,12 +160,21 @@ object Dpi {
 
     // ---- Decisions ----
 
+    /**
+     * Blocks a YouTube request made right after launch until the bypass has its first route (or is off, or has
+     * waited [FIRST_ROUTE_WAIT_MS]), so it does not go directly while byedpi is still starting.
+     */
+    fun awaitFirstRoute() {
+        if (::app.isInitialized) firstRoute.await(FIRST_ROUTE_WAIT_MS, TimeUnit.MILLISECONDS)
+    }
+
     private suspend fun apply(inputs: Inputs) {
         if (!inputs.enabled) {
             recheck?.cancel()
             stopMain()
             setRoute(null)
             mutableState.value = DpiState.Off
+            firstRoute.countDown()
             return
         }
         if (inputs.presets.strategies.isEmpty()) return
@@ -167,6 +182,7 @@ object Dpi {
             stopMain()
             setRoute(proxy)
             mutableState.value = DpiState.CustomProxy
+            firstRoute.countDown()
             return
         }
         val key = inputs.network
@@ -177,6 +193,7 @@ object Dpi {
         }
         if (inputs.customArgs.isNotBlank()) {
             Strategies.validate(inputs.customArgs)?.let { runMain(CUSTOM, it) }
+            firstRoute.countDown()
             return
         }
         when (val saved = inputs.saved) {
@@ -184,16 +201,22 @@ object Dpi {
                 stopMain()
                 setRoute(null)
                 mutableState.value = DpiState.NotNeeded
+                firstRoute.countDown()
             }
-            null -> if (cancelledOn == key) {
-                mutableState.value = DpiState.Cancelled
-            } else {
-                search(key, inputs.presets.strategies)
+            null -> {
+                // A search takes a minute; requests go directly meanwhile, as they always did.
+                firstRoute.countDown()
+                if (cancelledOn == key) mutableState.value = DpiState.Cancelled else search(key, inputs.presets.strategies)
             }
             else -> {
                 val strategy = inputs.presets.strategies.firstOrNull { it.id == saved }
                 val args = strategy?.let { Strategies.validate(it.args) }
-                if (args == null) store.forget(key) else runMain(saved, args)
+                if (args == null) {
+                    store.forget(key)
+                } else {
+                    runMain(saved, args)
+                    firstRoute.countDown()
+                }
             }
         }
     }
@@ -308,7 +331,7 @@ object Dpi {
     fun setCustomProxy(proxy: String) = scope.launch { store.setCustomProxy(proxy) }
 
     suspend fun refreshPresets(): Presets.Refresh {
-        val proxy = BypassSelector.proxy
+        val proxy = Http.route
         val (result, etag) = Presets.refresh(app, mutablePresets.value, memory.value.presetsEtag, proxy)
         if (result != Presets.Refresh.Failed) store.presetsChecked(etag, System.currentTimeMillis())
         if (result is Presets.Refresh.Updated) {
@@ -321,11 +344,16 @@ object Dpi {
     // ---- Network ----
 
     private fun setRoute(proxy: Proxy?) {
-        if (BypassSelector.proxy == proxy) return
-        BypassSelector.proxy = proxy
-        // Pooled connections were made on the old route; idle ones must not carry YouTube past the new one.
-        // Closing them talks TLS, so not on the main thread.
-        scope.launch(Dispatchers.IO) { Http.client.connectionPool.evictAll() }
+        val old = Http.setRoute(proxy) ?: return
+        // YouTube calls still on the old route stop (on a blocked network a direct one stalls rather than fails,
+        // and the player retries on the new route); ones held at the start move over by themselves (Http.RouteGate).
+        // Its idle connections close. Both talk TLS, so not on the main thread.
+        scope.launch(Dispatchers.IO) {
+            for (call in old.dispatcher.runningCalls()) {
+                if (isBypassHost(call.request().url.host) && !Http.isHeld(call)) call.cancel()
+            }
+            old.connectionPool.evictAll()
+        }
     }
 
     private fun watchNetwork() {
@@ -387,6 +415,16 @@ object Dpi {
         }
     }
 
+    private val connectedVia = mutableSetOf<String>()
+
+    /** From [Http.client]'s event listener: which way connections to YouTube really go, once per domain and route. */
+    fun onConnected(host: String, proxy: Proxy) {
+        if (!::app.isInitialized || !Settings.current.value.dpiBypass) return
+        val domain = bypassDomain(host) ?: return
+        val via = "$domain via ${if (proxy.type() == Proxy.Type.DIRECT) "direct" else proxy}"
+        if (synchronized(connectedVia) { connectedVia.add(via) }) log("Connected: $via")
+    }
+
     fun onRequestSucceeded(host: String) {
         if (::app.isInitialized && isBypassHost(host) && failures.isNotEmpty()) scope.launch { failures.clear() }
     }
@@ -446,8 +484,8 @@ object Dpi {
 
     /** Checks the route YouTube takes now (bypass, own proxy or direct), for "Проверить сейчас". */
     suspend fun checkNow(): ProbeResult {
-        val proxy = BypassSelector.proxy
-        val result = probeLock.withLock { Probe().check(proxy) }
+        val proxy = Http.route
+        val result = probeLock.withLock { Probe().checkRouted() }
         log("Check now through ${proxy ?: "direct"}: ${result.summary()}")
         return result
     }
@@ -456,12 +494,12 @@ object Dpi {
     fun describe(): String {
         if (!::app.isInitialized) return "off"
         val presets = mutablePresets.value
-        return "${mutableState.value}, presets v${presets.version} (${presets.strategies.size}), route ${BypassSelector.proxy ?: "direct"}"
+        return "${mutableState.value}, presets v${presets.version} (${presets.strategies.size}), route ${Http.route ?: "direct"}"
     }
 
     /** The proxy for the sign-in WebView, as a Chromium proxy rule; null = direct. */
     fun webViewProxy(): String? {
-        val proxy = BypassSelector.proxy ?: return null
+        val proxy = Http.route ?: return null
         val address = proxy.address() as? java.net.InetSocketAddress ?: return null
         val scheme = if (proxy.type() == Proxy.Type.HTTP) "http" else "socks5"
         return "$scheme://${address.hostString}:${address.port}"

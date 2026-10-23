@@ -53,8 +53,8 @@ const val SUBTITLE_TRANSLATED = "translated"
  * a manual quality pick is just a track override. Live streams use YouTube's HLS manifest.
  */
 class YoutubeMediaSourceFactory : MediaSource.Factory {
-    private val youtubeDataSource = ResolvingDataSource.Factory(OkHttpDataSource.Factory(Http.client), YoutubeRequests)
-    private val plainDataSource = OkHttpDataSource.Factory(Http.client).setUserAgent(Http.USER_AGENT)
+    private val youtubeDataSource = ResolvingDataSource.Factory(OkHttpDataSource.Factory(Http.calls), YoutubeRequests)
+    private val plainDataSource = OkHttpDataSource.Factory(Http.calls).setUserAgent(Http.USER_AGENT)
     private val subtitleDataSource = DataSource.Factory { SubtitleDataSource() }
     private val codecs by lazy { deviceCodecPreference() }
     private var drmProvider: DrmSessionManagerProvider? = null
