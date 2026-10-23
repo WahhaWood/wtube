@@ -1,5 +1,7 @@
 package dev.wahha.wtube.ui.components
 
+import androidx.compose.runtime.LaunchedEffect
+import dev.wahha.wtube.data.ErrorLog
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -88,6 +90,7 @@ fun errorDetail(error: Throwable): String =
 
 @Composable
 fun ErrorState(error: Throwable, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    LaunchedEffect(error) { ErrorLog.note("[screen] ${errorDetail(error)}") }
     MessageState(WIcons.Error, stringResource(errorMessage(error)), modifier, detail = errorDetail(error)) {
         FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }

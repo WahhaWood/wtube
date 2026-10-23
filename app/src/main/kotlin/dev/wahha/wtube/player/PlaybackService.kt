@@ -38,7 +38,9 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dev.wahha.wtube.MainActivity
+import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.dpi.BypassSelector
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.WatchProgress
@@ -256,6 +258,9 @@ class PlaybackService : MediaSessionService() {
         /** Stream links expire after some hours: refetch them once and go on from the same spot, without a button. */
         override fun onPlayerError(error: PlaybackException) {
             val id = player.currentMediaItem?.mediaId ?: return
+            // Into the app's own event file: on some phones the shared logcat is nearly empty.
+            val causes = generateSequence(error.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}" }
+            ErrorLog.note("[player] ${error.errorCodeName} on $id, route ${BypassSelector.proxy ?: "direct"}: $causes")
             if (!error.isExpiredLink()) return
             val now = SystemClock.elapsedRealtime()
             refreshed?.let { (lastId, at) -> if (lastId == id && now - at < REFRESH_AGAIN_MS) return }

@@ -431,7 +431,10 @@
     <string name="dpi_manual_hint">Пресет запоминается для текущей сети. Отметки — результаты последнего подбора.</string>
     <string name="dpi_result_fast">работает, %1$d Мбит/с</string>
     <string name="dpi_result_slow">работает медленно, %1$d кбит/с</string>
-    <string name="dpi_result_works">работает</string>
+    <string name="dpi_result_unverified">видео не проверено</string>
+    <string name="dpi_check">Проверить сейчас</string>
+    <string name="dpi_check_summary">Скачать кусок видео тем путём, которым YouTube идёт сейчас, и замерить скорость</string>
+    <string name="dpi_checking">Проверяю… (до минуты)</string>
     <string name="dpi_result_partly">частично: %1$s</string>
     <string name="dpi_result_failed">не работает</string>
     <string name="dpi_part_site">сайт</string>

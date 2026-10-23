@@ -205,7 +205,6 @@ class DpiTest {
     private fun probe(server: MockWebServer, streamUrl: String?) = Probe(
         siteUrl = server.url("/generate_204").toString(),
         imageUrl = server.url("/thumb.jpg").toString(),
-        redirectorUrl = server.url("/generate_204").toString(),
         streamUrl = { streamUrl },
     )
 
@@ -230,18 +229,21 @@ class DpiTest {
             val result = probe(server, server.url("/videoplayback?id=1").toString()).check(null)
             assertTrue(result.site && result.images)
             assertFalse(result.toString(), result.video)
+            assertTrue(result.note, " KB in " in result.note)
         } finally {
             server.shutdown()
         }
     }
 
+    /** 0.20.0 counted a bare googlevideo answer when no stream link came, and picked a route that stalled video. */
     @Test
-    fun withoutAStreamLinkGooglevideoIsOnlyReached() = runBlocking {
+    fun withoutAStreamLinkTheRouteDoesNotWork() = runBlocking {
         val server = server(MockResponse().setResponseCode(500))
         try {
             val result = probe(server, streamUrl = null).check(null)
-            assertTrue(result.works)
-            assertFalse(result.fast)
+            assertTrue(result.site && result.images)
+            assertFalse(result.works)
+            assertEquals("no stream link", result.note)
         } finally {
             server.shutdown()
         }

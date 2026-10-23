@@ -66,6 +66,8 @@ fun BypassScreen() {
     val network by Dpi.networkKey.collectAsStateWithLifecycle()
     var manualOpen by rememberSaveable { mutableStateOf(false) }
     var dialog by rememberSaveable { mutableStateOf<BypassDialog?>(null) }
+    var checking by remember { mutableStateOf(false) }
+    var checked by remember { mutableStateOf<ProbeResult?>(null) }
     val scope = rememberCoroutineScope()
 
     LazyColumn(
@@ -82,6 +84,22 @@ fun BypassScreen() {
         if (!settings.dpiBypass) return@LazyColumn
 
         item { ValueRow(stringResource(R.string.dpi_status), statusText(state, network), onClick = null) }
+        item {
+            val value = when {
+                checking -> stringResource(R.string.dpi_checking)
+                checked != null -> resultText(checked!!)
+                else -> stringResource(R.string.dpi_check_summary)
+            }
+            ValueRow(stringResource(R.string.dpi_check), value, onClick = if (checking || state is DpiState.Testing) null else {
+                {
+                    checking = true
+                    scope.launch {
+                        checked = Dpi.checkNow()
+                        checking = false
+                    }
+                }
+            })
+        }
         val testing = state as? DpiState.Testing
         if (testing != null) {
             item {
@@ -175,7 +193,8 @@ private fun statusText(state: DpiState, network: String?): String = when (state)
 private fun resultText(result: ProbeResult): String = when {
     result.fast -> stringResource(R.string.dpi_result_fast, result.kbps / 1000)
     result.works && result.kbps > 0 -> stringResource(R.string.dpi_result_slow, result.kbps)
-    result.works -> stringResource(R.string.dpi_result_works)
+    // Saved by 0.20.0, which counted a bare googlevideo answer as working.
+    result.works -> stringResource(R.string.dpi_result_unverified)
     result.score > 0 -> {
         val parts = listOfNotNull(
             R.string.dpi_part_site.takeIf { result.site },

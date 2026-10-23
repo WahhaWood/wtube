@@ -5,6 +5,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -60,6 +61,18 @@ class DpiStore(context: Context) {
         }
     }
 
+    /**
+     * 0.20.0 counted a bare googlevideo answer as a working route and remembered strategies that stall video:
+     * its choices, recent list and results are dropped once, so every network is searched again.
+     */
+    suspend fun migrate() = store.edit { prefs ->
+        if ((prefs[Version] ?: 1) >= VERSION) return@edit
+        prefs.asMap().keys.filter { it.name.startsWith(NET_PREFIX) }.forEach { prefs.remove(it) }
+        prefs.remove(Recent)
+        prefs.remove(Results)
+        prefs[Version] = VERSION
+    }
+
     suspend fun forget(network: String) = store.edit { it.remove(stringPreferencesKey(NET_PREFIX + network)) }
 
     suspend fun saveResults(results: Map<String, ProbeResult>) = store.edit { it[Results] = json.encodeToString(results) }
@@ -75,6 +88,8 @@ class DpiStore(context: Context) {
 
     private companion object {
         const val NET_PREFIX = "net:"
+        const val VERSION = 2
+        val Version = intPreferencesKey("version")
         val Recent = stringPreferencesKey("recent")
         val Results = stringPreferencesKey("results")
         val CustomArgs = stringPreferencesKey("custom_args")

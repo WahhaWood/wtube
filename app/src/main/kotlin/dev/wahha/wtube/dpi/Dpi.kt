@@ -20,6 +20,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.wahha.wtube.MainActivity
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Settings
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -128,12 +130,17 @@ object Dpi {
         main = DpiProcess(app, DpiMainService::class.java).also { it.onDied = ::onMainDied }
         probes = listOf(DpiProbe1Service::class.java, DpiProbe2Service::class.java, DpiProbe3Service::class.java).map { DpiProcess(app, it) }
         watchNetwork()
+        scope.launch { network.collect { if (Settings.current.value.dpiBypass) log("Network: ${it ?: "none"}") } }
+        scope.launch {
+            mutableState.map { if (it is DpiState.Testing) "Testing" else it.toString() }.distinctUntilChanged().collect { log("State: $it") }
+        }
         scope.launch {
             // Off by default: the presets are read only once the bypass is on.
             Settings.current.first { it.dpiBypass }
             mutablePresets.value = withContext(Dispatchers.IO) { Presets.load(app) }
         }
         scope.launch {
+            store.migrate()
             combine(Settings.current, store.memory, network, mutablePresets, requests) { settings, memory, key, presets, request ->
                 Inputs(settings.dpiBypass, memory.customArgs, memory.customProxy, key, key?.let { memory.networks[it] }, presets, request)
             }.distinctUntilChanged().collectLatest { apply(it) }
@@ -202,9 +209,9 @@ object Dpi {
             mainArgs = args
             setRoute(localSocks(port))
             mutableState.value = DpiState.Running(id)
-            Log.i(TAG, "Bypass running: $id on port $port")
+            log("Bypass running: $id on port $port")
         } catch (e: IOException) {
-            Log.w(TAG, "byedpi did not start: ${e.message}")
+            log("byedpi did not start: ${e.message}")
             mainArgs = null
             setRoute(null)
             noteDeath()
@@ -220,7 +227,7 @@ object Dpi {
 
     /** The proxy's process went away on its own: direct until it is back, a few restarts, then give up. */
     private fun onMainDied() {
-        Log.w(TAG, "byedpi process died")
+        log("byedpi process died")
         mainArgs = null
         setRoute(null)
         noteDeath()
@@ -246,18 +253,22 @@ object Dpi {
         recheck?.cancel()
         val results = mutableMapOf<String, ProbeResult>()
         mutableState.value = DpiState.Testing(0, candidates.size)
+        log("Search in $key: ${candidates.size} candidates")
         val outcome = probeLock.withLock {
             try {
-                StrategySearch(probes, Probe()::check).run(
+                StrategySearch(probes, loggedProbe()).run(
                     candidates,
                     onProgress = { done, total -> mutableState.value = DpiState.Testing(done, total) },
-                    onResult = { strategy, result -> results[strategy.id] = result },
+                    onResult = { strategy, result ->
+                        results[strategy.id] = result
+                        log("  ${strategy.id}: ${result.summary()}")
+                    },
                 )
             } finally {
                 withContext(NonCancellable) { if (results.isNotEmpty()) store.saveResults(results) }
             }
         }
-        Log.i(TAG, "Search in this network: $outcome")
+        log("Search in this network: ${outcome.summary()}")
         when (outcome) {
             SearchOutcome.Direct -> store.remember(key, DpiMemory.DIRECT)
             is SearchOutcome.Found -> store.remember(key, outcome.strategy.id)
@@ -301,7 +312,7 @@ object Dpi {
         val (result, etag) = Presets.refresh(app, mutablePresets.value, memory.value.presetsEtag, proxy)
         if (result != Presets.Refresh.Failed) store.presetsChecked(etag, System.currentTimeMillis())
         if (result is Presets.Refresh.Updated) {
-            Log.i(TAG, "Presets updated to version ${result.list.version}")
+            log("Presets updated to version ${result.list.version}")
             mutablePresets.value = result.list
         }
         return result
@@ -386,9 +397,11 @@ object Dpi {
         val presets = mutablePresets.value.strategies
         val saved = memory.value.networks[key]
         val candidates = (listOfNotNull(saved) + memory.value.recent).distinct().mapNotNull { id -> presets.firstOrNull { it.id == id } }
-        Log.i(TAG, "YouTube keeps failing, re-checking ${candidates.size} recent strategies")
-        val outcome = probeLock.withLock { StrategySearch(probes, Probe()::check).run(candidates) }
-        Log.i(TAG, "Re-check: $outcome")
+        log("YouTube keeps failing, re-checking ${candidates.size} recent strategies")
+        val outcome = probeLock.withLock {
+            StrategySearch(probes, loggedProbe()).run(candidates, onResult = { s, r -> log("  ${s.id}: ${r.summary()}") })
+        }
+        log("Re-check: ${outcome.summary()}")
         when (outcome) {
             SearchOutcome.Direct -> if (saved != DpiMemory.DIRECT) store.remember(key, DpiMemory.DIRECT)
             is SearchOutcome.Found -> if (outcome.strategy.id != saved) store.remember(key, outcome.strategy.id)
@@ -419,6 +432,26 @@ object Dpi {
         runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
 
+    /** A fresh [Probe] (one stream link per search) that logs the direct check. */
+    private fun loggedProbe(): suspend (Proxy?) -> ProbeResult {
+        val probe = Probe()
+        return { proxy -> probe.check(proxy).also { if (proxy == null) log("  direct: ${it.summary()}") } }
+    }
+
+    /** To logcat and to the app's own event file (some phones show an app hardly any of its logcat). */
+    private fun log(text: String) {
+        Log.i(TAG, text)
+        ErrorLog.note("[bypass] $text")
+    }
+
+    /** Checks the route YouTube takes now (bypass, own proxy or direct), for "Проверить сейчас". */
+    suspend fun checkNow(): ProbeResult {
+        val proxy = BypassSelector.proxy
+        val result = probeLock.withLock { Probe().check(proxy) }
+        log("Check now through ${proxy ?: "direct"}: ${result.summary()}")
+        return result
+    }
+
     /** One line for the shared log. */
     fun describe(): String {
         if (!::app.isInitialized) return "off"
@@ -443,4 +476,15 @@ fun networkKey(cellular: Boolean, operator: String?, gateways: List<String>, dns
     if (cellular) return "cell:" + operator?.takeIf { it.isNotBlank() }.orEmpty().ifEmpty { "unknown" }
     val digest = MessageDigest.getInstance("SHA-256").digest((gateways.sorted() + "|" + dns.sorted()).joinToString(",").toByteArray())
     return "net:" + digest.take(6).joinToString("") { "%02x".format(it) }
+}
+
+private fun ProbeResult.summary(): String {
+    fun mark(ok: Boolean) = if (ok) "+" else "-"
+    return "site${mark(site)} img${mark(images)} video${mark(video)}" + (if (video) " $kbps kbit/s" else "") + (if (note.isNotEmpty()) " ($note)" else "")
+}
+
+private fun SearchOutcome.summary(): String = when (this) {
+    SearchOutcome.Direct -> "direct"
+    is SearchOutcome.Found -> "${strategy.id} (${if (fast) "fast" else "best of the slow"}: ${result.summary()})"
+    SearchOutcome.None -> "nothing works"
 }

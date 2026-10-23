@@ -21,9 +21,12 @@ object ErrorLog {
     private const val MAX_CRASH_BYTES = 64 * 1024
     // Warnings and errors from everyone in the process, plus our own notable events at info level.
     private val LogcatFilter = listOf("PlaybackService:I", "Account:I", "*:W")
+    private const val MAX_EVENT_BYTES = 64 * 1024
     private var crashes: File? = null
+    private var events: File? = null
 
     fun init(context: Context) {
+        events = File(context.filesDir, "events.log")
         val file = File(context.filesDir, "crashes.log").also { crashes = it }
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, e ->
@@ -35,6 +38,21 @@ object ErrorLog {
     private fun appendCrash(file: File, text: String) {
         val old = if (file.exists()) file.readText() else ""
         file.writeText((old + redact(text) + "\n").takeLast(MAX_CRASH_BYTES))
+    }
+
+    /**
+     * Keeps [text] in the app's own event file, which survives restarts and goes into the shared log. Some phones
+     * (realme/ColorOS) hand an app almost none of its logcat, so what matters for a report goes here too.
+     */
+    fun note(text: String) {
+        val file = events ?: return
+        val line = "${timestamp()} ${redact(text)}\n"
+        synchronized(this) {
+            runCatching {
+                if (file.length() > MAX_EVENT_BYTES) file.writeText(file.readText().takeLast(MAX_EVENT_BYTES / 2))
+                file.appendText(line)
+            }
+        }
     }
 
     /** Writes the report into the cache for sharing: versions, saved crashes, then this run's log. */
@@ -56,6 +74,8 @@ object ErrorLog {
             appendLine()
             appendLine("== Crashes ==")
             appendLine(crashes?.takeIf { it.exists() }?.readText()?.ifBlank { null } ?: "none")
+            appendLine("== Events ==")
+            appendLine(events?.takeIf { it.exists() }?.let { synchronized(this@ErrorLog) { it.readText() } }?.ifBlank { null } ?: "none")
             appendLine("== This run ==")
             append(logcat)
             appendLine("== Bypass ==")
