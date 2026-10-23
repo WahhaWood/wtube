@@ -108,9 +108,11 @@ fun LoadMoreEffect(listState: LazyListState, threshold: Int = 6, onLoadMore: () 
             info.totalItemsCount > 0 && last >= info.totalItemsCount - threshold
         }
     }
+    val total by remember(listState) { derivedStateOf { listState.layoutInfo.totalItemsCount } }
     // The list behind the same state can change (a channel tab or sort): always page the current one.
     val loadMore by rememberUpdatedState(onLoadMore)
     LaunchedEffect(listState) {
-        snapshotFlow { nearEnd }.filter { it }.collect { loadMore() }
+        // Keyed on the size too: a page that leaves the list still near its end must load the next one.
+        snapshotFlow { nearEnd to total }.filter { it.first }.collect { loadMore() }
     }
 }

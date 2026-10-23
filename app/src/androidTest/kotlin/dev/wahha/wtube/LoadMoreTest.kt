@@ -43,4 +43,22 @@ class LoadMoreTest {
         compose.onNodeWithTag("list").performScrollToIndex(49)
         compose.runOnIdle { assertEquals(listOf("second"), calls) }
     }
+
+    // A page that grows the list but leaves the end still inside the threshold must trigger the next load.
+    @Test
+    fun smallPageStillNearEndLoadsAgain() {
+        var calls = 0
+        var count by mutableStateOf(10)
+        val state = LazyListState()
+        compose.setContent {
+            LazyColumn(Modifier.height(200.dp).testTag("list"), state = state) {
+                items(count) { Text("item $it", Modifier.height(40.dp)) }
+            }
+            LoadMoreEffect(state) { calls++ }
+        }
+        compose.onNodeWithTag("list").performScrollToIndex(9)
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.runOnIdle { count = 12 }
+        compose.runOnIdle { assertEquals(2, calls) }
+    }
 }
