@@ -59,6 +59,7 @@ import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.HiddenItems
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
+import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.SponsorBlock
 import dev.wahha.wtube.data.Updates
@@ -316,6 +317,7 @@ fun SettingsScreen() {
                 TextButton(onClick = {
                     History.clear()
                     SearchHistory.clear()
+                    WatchStats.clear()
                     clearOpen = false
                 }) { Text(stringResource(R.string.settings_clear)) }
             },

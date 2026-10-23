@@ -124,6 +124,7 @@ import dev.wahha.wtube.ui.icon.Subscriptions
 import dev.wahha.wtube.ui.icon.VideoLibrary
 import dev.wahha.wtube.ui.icon.WIcons
 import dev.wahha.wtube.ui.library.HistoryScreen
+import dev.wahha.wtube.ui.library.StatsScreen
 import dev.wahha.wtube.ui.library.LibraryScreen
 import dev.wahha.wtube.ui.playlist.PlaylistScreen
 import dev.wahha.wtube.ui.search.SearchScreen
@@ -150,6 +151,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class Feed(val browseId: String)
 @Serializable object DownloadsRoute
 @Serializable object HistoryRoute
+@Serializable object StatsRoute
 
 // The bar's tabs; Search is its own glass button beside the capsule, as in SimpMusic.
 private val TabRoutes = listOf(Home, Subscriptions, Library)
@@ -253,6 +255,10 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                 leaveVideo()
                 navController.navigate(HistoryRoute)
             },
+            openStats = {
+                leaveVideo()
+                navController.navigate(StatsRoute)
+            },
             back = { navController.popBackStack() },
         )
     }
@@ -352,6 +358,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                     composable<Feed> { entry -> Page { FeedScreen(entry.toRoute<Feed>().browseId) } }
                     composable<DownloadsRoute> { Page { DownloadsScreen() } }
                     composable<HistoryRoute> { Page { HistoryScreen() } }
+                    composable<StatsRoute> { Page { StatsScreen() } }
                 }
                 // Keeps the clock and icons readable over text scrolling beneath the transparent status bar.
                 Box(

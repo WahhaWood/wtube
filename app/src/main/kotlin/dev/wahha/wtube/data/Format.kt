@@ -75,3 +75,13 @@ fun parseYoutubeTime(t: String): Long? {
     val (h, m, s) = match.destructured
     return (h.toLongOrNull() ?: 0) * 3600 + (m.toLongOrNull() ?: 0) * 60 + (s.toLongOrNull() ?: 0)
 }
+
+/** "5 мин", "2 ч 05 мин"; under a minute reads "< 1 мин". */
+fun formatWatchTime(seconds: Long): String {
+    val minutes = seconds.coerceAtLeast(0) / 60
+    return when {
+        minutes < 1 -> "< 1 мин"
+        minutes < 60 -> "$minutes мин"
+        else -> "%d ч %02d мин".format(minutes / 60, minutes % 60)
+    }
+}

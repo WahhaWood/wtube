@@ -11,6 +11,7 @@ import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.SearchHistory
+import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
@@ -25,6 +26,7 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
         Settings.init(this)
         History.init(this)
         SearchHistory.init(this)
+        WatchStats.init(this)
         Hidden.init(this)
         Downloads.init(this)
         Account.init(this)

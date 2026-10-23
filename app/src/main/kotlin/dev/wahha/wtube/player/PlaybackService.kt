@@ -91,6 +91,7 @@ class PlaybackService : MediaSessionService() {
             .build()
         player.addListener(PlayerListener(player))
         player.addListener(WatchReporter(scope, player))
+        player.addListener(StatsRecorder(scope, player))
         player.addListener(SegmentSkipper(this, scope, player))
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {

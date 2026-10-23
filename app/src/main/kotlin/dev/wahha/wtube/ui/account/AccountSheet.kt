@@ -45,6 +45,7 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
+import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Identity
 import dev.wahha.wtube.data.account.Session
@@ -180,6 +181,7 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
                     History.clear()
                     SearchHistory.clear()
                     Hidden.clear()
+                    WatchStats.clear()
                 }
                 onDismiss()
             }

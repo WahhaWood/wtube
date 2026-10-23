@@ -96,6 +96,8 @@ class Navigator(
     val openDownloads: () -> Unit,
     /** The whole local watch history. */
     val openHistory: () -> Unit,
+    /** How long videos were watched, per day, channel and video. */
+    val openStats: () -> Unit,
     val back: () -> Unit,
 ) {
     /** [from] is the tapped card's thumbnail, for the page to grow out of. */

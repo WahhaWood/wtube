@@ -61,6 +61,7 @@ import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.ChevronRight
 import dev.wahha.wtube.ui.icon.Download
+import dev.wahha.wtube.ui.icon.BarChart
 import dev.wahha.wtube.ui.icon.History
 import dev.wahha.wtube.ui.icon.ThumbUp
 import dev.wahha.wtube.ui.icon.WIcons
@@ -158,6 +159,7 @@ fun LibraryScreen(vm: LibraryViewModel = viewModel()) {
             val done = downloads.count { it.state == DownloadState.DONE }
             LinkRow(WIcons.Download, stringResource(R.string.downloads_title), done.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.videos_count, it, it.toString()) }, nav.openDownloads)
         }
+        item { LinkRow(WIcons.BarChart, stringResource(R.string.stats_title), null, nav.openStats) }
         if (signedIn) {
             item { LinkRow(WIcons.History, stringResource(R.string.library_youtube_history), null) { nav.openFeed(Feeds.HISTORY) } }
         }
