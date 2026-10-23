@@ -108,7 +108,8 @@ class DpiProcess(context: Context, private val service: Class<out DpiService>) :
     }
 
     companion object {
-        private const val START_TIMEOUT_MS = 10_000L
+        // A cold process start on ColorOS right after the test processes went took over 10 s (0.20.2 log).
+        private const val START_TIMEOUT_MS = 20_000L
         private const val STOP_TIMEOUT_MS = 2_000L
         private var nextStart = 0L
 

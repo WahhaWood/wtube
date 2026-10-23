@@ -19,8 +19,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 32
-        versionName = "0.20.2"
+        versionCode = 33
+        versionName = "0.20.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")

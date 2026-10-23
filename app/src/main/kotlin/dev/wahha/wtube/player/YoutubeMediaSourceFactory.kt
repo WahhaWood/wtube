@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.dash.DashMediaSource
@@ -27,6 +28,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.YouTube
@@ -58,7 +60,9 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
     private val subtitleDataSource = DataSource.Factory { SubtitleDataSource() }
     private val codecs by lazy { deviceCodecPreference() }
     private var drmProvider: DrmSessionManagerProvider? = null
-    private var errorPolicy: LoadErrorHandlingPolicy? = null
+    // More tries than the default 3: a retry may go to the stream's spare server, and a stall re-check of the
+    // bypass can take half a minute to move the route; giving up earlier shows an error over a video about to play.
+    private var errorPolicy: LoadErrorHandlingPolicy? = NetworkRetryPolicy()
 
     override fun setDrmSessionManagerProvider(drmSessionManagerProvider: DrmSessionManagerProvider) =
         apply { drmProvider = drmSessionManagerProvider }
@@ -203,3 +207,19 @@ private fun MediaCodecInfo.isHardware(): Boolean =
     } else {
         !name.startsWith("OMX.google.") && !name.startsWith("c2.android.")
     }
+
+/**
+ * Network failures are tried [NETWORK_RETRIES] times; an HTTP error (an expired link's 403) as often as by
+ * default, so the link refresh in [PlaybackService] comes as quickly as before.
+ */
+private class NetworkRetryPolicy : DefaultLoadErrorHandlingPolicy(NETWORK_RETRIES) {
+    override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+        if (loadErrorInfo.exception is HttpDataSource.InvalidResponseCodeException && loadErrorInfo.errorCount > HTTP_RETRIES) return C.TIME_UNSET
+        return super.getRetryDelayMsFor(loadErrorInfo)
+    }
+
+    companion object {
+        const val NETWORK_RETRIES = 8
+        const val HTTP_RETRIES = DEFAULT_MIN_LOADABLE_RETRY_COUNT
+    }
+}

@@ -23,11 +23,13 @@ import dev.wahha.wtube.R
 import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.YouTube
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -270,16 +272,28 @@ object Dpi {
         }
     }
 
-    private suspend fun search(key: String, presets: List<Strategy>) {
-        val recent = memory.value.recent.mapNotNull { id -> presets.firstOrNull { it.id == id } }
-        val candidates = (recent + presets).distinctBy { it.id }
-        recheck?.cancel()
+    /**
+     * [stream]: the googlevideo link to check video with instead of the test video's; [first]: ids to try
+     * before the recent ones. [keepOnNone]: when nothing works, leave the current route as it is.
+     */
+    private suspend fun search(
+        key: String,
+        presets: List<Strategy>,
+        stream: String? = null,
+        first: List<String> = emptyList(),
+        keepOnNone: Boolean = false,
+    ) {
+        val ids = first + memory.value.recent
+        val preferred = ids.mapNotNull { id -> presets.firstOrNull { it.id == id } }
+        val candidates = (preferred + presets).distinctBy { it.id }
+        // Not itself: a stalled video's search runs as the re-check.
+        recheck?.takeIf { it !== currentCoroutineContext()[Job] }?.cancel()
         val results = mutableMapOf<String, ProbeResult>()
         mutableState.value = DpiState.Testing(0, candidates.size)
         log("Search in $key: ${candidates.size} candidates")
         val outcome = probeLock.withLock {
             try {
-                StrategySearch(probes, loggedProbe()).run(
+                StrategySearch(probes, loggedProbe(stream)).run(
                     candidates,
                     onProgress = { done, total -> mutableState.value = DpiState.Testing(done, total) },
                     onResult = { strategy, result ->
@@ -295,7 +309,7 @@ object Dpi {
         when (outcome) {
             SearchOutcome.Direct -> store.remember(key, DpiMemory.DIRECT)
             is SearchOutcome.Found -> store.remember(key, outcome.strategy.id)
-            SearchOutcome.None -> {
+            SearchOutcome.None -> if (!keepOnNone) {
                 stopMain()
                 mutableState.value = DpiState.NoStrategy
             }
@@ -416,13 +430,61 @@ object Dpi {
     }
 
     private val connectedVia = mutableSetOf<String>()
+    private val failedVia = mutableSetOf<String>()
+
+    /** "<domain> via <route>"; googlevideo by server, since a bypass can get through to one and not another. */
+    private fun via(host: String, proxy: Proxy): String? {
+        val domain = bypassDomain(host) ?: return null
+        val name = if (domain == "googlevideo.com") host.lowercase() else domain
+        return "$name via ${if (proxy.type() == Proxy.Type.DIRECT) "direct" else proxy}"
+    }
 
     /** From [Http.client]'s event listener: which way connections to YouTube really go, once per domain and route. */
     fun onConnected(host: String, proxy: Proxy) {
         if (!::app.isInitialized || !Settings.current.value.dpiBypass) return
-        val domain = bypassDomain(host) ?: return
-        val via = "$domain via ${if (proxy.type() == Proxy.Type.DIRECT) "direct" else proxy}"
+        val via = via(host, proxy) ?: return
         if (synchronized(connectedVia) { connectedVia.add(via) }) log("Connected: $via")
+    }
+
+    /** From [Http.client]'s event listener: a connection to YouTube failed (TCP, SOCKS or TLS), once per server, route and error. */
+    fun onConnectFailed(host: String, proxy: Proxy, error: IOException) {
+        if (!::app.isInitialized || !Settings.current.value.dpiBypass) return
+        val via = via(host, proxy) ?: return
+        val line = "$via: ${error.javaClass.simpleName}"
+        if (synchronized(failedVia) { failedVia.add(line) }) log("Could not connect: $line ${error.message.orEmpty().take(100)}")
+    }
+
+    private val stallChecked = mutableSetOf<String>()
+
+    /**
+     * The player has been waiting for video [id] for a while. The search's test video says little about the
+     * servers this one comes from (0.20.2: the test video loaded at 10 Mbit/s through bb24, the friend's video
+     * never connected), so the strategies are checked again with this video's own stream: the current one and
+     * those that worked first, then the rest. Once per video and route; nothing working leaves the route alone.
+     */
+    fun onVideoStalled(id: String) {
+        if (!::app.isInitialized) return
+        scope.launch {
+            val current = mutableState.value
+            if (current != DpiState.NotNeeded && (current !is DpiState.Running || current.strategy == CUSTOM)) return@launch
+            val key = network.value ?: return@launch
+            if (!stallChecked.add("$id ${Http.route}")) return@launch
+            val stream = YouTube.cachedStreamInfo(id)?.videoOnlyStreams?.filter { it.isUrl }?.maxByOrNull { it.bitrate }?.content
+                ?: return@launch
+            recheck?.cancel()
+            recheck = launch {
+                val memory = memory.value
+                val saved = memory.networks[key]
+                log("Video $id stalls via ${Http.route ?: "direct"}: checking with its own stream")
+                search(
+                    key, mutablePresets.value.strategies, stream,
+                    first = listOfNotNull(saved) + memory.results.filterValues { it.works }.keys,
+                    keepOnNone = true,
+                )
+                // An unchanged choice leaves the state at Testing: deciding again puts it back.
+                requests.value++
+            }
+        }
     }
 
     fun onRequestSucceeded(host: String) {
@@ -470,9 +532,9 @@ object Dpi {
         runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
 
-    /** A fresh [Probe] (one stream link per search) that logs the direct check. */
-    private fun loggedProbe(): suspend (Proxy?) -> ProbeResult {
-        val probe = Probe()
+    /** A fresh [Probe] (one stream link per search, or [stream]) that logs the direct check. */
+    private fun loggedProbe(stream: String? = null): suspend (Proxy?) -> ProbeResult {
+        val probe = if (stream == null) Probe() else Probe(streamUrl = { stream })
         return { proxy -> probe.check(proxy).also { if (proxy == null) log("  direct: ${it.summary()}") } }
     }
 
@@ -518,7 +580,8 @@ fun networkKey(cellular: Boolean, operator: String?, gateways: List<String>, dns
 
 private fun ProbeResult.summary(): String {
     fun mark(ok: Boolean) = if (ok) "+" else "-"
-    return "site${mark(site)} img${mark(images)} video${mark(video)}" + (if (video) " $kbps kbit/s" else "") + (if (note.isNotEmpty()) " ($note)" else "")
+    return "site${mark(site)} img${mark(images)} video${mark(video)}" + (if (video) " $kbps kbit/s" else "") +
+        (spare?.let { " spare${mark(it)}" } ?: "") + (if (note.isNotEmpty()) " ($note)" else "")
 }
 
 private fun SearchOutcome.summary(): String = when (this) {

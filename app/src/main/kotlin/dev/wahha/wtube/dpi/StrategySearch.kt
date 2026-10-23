@@ -48,7 +48,9 @@ class StrategySearch(
             batchResults.firstOrNull { it.second.fast }?.let { (strategy, result) -> return SearchOutcome.Found(strategy, result, fast = true) }
         }
         // Nothing fast: a working strategy that is quicker than going direct, else direct if that works at all.
-        val best = results.filter { it.second.works }.maxWithOrNull(compareBy({ it.second.kbps }, { -results.indexOf(it) }))
+        // One that also reached the spare server first, however slow: the other may never connect for some videos.
+        val best = results.filter { it.second.works }
+            .maxWithOrNull(compareBy({ it.second.spare != false }, { it.second.kbps }, { -results.indexOf(it) }))
         return when {
             best != null && (!direct.works || best.second.kbps > direct.kbps) -> SearchOutcome.Found(best.first, best.second, fast = false)
             direct.works -> SearchOutcome.Direct

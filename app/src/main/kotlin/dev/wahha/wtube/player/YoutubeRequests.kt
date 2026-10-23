@@ -9,6 +9,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
 import dev.wahha.wtube.data.Http
+import dev.wahha.wtube.data.StreamServers
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.util.concurrent.atomic.AtomicLong
 
@@ -25,7 +26,8 @@ object YoutubeRequests : ResolvingDataSource.Resolver {
 
     override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
         if (dataSpec.uri.path?.startsWith("/videoplayback") != true) return dataSpec
-        val original = dataSpec.uri.toString()
+        // Each try is resolved anew, so a retry after a failed connection goes to the spare server.
+        val original = StreamServers.pick(dataSpec.uri.toString(), Http.route)
         val headers = HashMap(dataSpec.httpRequestHeaders) + clientHeaders(original)
         return dataSpec.buildUpon()
             .setUri(Uri.parse(videoplaybackUrl(original, dataSpec.position, dataSpec.length, requestNumber.getAndIncrement())))

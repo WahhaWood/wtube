@@ -49,6 +49,7 @@ import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.qualityCap
 import dev.wahha.wtube.data.watchUrl
 import dev.wahha.wtube.download.Downloads
+import dev.wahha.wtube.dpi.Dpi
 import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -307,6 +308,7 @@ class PlaybackService : MediaSessionService() {
                 if (!player.playWhenReady) return@launch
                 val buffered = (player.bufferedPosition - player.currentPosition) / 1000
                 ErrorLog.note("[player] buffering ${STALL_NOTE_MS / 1000} s on ${player.currentMediaItem?.mediaId} (${buffered} s ahead), route ${Http.route ?: "direct"}")
+                player.currentMediaItem?.mediaId?.let { Dpi.onVideoStalled(it) }
             }
         }
 

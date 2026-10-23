@@ -189,6 +189,22 @@ class DpiTest {
         assertEquals(3, engine.stops)
     }
 
+    @Test
+    fun aStrategyThatMissesTheSpareServerIsNotFast() = runBlocking {
+        val outcome = search(List(3) { FakeEngine() }, mapOf("direct" to blocked, "s1" to fast.copy(spare = false), "s5" to fast.copy(spare = true)))
+            .run(strategies(6))
+        assertEquals("s5", (outcome as SearchOutcome.Found).strategy.id)
+        assertTrue(outcome.fast)
+    }
+
+    @Test
+    fun withoutFastOneThatReachesTheSpareWinsOverAQuickerOne() = runBlocking {
+        val outcome = search(List(3) { FakeEngine() }, mapOf("direct" to blocked, "s1" to fast.copy(spare = false), "s2" to slow.copy(spare = true)))
+            .run(strategies(3))
+        assertEquals("s2", (outcome as SearchOutcome.Found).strategy.id)
+        assertFalse(outcome.fast)
+    }
+
     // ---- Probe against a local server ----
 
     private fun server(videoBody: MockResponse): MockWebServer = MockWebServer().apply {

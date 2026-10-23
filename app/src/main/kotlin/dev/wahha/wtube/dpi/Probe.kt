@@ -2,6 +2,7 @@ package dev.wahha.wtube.dpi
 
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.NewPipeDownloader
+import dev.wahha.wtube.data.StreamServers
 import dev.wahha.wtube.player.YoutubeRequests
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
@@ -31,10 +32,15 @@ data class ProbeResult(
     val kbps: Int = 0,
     /** Why the video part failed, for the log: no stream link, an HTTP code, or how much came before it stalled. */
     val note: String = "",
+    /**
+     * The stream's spare server ([StreamServers]) gave video too; null = not tried (no spare, or the first
+     * server failed). A route that reaches only one server leaves the videos on the other stalled (0.20.2).
+     */
+    val spare: Boolean? = null,
 ) {
     val works get() = site && images && video
-    /** Works and plays 1080p without stalling. */
-    val fast get() = works && kbps >= FAST_KBPS
+    /** Works and plays 1080p without stalling, from either of the stream's servers. */
+    val fast get() = works && kbps >= FAST_KBPS && spare != false
     val score get() = (if (site) 1 else 0) + (if (images) 1 else 0) + (if (video) 2 else 0)
 
     companion object {
@@ -73,7 +79,8 @@ class Probe(
                 stream ?: withTimeoutOrNull(STREAM_URL_TIMEOUT_MS) { runCatching { streamUrl(extractorClient(client)) }.getOrNull() }?.also { stream = it }
             } ?: return ProbeResult(site, images, video = false, note = "no stream link")
             val (kbps, note) = videoSpeed(client, url)
-            return ProbeResult(site, images, video = kbps != null, kbps = kbps ?: 0, note = note)
+            val spare = if (kbps == null) null else StreamServers.spareUrl(url)?.let { videoSpeed(client, it).first != null }
+            return ProbeResult(site, images, video = kbps != null, kbps = kbps ?: 0, note = note, spare = spare)
         } finally {
             client.connectionPool.evictAll()
         }

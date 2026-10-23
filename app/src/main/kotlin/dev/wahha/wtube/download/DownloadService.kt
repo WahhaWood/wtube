@@ -19,6 +19,7 @@ import androidx.core.app.ServiceCompat
 import dev.wahha.wtube.MainActivity
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.Http
+import dev.wahha.wtube.data.StreamServers
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.player.VideoCodec
 import dev.wahha.wtube.player.sameLanguage
@@ -192,7 +193,9 @@ class DownloadService : Service() {
 
     /** Appends bytes of [url] to [target] until it holds [length] of them; [offset] places them in the overall progress. */
     private suspend fun part(download: Download, url: String, length: Long, target: File, offset: Long, total: Long) {
-        downloadRange(Http.calls, url, length, target, CHUNK_BYTES, YoutubeRequests::rangeRequest, ensureAlive = {
+        downloadRange(Http.calls, url, length, target, CHUNK_BYTES, { link, from, to ->
+            YoutubeRequests.rangeRequest(StreamServers.pick(link, Http.route), from, to)
+        }, ensureAlive = {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (!Downloads.isCurrent(download)) throw CancellationException("Download removed")
         }) { position ->

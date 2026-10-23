@@ -89,7 +89,7 @@ object Http {
             }
             if (now.proxySelector === selector) {
                 held -= call
-                return chain.proceed(request)
+                return chain.withShortVideoTimeouts().proceed(request)
             }
             try {
                 return now.newCall(request).execute()
@@ -99,6 +99,20 @@ object Http {
         }
     }
 
+    /**
+     * A googlevideo server the bypass does not get through to never answers the TLS handshake, which waits
+     * out the read timeout; 30 s of that is a stalled video before the spare server ([StreamServers]) is tried.
+     */
+    private fun Interceptor.Chain.withShortVideoTimeouts(): Interceptor.Chain {
+        if (!request().url.host.endsWith(".googlevideo.com")) return this
+        // Only ever shorter: the bypass check sets its own, shorter limits.
+        return withConnectTimeout(minOf(connectTimeoutMillis(), VIDEO_CONNECT_TIMEOUT_MS), TimeUnit.MILLISECONDS)
+            .withReadTimeout(minOf(readTimeoutMillis(), VIDEO_READ_TIMEOUT_MS), TimeUnit.MILLISECONDS)
+    }
+
+    private const val VIDEO_CONNECT_TIMEOUT_MS = 10_000
+    private const val VIDEO_READ_TIMEOUT_MS = 15_000
+
     /** Tells the bypass about YouTube requests that fail on the network, so it can re-check its strategy. */
     private object BypassWatch : EventListener() {
         override fun callFailed(call: Call, ioe: IOException) {
@@ -107,7 +121,17 @@ object Http {
 
         override fun callEnd(call: Call) = Dpi.onRequestSucceeded(call.request().url.host)
 
-        override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) =
-            Dpi.onConnected(call.request().url.host, proxy)
+        override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+            val host = call.request().url.host
+            StreamServers.onConnected(host)
+            Dpi.onConnected(host, proxy)
+        }
+
+        override fun connectFailed(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?, ioe: IOException) {
+            if (call.isCanceled()) return
+            val host = call.request().url.host
+            StreamServers.onConnectFailed(host, proxy.takeIf { it.type() != Proxy.Type.DIRECT })
+            Dpi.onConnectFailed(host, proxy, ioe)
+        }
     }
 }
