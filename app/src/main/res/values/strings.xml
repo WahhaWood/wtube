@@ -430,7 +430,8 @@
     <string name="dpi_manual">Выбрать вручную</string>
     <string name="dpi_manual_hint">Пресет запоминается для текущей сети. Отметки — результаты последнего подбора.</string>
     <string name="dpi_result_fast">работает, %1$d Мбит/с</string>
-    <string name="dpi_result_one_server">%1$d Мбит/с, но запасной сервер видео не отвечает</string>
+    <string name="dpi_result_one_server">%1$d Мбит/с, но не все серверы видео отвечают</string>
+    <string name="dpi_result_throttled">%1$d Мбит/с на первом мегабайте, дальше тормозит</string>
     <string name="dpi_result_slow">работает медленно, %1$d кбит/с</string>
     <string name="dpi_result_unverified">видео не проверено</string>
     <string name="dpi_check">Проверить сейчас</string>

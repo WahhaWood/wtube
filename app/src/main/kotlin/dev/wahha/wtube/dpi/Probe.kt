@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CancellationException
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.EventListener
@@ -37,10 +38,19 @@ data class ProbeResult(
      * server failed). A route that reaches only one server leaves the videos on the other stalled (0.20.2).
      */
     val spare: Boolean? = null,
+    /**
+     * [DEEP_BYTES] more of the same stream came fast too; null = not tried (only a route fast so far is).
+     * A censor may let the first megabyte through and throttle the rest.
+     */
+    val deep: Boolean? = null,
+    /** A second video, on a server of its own, gave video too; null = not tried or no link for it. */
+    val other: Boolean? = null,
 ) {
     val works get() = site && images && video
-    /** Works and plays 1080p without stalling, from either of the stream's servers. */
-    val fast get() = works && kbps >= FAST_KBPS && spare != false
+    /** Works and plays 1080p without stalling, from either of the stream's servers, past the first megabyte and on another video's server. */
+    val fast get() = works && kbps >= FAST_KBPS && spare != false && deep != false && other != false
+    /** Got through every server it was checked on, however slowly. */
+    val allServers get() = spare != false && other != false
     val score get() = (if (site) 1 else 0) + (if (images) 1 else 0) + (if (video) 2 else 0)
 
     companion object {
@@ -57,10 +67,15 @@ class Probe(
     private val siteUrl: String = "https://www.youtube.com/generate_204",
     private val imageUrl: String = "https://i.ytimg.com/vi/$TEST_VIDEO/mqdefault.jpg",
     /** A googlevideo stream URL through the given client; null if it could not be had. */
-    private val streamUrl: suspend (OkHttpClient) -> String? = ::extractStreamUrl,
+    private val streamUrl: suspend (OkHttpClient) -> String? = { extractStreamUrl(it) },
+    /** A stream of another video, on another server, checked only for routes that pass everything else. */
+    private val otherUrl: suspend (OkHttpClient) -> String? = { extractStreamUrl(it, OTHER_VIDEO) },
 ) {
     private val streamLock = Mutex()
     private var stream: String? = null
+    private val otherLock = Mutex()
+    private var other: String? = null
+    private var otherTried = false
 
     /** [proxy] null = directly. */
     suspend fun check(proxy: Proxy?): ProbeResult = withContext(Dispatchers.IO) { checkOn(clientFor(proxy)) }
@@ -75,29 +90,77 @@ class Probe(
             val images = fetch(client, Request.Builder().url(imageUrl).build()) { code, bytes -> code == 200 && bytes > 0 }
             // Without a stream link the app could not play anything on this route either, so it does not work.
             // (Until 0.20.0 a bare googlevideo handshake counted, and a route that stalls video got picked.)
+            var linkError = "timeout"
             val url = streamLock.withLock {
-                stream ?: withTimeoutOrNull(STREAM_URL_TIMEOUT_MS) { runCatching { streamUrl(extractorClient(client)) }.getOrNull() }?.also { stream = it }
-            } ?: return ProbeResult(site, images, video = false, note = "no stream link")
+                stream ?: withTimeoutOrNull(STREAM_URL_TIMEOUT_MS) {
+                    try {
+                        streamUrl(extractorClient(client)).also { if (it == null) linkError = "no video-only stream" }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        linkError = e.javaClass.simpleName
+                        null
+                    }
+                }?.also { stream = it }
+            } ?: return ProbeResult(site, images, video = false, note = "no stream link ($linkError)")
             val (kbps, note) = videoSpeed(client, url)
             val spare = if (kbps == null) null else StreamServers.spareUrl(url)?.let { videoSpeed(client, it).first != null }
-            return ProbeResult(site, images, video = kbps != null, kbps = kbps ?: 0, note = note, spare = spare)
+            val result = ProbeResult(site, images, video = kbps != null, kbps = kbps ?: 0, note = note, spare = spare)
+            if (!result.fast) return result
+            // Only a route that looks fast pays for the longer checks.
+            val (deepKbps, deepNote) = videoSpeed(
+                client.newBuilder().callTimeout(DEEP_TIME_LIMIT_NS / 1_000_000_000 + 5, TimeUnit.SECONDS).build(),
+                url, from = VIDEO_BYTES, bytes = DEEP_BYTES, timeLimitNs = DEEP_TIME_LIMIT_NS, minBytes = DEEP_BYTES,
+            )
+            if (deepKbps == null) return result.copy(deep = false, note = "then $deepNote")
+            val otherStream = otherLock.withLock {
+                if (!otherTried) {
+                    otherTried = true
+                    other = withTimeoutOrNull(STREAM_URL_TIMEOUT_MS) {
+                        try {
+                            otherUrl(extractorClient(client))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                }
+                other
+            }
+            val otherVideo = otherStream?.let { videoSpeed(client, it) }
+            return result.copy(
+                deep = true,
+                other = otherVideo?.let { it.first != null },
+                note = otherVideo?.takeIf { it.first == null }?.let { "other video: ${it.second}" } ?: result.note,
+            )
         } finally {
             client.connectionPool.evictAll()
         }
     }
 
-    /** Kbit/s over the first [VIDEO_BYTES] of [url] (null if too little came within the time limit), and what happened. */
-    private suspend fun videoSpeed(client: OkHttpClient, url: String): Pair<Int?, String> = runInterruptible(Dispatchers.IO) {
+    /**
+     * Kbit/s over [bytes] of [url] from [from] (null if less than [minBytes] came within [timeLimitNs]),
+     * and what happened.
+     */
+    private suspend fun videoSpeed(
+        client: OkHttpClient,
+        url: String,
+        from: Long = 0,
+        bytes: Long = VIDEO_BYTES,
+        timeLimitNs: Long = VIDEO_TIME_LIMIT_NS,
+        minBytes: Long = MIN_VIDEO_BYTES,
+    ): Pair<Int?, String> = runInterruptible(Dispatchers.IO) {
         val started = System.nanoTime()
         var read = 0L
         var error = ""
         try {
-            client.newCall(rangeRequest(url)).execute().use { response ->
+            client.newCall(YoutubeRequests.rangeRequest(url, from, from + bytes)).execute().use { response ->
                 if (!response.isSuccessful) return@runInterruptible null to "HTTP ${response.code}"
                 val source = response.body.source()
                 val buffer = ByteArray(64 * 1024)
                 val input = source.inputStream()
-                while (read < VIDEO_BYTES && System.nanoTime() - started < VIDEO_TIME_LIMIT_NS) {
+                while (read < bytes && System.nanoTime() - started < timeLimitNs) {
                     val n = input.read(buffer)
                     if (n < 0) break
                     read += n
@@ -108,7 +171,7 @@ class Probe(
         }
         val ms = (System.nanoTime() - started) / 1_000_000
         val note = "${read / 1024} KB in $ms ms$error"
-        (if (read < MIN_VIDEO_BYTES) null else (read * 8 / ms.coerceAtLeast(1)).toInt()) to note
+        (if (read < minBytes) null else (read * 8 / ms.coerceAtLeast(1)).toInt()) to note
     }
 
     private suspend fun fetch(client: OkHttpClient, request: Request, ok: (Int, Long) -> Boolean): Boolean =
@@ -123,9 +186,14 @@ class Probe(
     companion object {
         /** Big Buck Bunny on the Blender channel: long-lived, public, has large streams. */
         const val TEST_VIDEO = "aqz-KE-bpKQ"
+        /** Sintel, same channel: its streams sit on other servers than [TEST_VIDEO]'s (checked 2026-10-24). */
+        const val OTHER_VIDEO = "eRsGyueVLvQ"
         const val VIDEO_BYTES = 1L shl 20
         const val MIN_VIDEO_BYTES = 256L * 1024
         private const val VIDEO_TIME_LIMIT_NS = 8_000_000_000L
+        /** 4 MB in 16 s = 2 Mbit/s, [ProbeResult.FAST_KBPS]. */
+        const val DEEP_BYTES = 4L shl 20
+        private const val DEEP_TIME_LIMIT_NS = 16_000_000_000L
         // The extractor makes several requests, one of them the ~2.5 MB player script: slow over a bypass on LTE.
         private const val STREAM_URL_TIMEOUT_MS = 60_000L
 
@@ -144,13 +212,11 @@ class Probe(
         private fun extractorClient(client: OkHttpClient): OkHttpClient =
             client.newBuilder().callTimeout(0, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS).build()
 
-        fun rangeRequest(url: String): Request = YoutubeRequests.rangeRequest(url, 0, VIDEO_BYTES)
-
-        /** Runs the extractor for [TEST_VIDEO] with every request on [client]; the largest video-only stream. */
-        suspend fun extractStreamUrl(client: OkHttpClient): String? = runInterruptible(Dispatchers.IO) {
+        /** Runs the extractor for [video] with every request on [client]; the largest video-only stream. */
+        suspend fun extractStreamUrl(client: OkHttpClient, video: String = TEST_VIDEO): String? = runInterruptible(Dispatchers.IO) {
             NewPipeDownloader.clientOverride.set(client)
             try {
-                StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$TEST_VIDEO")
+                StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$video")
                     .videoOnlyStreams.filter { it.isUrl }.maxByOrNull { it.bitrate }?.content
             } finally {
                 NewPipeDownloader.clientOverride.remove()

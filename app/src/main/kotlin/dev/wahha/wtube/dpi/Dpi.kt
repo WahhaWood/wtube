@@ -46,6 +46,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.Proxy
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
@@ -211,7 +213,7 @@ object Dpi {
                 if (cancelledOn == key) mutableState.value = DpiState.Cancelled else search(key, inputs.presets.strategies)
             }
             else -> {
-                val strategy = inputs.presets.strategies.firstOrNull { it.id == saved }
+                val strategy = Strategies.find(inputs.presets.strategies, saved)
                 val args = strategy?.let { Strategies.validate(it.args) }
                 if (args == null) {
                     store.forget(key)
@@ -275,6 +277,7 @@ object Dpi {
     /**
      * [stream]: the googlevideo link to check video with instead of the test video's; [first]: ids to try
      * before the recent ones. [keepOnNone]: when nothing works, leave the current route as it is.
+     * [v4Twins]: each of those first ones is also tried over IPv4 only, right after itself.
      */
     private suspend fun search(
         key: String,
@@ -282,9 +285,11 @@ object Dpi {
         stream: String? = null,
         first: List<String> = emptyList(),
         keepOnNone: Boolean = false,
+        v4Twins: Boolean = false,
     ) {
         val ids = first + memory.value.recent
-        val preferred = ids.mapNotNull { id -> presets.firstOrNull { it.id == id } }
+        val preferred = ids.mapNotNull { id -> Strategies.find(presets, id) }
+            .flatMap { if (v4Twins && !it.args.startsWith("-X ")) listOf(it, Strategies.v4(it)) else listOf(it) }
         val candidates = (preferred + presets).distinctBy { it.id }
         // Not itself: a stalled video's search runs as the re-check.
         recheck?.takeIf { it !== currentCoroutineContext()[Job] }?.cancel()
@@ -443,7 +448,7 @@ object Dpi {
     fun onConnected(host: String, proxy: Proxy) {
         if (!::app.isInitialized || !Settings.current.value.dpiBypass) return
         val via = via(host, proxy) ?: return
-        if (synchronized(connectedVia) { connectedVia.add(via) }) log("Connected: $via")
+        if (synchronized(connectedVia) { connectedVia.add(via) }) scope.launch(Dispatchers.IO) { log("Connected: $via${dnsNote(host)}") }
     }
 
     /** From [Http.client]'s event listener: a connection to YouTube failed (TCP, SOCKS or TLS), once per server, route and error. */
@@ -451,7 +456,19 @@ object Dpi {
         if (!::app.isInitialized || !Settings.current.value.dpiBypass) return
         val via = via(host, proxy) ?: return
         val line = "$via: ${error.javaClass.simpleName}"
-        if (synchronized(failedVia) { failedVia.add(line) }) log("Could not connect: $line ${error.message.orEmpty().take(100)}")
+        if (synchronized(failedVia) { failedVia.add(line) }) {
+            scope.launch(Dispatchers.IO) { log("Could not connect: $line ${error.message.orEmpty().take(100)}${dnsNote(host)}") }
+        }
+    }
+
+    /**
+     * " (dns v6,v4)" for a googlevideo [host]: the address families the phone's resolver gives, in its order.
+     * Through the proxy OkHttp passes the name and byedpi resolves it the same way, connecting to the first.
+     */
+    private fun dnsNote(host: String): String {
+        if (bypassDomain(host) != "googlevideo.com") return ""
+        val families = runCatching { InetAddress.getAllByName(host).map { if (it is Inet6Address) "v6" else "v4" }.distinct() }.getOrNull()
+        return " (dns ${families?.joinToString(",") ?: "failed"})"
     }
 
     private val stallChecked = mutableSetOf<String>()
@@ -480,6 +497,7 @@ object Dpi {
                     key, mutablePresets.value.strategies, stream,
                     first = listOfNotNull(saved) + memory.results.filterValues { it.works }.keys,
                     keepOnNone = true,
+                    v4Twins = true,
                 )
                 // An unchanged choice leaves the state at Testing: deciding again puts it back.
                 requests.value++
@@ -496,7 +514,7 @@ object Dpi {
         val key = network.value ?: return
         val presets = mutablePresets.value.strategies
         val saved = memory.value.networks[key]
-        val candidates = (listOfNotNull(saved) + memory.value.recent).distinct().mapNotNull { id -> presets.firstOrNull { it.id == id } }
+        val candidates = (listOfNotNull(saved) + memory.value.recent).distinct().mapNotNull { id -> Strategies.find(presets, id) }
         log("YouTube keeps failing, re-checking ${candidates.size} recent strategies")
         val outcome = probeLock.withLock {
             StrategySearch(probes, loggedProbe()).run(candidates, onResult = { s, r -> log("  ${s.id}: ${r.summary()}") })
@@ -581,7 +599,8 @@ fun networkKey(cellular: Boolean, operator: String?, gateways: List<String>, dns
 private fun ProbeResult.summary(): String {
     fun mark(ok: Boolean) = if (ok) "+" else "-"
     return "site${mark(site)} img${mark(images)} video${mark(video)}" + (if (video) " $kbps kbit/s" else "") +
-        (spare?.let { " spare${mark(it)}" } ?: "") + (if (note.isNotEmpty()) " ($note)" else "")
+        (spare?.let { " spare${mark(it)}" } ?: "") + (deep?.let { " deep${mark(it)}" } ?: "") +
+        (other?.let { " other${mark(it)}" } ?: "") + (if (note.isNotEmpty()) " ($note)" else "")
 }
 
 private fun SearchOutcome.summary(): String = when (this) {

@@ -192,7 +192,8 @@ private fun statusText(state: DpiState, network: String?): String = when (state)
 @Composable
 private fun resultText(result: ProbeResult): String = when {
     result.fast -> stringResource(R.string.dpi_result_fast, result.kbps / 1000)
-    result.works && result.spare == false -> stringResource(R.string.dpi_result_one_server, result.kbps / 1000)
+    result.works && !result.allServers -> stringResource(R.string.dpi_result_one_server, result.kbps / 1000)
+    result.works && result.deep == false -> stringResource(R.string.dpi_result_throttled, result.kbps / 1000)
     result.works && result.kbps > 0 -> stringResource(R.string.dpi_result_slow, result.kbps)
     // Saved by 0.20.0, which counted a bare googlevideo answer as working.
     result.works -> stringResource(R.string.dpi_result_unverified)

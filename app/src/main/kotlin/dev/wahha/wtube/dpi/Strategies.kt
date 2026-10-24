@@ -28,6 +28,18 @@ object Strategies {
         return list.copy(strategies = valid).takeIf { valid.isNotEmpty() }
     }
 
+    private const val V4_SUFFIX = "-v4"
+
+    /**
+     * [strategy] over IPv4 only. byedpi resolves the names it gets itself and connects to the first address
+     * alone, on a phone with IPv6 usually that one, and a censor may treat the two ways differently (0.20.4).
+     */
+    fun v4(strategy: Strategy) = Strategy(strategy.id + V4_SUFFIX, "-X " + strategy.args, strategy.note)
+
+    /** The strategy [id] names among [presets]: one of them or the [v4] twin of one. */
+    fun find(presets: List<Strategy>, id: String): Strategy? = presets.firstOrNull { it.id == id }
+        ?: id.removeSuffix(V4_SUFFIX).takeIf { it != id }?.let { base -> presets.firstOrNull { it.id == base } }?.let(::v4)
+
     // Short option -> takes an argument. Only what shapes the desync; listening address, files, daemon mode,
     // redirects and debug output are ours to set or must never be set from a downloaded list.
     private val Options = mapOf(

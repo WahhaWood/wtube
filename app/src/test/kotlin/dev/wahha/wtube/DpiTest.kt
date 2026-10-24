@@ -205,6 +205,25 @@ class DpiTest {
         assertFalse(outcome.fast)
     }
 
+    @Test
+    fun aStrategyThatSlowsDownOrMissesAnotherVideoIsNotFast() = runBlocking {
+        val outcome = search(
+            List(3) { FakeEngine() },
+            mapOf("direct" to blocked, "s1" to fast.copy(deep = false), "s2" to fast.copy(other = false), "s5" to fast.copy(deep = true, other = true)),
+        ).run(strategies(6))
+        assertEquals("s5", (outcome as SearchOutcome.Found).strategy.id)
+        assertTrue(outcome.fast)
+    }
+
+    @Test
+    fun v4TwinIsFoundByItsIdAndResolvesOverIpv4Only() {
+        val presets = listOf(Strategy("bb24", "-s1 -d3+s"))
+        assertEquals(Strategy("bb24-v4", "-X -s1 -d3+s"), Strategies.find(presets, "bb24-v4"))
+        assertEquals(presets[0], Strategies.find(presets, "bb24"))
+        assertNull(Strategies.find(presets, "bb25-v4"))
+        assertEquals(listOf("-X", "-s1", "-d3+s"), Strategies.validate(Strategies.v4(presets[0]).args))
+    }
+
     // ---- Probe against a local server ----
 
     private fun server(videoBody: MockResponse): MockWebServer = MockWebServer().apply {
@@ -219,19 +238,53 @@ class DpiTest {
         start()
     }
 
-    private fun probe(server: MockWebServer, streamUrl: String?) = Probe(
+    private fun probe(server: MockWebServer, streamUrl: String?, otherUrl: String? = streamUrl) = Probe(
         siteUrl = server.url("/generate_204").toString(),
         imageUrl = server.url("/thumb.jpg").toString(),
         streamUrl = { streamUrl },
+        otherUrl = { otherUrl },
     )
 
+    private fun video(bytes: Long) = MockResponse().setBody(Buffer().write(ByteArray(bytes.toInt())))
+
     @Test
-    fun probeReadsAMegabyteOfVideo() = runBlocking {
-        val server = server(MockResponse().setBody(Buffer().write(ByteArray(Probe.VIDEO_BYTES.toInt()))))
+    fun probeReadsAMegabyteOfVideoThenMoreAndAnotherVideo() = runBlocking {
+        val server = server(video(Probe.VIDEO_BYTES + Probe.DEEP_BYTES))
         try {
             val result = probe(server, server.url("/videoplayback?id=1").toString()).check(null)
             assertTrue(result.toString(), result.works && result.fast)
+            assertEquals(true, result.deep)
+            assertEquals(true, result.other)
             assertTrue(server.takeRequest().path == "/generate_204")
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    /** A censor that lets the first megabyte through and then stalls the stream. */
+    @Test
+    fun videoThatEndsAfterTheFirstMegabyteIsNotFast() = runBlocking {
+        val server = server(video(Probe.VIDEO_BYTES))
+        try {
+            val result = probe(server, server.url("/videoplayback?id=1").toString()).check(null)
+            assertTrue(result.toString(), result.works)
+            assertEquals(false, result.deep)
+            assertFalse(result.fast)
+            assertNull(result.other)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun anotherVideosServerThatDoesNotAnswerIsNotFast() = runBlocking {
+        val server = server(video(Probe.VIDEO_BYTES + Probe.DEEP_BYTES))
+        try {
+            val result = probe(server, server.url("/videoplayback?id=1").toString(), otherUrl = server.url("/missing").toString()).check(null)
+            assertEquals(true, result.deep)
+            assertEquals(false, result.other)
+            assertFalse(result.fast)
+            assertTrue(result.note, "other video: HTTP 404" in result.note)
         } finally {
             server.shutdown()
         }
@@ -260,7 +313,7 @@ class DpiTest {
             val result = probe(server, streamUrl = null).check(null)
             assertTrue(result.site && result.images)
             assertFalse(result.works)
-            assertEquals("no stream link", result.note)
+            assertEquals("no stream link (no video-only stream)", result.note)
         } finally {
             server.shutdown()
         }
