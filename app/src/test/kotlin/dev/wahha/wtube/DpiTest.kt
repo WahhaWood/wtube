@@ -139,7 +139,7 @@ class DpiTest {
                 if (proxy == null) results.getValue("direct")
                 else results[byPort.getValue((proxy.address() as InetSocketAddress).port)] ?: blocked
             },
-            proxyOf = { port ->
+            proxyOf = { _, port ->
                 byPort[port] = engines.first { 1000 + (it.running?.hashCode() ?: 0).and(0xfff) == port }.running!!.single().removePrefix("-")
                 Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("localhost", port))
             },
@@ -163,6 +163,17 @@ class DpiTest {
         assertTrue(outcome.fast)
         assertEquals((1..6).map { "s$it" }, seen)
         engines.forEach { assertEquals(it.starts, it.stops); assertNull(it.running) }
+    }
+
+    @Test
+    fun theOtherWorkingStrategiesBecomeBackupsBestFirst() = runBlocking {
+        val outcome = search(
+            List(3) { FakeEngine() },
+            mapOf("direct" to blocked, "s2" to slow, "s3" to slow.copy(kbps = 900), "s4" to slow.copy(kbps = 700), "s5" to slow.copy(kbps = 100)),
+        ).run(strategies(6)) as SearchOutcome.Found
+        assertEquals("s3", outcome.strategy.id)
+        assertEquals(listOf("s4", "s2"), outcome.backups.map { it.id })
+        assertEquals("s3,s4,s2", outcome.choice)
     }
 
     @Test

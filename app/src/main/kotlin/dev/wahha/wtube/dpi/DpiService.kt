@@ -41,6 +41,10 @@ open class DpiService : Service() {
 /** The proxy the app's traffic goes through. */
 class DpiMainService : DpiService()
 
+/** Two more proxies with other strategies that stay up next to the main one: the [Relay] falls back to them. */
+class DpiBackup1Service : DpiService()
+class DpiBackup2Service : DpiService()
+
 /** Slots for trying strategies side by side while the main proxy keeps serving. */
 class DpiProbe1Service : DpiService()
 class DpiProbe2Service : DpiService()

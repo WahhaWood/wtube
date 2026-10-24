@@ -15,7 +15,7 @@ import kotlinx.serialization.json.Json
 
 /** What the bypass remembers on this phone only (not in backups: networks and strategies are this phone's). */
 data class DpiMemory(
-    /** Network key -> strategy id, or [DIRECT] when the network needs no bypass. */
+    /** Network key -> strategy ids, best first, joined by ","; or [DIRECT] when the network needs no bypass. */
     val networks: Map<String, String> = emptyMap(),
     /** Strategies that worked lately, newest first. */
     val recent: List<String> = emptyList(),
@@ -56,7 +56,8 @@ class DpiStore(context: Context) {
     suspend fun remember(network: String, choice: String) = store.edit { prefs ->
         prefs[stringPreferencesKey(NET_PREFIX + network)] = choice
         if (choice != DpiMemory.DIRECT) {
-            val recent = listOf(choice) + prefs[Recent]?.split(',').orEmpty().filter { it.isNotBlank() && it != choice }
+            val best = choice.substringBefore(',')
+            val recent = listOf(best) + prefs[Recent]?.split(',').orEmpty().filter { it.isNotBlank() && it != best }
             prefs[Recent] = recent.take(DpiMemory.RECENT_SIZE).joinToString(",")
         }
     }

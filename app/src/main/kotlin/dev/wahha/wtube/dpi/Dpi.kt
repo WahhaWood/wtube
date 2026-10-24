@@ -24,6 +24,7 @@ import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
+import okhttp3.EventListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,7 +48,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.Inet6Address
-import java.net.InetAddress
 import java.net.Proxy
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
@@ -91,11 +91,14 @@ object Dpi {
     private const val RECHECK_EVERY_MS = 5 * 60_000L
     private const val RESTART_DELAY_MS = 5_000L
     private const val FIRST_ROUTE_WAIT_MS = 10_000L
+    private const val SLOTS = 3
+    private const val RELAY_LOG_EVERY_MS = 60_000L
     const val ACTION_OPEN = "dev.wahha.wtube.action.OPEN_DPI"
 
     private lateinit var app: Context
     private lateinit var store: DpiStore
     private lateinit var main: DpiProcess
+    private lateinit var backups: List<DpiProcess>
     private lateinit var probes: List<DpiProcess>
     // Lazy: Http.client reports to this object in JVM tests too, where there is no main thread.
     private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
@@ -105,7 +108,19 @@ object Dpi {
     private val mutablePresets = MutableStateFlow(StrategyList(0, strategies = emptyList()))
     private val requests = MutableStateFlow(0)
     private val probeLock = Mutex()
-    private var mainArgs: List<String>? = null
+    // Slot 0 is the main proxy, 1 and 2 the backups: what each runs (null = not running), where, and under which name.
+    private val slotArgs = arrayOfNulls<List<String>>(SLOTS)
+    private val slotPorts = IntArray(SLOTS)
+    private val slotLabels = Array(SLOTS) { "" }
+    @Volatile private var live: List<Backend> = emptyList()
+    private var relay: Relay? = null
+    private var relayLog: Job? = null
+    private val dohClient by lazy {
+        Http.base.newBuilder().proxy(Proxy.NO_PROXY).eventListener(EventListener.NONE)
+            .connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).callTimeout(5, TimeUnit.SECONDS).build()
+    }
+    internal val probeResolver get() = resolver
+    private val resolver by lazy { Resolver({ dohClient }, note = ::log) }
     private var cancelledOn: String? = null
     private val deaths = ArrayDeque<Long>()
     private val failures = ArrayDeque<Long>()
@@ -136,6 +151,9 @@ object Dpi {
         store = DpiStore(app)
         memory = store.memory.stateIn(scope, SharingStarted.Eagerly, DpiMemory())
         main = DpiProcess(app, DpiMainService::class.java).also { it.onDied = ::onMainDied }
+        backups = listOf(DpiBackup1Service::class.java, DpiBackup2Service::class.java).mapIndexed { i, service ->
+            DpiProcess(app, service).also { it.onDied = { onBackupDied(i + 1) } }
+        }
         probes = listOf(DpiProbe1Service::class.java, DpiProbe2Service::class.java, DpiProbe3Service::class.java).map { DpiProcess(app, it) }
         watchNetwork()
         scope.launch { network.collect { if (Settings.current.value.dpiBypass) log("Network: ${it ?: "none"}") } }
@@ -192,11 +210,11 @@ object Dpi {
         val key = inputs.network
         if (key == null) {
             // No network: keep whatever runs, it is picked again when one comes.
-            if (mainArgs == null) mutableState.value = DpiState.Starting
+            if (slotArgs[0] == null) mutableState.value = DpiState.Starting
             return
         }
         if (inputs.customArgs.isNotBlank()) {
-            Strategies.validate(inputs.customArgs)?.let { runMain(CUSTOM, it) }
+            Strategies.validate(inputs.customArgs)?.let { runMain(listOf(CUSTOM to it)) }
             firstRoute.countDown()
             return
         }
@@ -213,51 +231,105 @@ object Dpi {
                 if (cancelledOn == key) mutableState.value = DpiState.Cancelled else search(key, inputs.presets.strategies)
             }
             else -> {
-                val strategy = Strategies.find(inputs.presets.strategies, saved)
-                val args = strategy?.let { Strategies.validate(it.args) }
-                if (args == null) {
+                val slots = saved.split(',').distinct().mapNotNull { id ->
+                    Strategies.find(inputs.presets.strategies, id)?.let { Strategies.validate(it.args) }?.let { id to it }
+                }.take(SLOTS)
+                if (slots.firstOrNull()?.first != saved.substringBefore(',')) {
                     store.forget(key)
                 } else {
-                    runMain(saved, args)
+                    runMain(slots)
                     firstRoute.countDown()
                 }
             }
         }
     }
 
-    private suspend fun runMain(id: String, args: List<String>) {
-        if (mainArgs == args) {
+    /**
+     * Runs the proxies ([slots]: strategy id and arguments, best first; the first is the main one, the others
+     * back it up) behind the [Relay], which is what YouTube's hosts are routed to. Only the ones that changed restart.
+     */
+    private suspend fun runMain(slots: List<Pair<String, List<String>>>) {
+        val id = slots.first().first
+        if (slotArgs.indices.all { slotArgs[it] == slots.getOrNull(it)?.second } && relay != null) {
             mutableState.value = DpiState.Running(id)
             return
         }
         mutableState.value = DpiState.Starting
-        try {
-            val port = main.start(args)
-            mainArgs = args
-            setRoute(localSocks(port))
-            mutableState.value = DpiState.Running(id)
-            log("Bypass running: $id on port $port")
-        } catch (e: IOException) {
-            log("byedpi did not start: ${e.message}")
-            mainArgs = null
-            setRoute(null)
-            noteDeath()
+        val engines = listOf(main) + backups
+        for (i in 0 until SLOTS) {
+            val slot = slots.getOrNull(i)
+            if (slot?.second == slotArgs[i] && slot != null) continue
+            slotArgs[i] = null
+            updateLive()
+            if (slot == null) {
+                engines[i].stop()
+                continue
+            }
+            try {
+                slotPorts[i] = engines[i].start(slot.second)
+                slotArgs[i] = slot.second
+                slotLabels[i] = slot.first
+                updateLive()
+            } catch (e: IOException) {
+                log("byedpi ${slot.first} did not start: ${e.message}")
+                if (i == 0) {
+                    setRoute(null)
+                    noteDeath()
+                    return
+                }
+            }
         }
+        val running = relay ?: withContext(Dispatchers.IO) { Relay(resolver, { live }, ::log) }.also {
+            relay = it
+            relayLog = scope.launch {
+                while (true) {
+                    delay(RELAY_LOG_EVERY_MS)
+                    relay?.summary()?.let { text -> log("Relay: $text") }
+                }
+            }
+        }
+        setRoute(running.proxy)
+        mutableState.value = DpiState.Running(id)
+        log("Bypass running: ${live.joinToString(" + ") { it.label }} behind the relay on port ${running.port}")
+    }
+
+    private fun updateLive() {
+        live = (0 until SLOTS).filter { slotArgs[it] != null }.map { Backend(slotPorts[it], slotLabels[it]) }
     }
 
     private suspend fun stopMain() {
-        if (mainArgs == null) return
-        mainArgs = null
+        if (slotArgs.all { it == null } && relay == null) return
         setRoute(null)
-        main.stop()
+        relayLog?.cancel()
+        relay?.close()
+        relay = null
+        val engines = listOf(main) + backups
+        for (i in 0 until SLOTS) {
+            if (slotArgs[i] == null) continue
+            slotArgs[i] = null
+            engines[i].stop()
+        }
+        updateLive()
     }
 
-    /** The proxy's process went away on its own: direct until it is back, a few restarts, then give up. */
+    /** The main proxy's process went away on its own: direct until it is back, a few restarts, then give up. */
     private fun onMainDied() {
         log("byedpi process died")
-        mainArgs = null
+        slotArgs[0] = null
+        updateLive()
         setRoute(null)
         noteDeath()
+    }
+
+    /** A backup's process went away: the relay goes on without it, and it is started again soon. */
+    private fun onBackupDied(slot: Int) {
+        log("byedpi backup ${slotLabels[slot]} died")
+        slotArgs[slot] = null
+        updateLive()
+        scope.launch {
+            delay(RESTART_DELAY_MS)
+            requests.value++
+        }
     }
 
     private fun noteDeath() {
@@ -298,7 +370,8 @@ object Dpi {
         log("Search in $key: ${candidates.size} candidates")
         val outcome = probeLock.withLock {
             try {
-                StrategySearch(probes, loggedProbe(stream)).run(
+                withContext(Dispatchers.IO) { ProbeRelays(probes.size) }.use { relays ->
+                StrategySearch(probes, loggedProbe(stream), relays::proxyOf, ::engineFailed).run(
                     candidates,
                     onProgress = { done, total -> mutableState.value = DpiState.Testing(done, total) },
                     onResult = { strategy, result ->
@@ -306,6 +379,7 @@ object Dpi {
                         log("  ${strategy.id}: ${result.summary()}")
                     },
                 )
+                }
             } finally {
                 withContext(NonCancellable) { if (results.isNotEmpty()) store.saveResults(results) }
             }
@@ -313,7 +387,7 @@ object Dpi {
         log("Search in this network: ${outcome.summary()}")
         when (outcome) {
             SearchOutcome.Direct -> store.remember(key, DpiMemory.DIRECT)
-            is SearchOutcome.Found -> store.remember(key, outcome.strategy.id)
+            is SearchOutcome.Found -> store.remember(key, outcome.choice)
             SearchOutcome.None -> if (!keepOnNone) {
                 stopMain()
                 mutableState.value = DpiState.NoStrategy
@@ -462,12 +536,11 @@ object Dpi {
     }
 
     /**
-     * " (dns v6,v4)" for a googlevideo [host]: the address families the phone's resolver gives, in its order.
-     * Through the proxy OkHttp passes the name and byedpi resolves it the same way, connecting to the first.
+     * " (dns v4,v6)" for a googlevideo [host]: the address families the [Relay] got for it, in its order.
      */
     private fun dnsNote(host: String): String {
         if (bypassDomain(host) != "googlevideo.com") return ""
-        val families = runCatching { InetAddress.getAllByName(host).map { if (it is Inet6Address) "v6" else "v4" }.distinct() }.getOrNull()
+        val families = runCatching { resolver.resolve(host).map { if (it is Inet6Address) "v6" else "v4" }.distinct() }.getOrNull()?.takeIf { it.isNotEmpty() }
         return " (dns ${families?.joinToString(",") ?: "failed"})"
     }
 
@@ -495,7 +568,7 @@ object Dpi {
                 log("Video $id stalls via ${Http.route ?: "direct"}: checking with its own stream")
                 search(
                     key, mutablePresets.value.strategies, stream,
-                    first = listOfNotNull(saved) + memory.results.filterValues { it.works }.keys,
+                    first = saved.orEmpty().split(',').filter { it.isNotBlank() } + memory.results.filterValues { it.works }.keys,
                     keepOnNone = true,
                     v4Twins = true,
                 )
@@ -514,15 +587,17 @@ object Dpi {
         val key = network.value ?: return
         val presets = mutablePresets.value.strategies
         val saved = memory.value.networks[key]
-        val candidates = (listOfNotNull(saved) + memory.value.recent).distinct().mapNotNull { id -> Strategies.find(presets, id) }
+        val candidates = (saved.orEmpty().split(',').filter { it.isNotBlank() } + memory.value.recent).distinct().mapNotNull { id -> Strategies.find(presets, id) }
         log("YouTube keeps failing, re-checking ${candidates.size} recent strategies")
         val outcome = probeLock.withLock {
-            StrategySearch(probes, loggedProbe()).run(candidates, onResult = { s, r -> log("  ${s.id}: ${r.summary()}") })
+            withContext(Dispatchers.IO) { ProbeRelays(probes.size) }.use { relays ->
+                StrategySearch(probes, loggedProbe(), relays::proxyOf, ::engineFailed).run(candidates, onResult = { s, r -> log("  ${s.id}: ${r.summary()}") })
+            }
         }
         log("Re-check: ${outcome.summary()}")
         when (outcome) {
             SearchOutcome.Direct -> if (saved != DpiMemory.DIRECT) store.remember(key, DpiMemory.DIRECT)
-            is SearchOutcome.Found -> if (outcome.strategy.id != saved) store.remember(key, outcome.strategy.id)
+            is SearchOutcome.Found -> if (outcome.choice != saved) store.remember(key, outcome.choice)
             SearchOutcome.None -> notifyBroken()
         }
     }
@@ -549,6 +624,8 @@ object Dpi {
             .build()
         runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
+
+    private fun engineFailed(strategy: Strategy, why: String) = log("  ${strategy.id}: engine did not start ($why), not tried")
 
     /** A fresh [Probe] (one stream link per search, or [stream]) that logs the direct check. */
     private fun loggedProbe(stream: String? = null): suspend (Proxy?) -> ProbeResult {
@@ -607,4 +684,25 @@ private fun SearchOutcome.summary(): String = when (this) {
     SearchOutcome.Direct -> "direct"
     is SearchOutcome.Found -> "${strategy.id} (${if (fast) "fast" else "best of the slow"}: ${result.summary()})"
     SearchOutcome.None -> "nothing works"
+}
+
+/**
+ * One [Relay] per probe engine, each sending to the engine that currently runs there, so that a strategy is
+ * judged the way it is used: with the relay's own name lookup and a second address when the first fails.
+ */
+private class ProbeRelays(count: Int) : java.io.Closeable {
+    private val ports = IntArray(count)
+    private val relays = List(count) { i ->
+        Relay(
+            Dpi.probeResolver, { listOf(Backend(ports[i], "probe")) },
+            attemptMs = 3_500, deadlineMs = 9_000, maxAttempts = 2,
+        )
+    }
+
+    fun proxyOf(engine: Int, port: Int): Proxy {
+        ports[engine] = port
+        return relays[engine].proxy
+    }
+
+    override fun close() = relays.forEach { it.close() }
 }

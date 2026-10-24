@@ -147,7 +147,7 @@ fun BypassScreen() {
         ManualSheet(
             presets.strategies,
             memory.results,
-            selected = network?.let { memory.networks[it] },
+            selected = network?.let { memory.networks[it]?.substringBefore(',') },
             onPick = { Dpi.choose(it); manualOpen = false },
             onDismiss = { manualOpen = false },
         )
