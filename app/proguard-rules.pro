@@ -32,3 +32,7 @@
 -keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
     <fields>;
 }
+
+# ML Kit's init provider instantiates its component registrars by reflection (R8 logged NoSuchMethodException <init> in 0.20.3).
+-keep class * implements com.google.firebase.components.ComponentRegistrar { <init>(); }
+-keep class com.google.mlkit.** implements com.google.firebase.components.ComponentRegistrar { <init>(); }
