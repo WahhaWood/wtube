@@ -26,6 +26,7 @@ WTube — самодельный клиент YouTube в духе NewPipe и Sim
 
 <p align="center"><img src="docs/screenshots/browse.png" alt="Главная, поиск, каналы, настройки" width="900"></p>
 <p align="center"><img src="docs/screenshots/player.png" alt="Плеер: полный экран, настройки, мини-плеер" width="900"></p>
+<p align="center"><img src="docs/screenshots/features.png" alt="Обход блокировок, расшифровка, статистика, библиотека" width="900"></p>
 
 <sub>Превью и названия роликов на скриншотах принадлежат их авторам и показаны только для демонстрации интерфейса.</sub>
 

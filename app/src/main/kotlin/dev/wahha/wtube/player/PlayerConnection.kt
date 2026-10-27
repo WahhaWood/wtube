@@ -59,6 +59,7 @@ class PlayerConnection(context: Context) {
         val paused = restoring == videoId
         restoring = null
         if (player.currentMediaItem?.mediaId == videoId && player.playerError == null) {
+            if (paused) return
             if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
             player.play()
             return

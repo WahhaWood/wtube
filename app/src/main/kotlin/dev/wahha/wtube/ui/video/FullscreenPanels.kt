@@ -114,7 +114,7 @@ internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, shelf
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // A vertical video is fullscreen upright: there the comments come up from the bottom instead.
         val upright = maxWidth < maxHeight
-        if (shelfProgress() > 0f) {
+        if (panel == FullscreenPanel.MoreVideos || shelfProgress() > 0f) {
             Box(
                 Modifier.fillMaxSize().graphicsLayer {
                     val p = shelfProgress()
