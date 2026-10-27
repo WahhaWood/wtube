@@ -435,7 +435,6 @@ fun PlayerSheet(
                                 sheet,
                                 fullscreen,
                                 inPictureInPicture,
-                                shelfOpen = { panel == FullscreenPanel.MoreVideos || shelf.value > 0f || shelf.isRunning },
                                 toggleFullscreen,
                                 onShelfDrag = { scope.launch { shelf.snapTo(it) } },
                                 onShelfEnd = { open ->
@@ -617,7 +616,6 @@ private fun Modifier.pointerInputVideoDrag(
     sheet: PlayerSheetState,
     fullscreen: Boolean,
     inPictureInPicture: Boolean,
-    shelfOpen: () -> Boolean,
     toggleFullscreen: () -> Unit,
     onShelfDrag: (Float) -> Unit,
     onShelfEnd: (open: Boolean) -> Unit,
@@ -630,7 +628,7 @@ private fun Modifier.pointerInputVideoDrag(
     awaitEachGesture {
         // The player's own tap detector consumes the down; drags still belong to us.
         val down = awaitFirstDown(requireUnconsumed = false)
-        if (sheet.progress > 0.5f || shelfOpen()) return@awaitEachGesture
+        if (sheet.progress > 0.5f) return@awaitEachGesture
         // A swipe from the top or bottom edge in fullscreen is the user pulling the system bars in.
         if (fullscreen && (down.position.y < edge || down.position.y > size.height - edge)) return@awaitEachGesture
         var total = 0f

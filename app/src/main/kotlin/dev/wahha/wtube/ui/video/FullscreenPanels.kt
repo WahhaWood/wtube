@@ -114,7 +114,7 @@ internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, shelf
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // A vertical video is fullscreen upright: there the comments come up from the bottom instead.
         val upright = maxWidth < maxHeight
-        if (panel == FullscreenPanel.MoreVideos || shelfProgress() > 0f) {
+        if (shelfProgress() > 0f) {
             Box(
                 Modifier.fillMaxSize().graphicsLayer {
                     val p = shelfProgress()
@@ -197,7 +197,7 @@ private fun MoreVideosShelf(vm: VideoViewModel, onClose: () -> Unit, onDrag: (Fl
                 detectVerticalDragGestures(
                     onDragStart = { total = 0f },
                     onDragEnd = { onDragEnd(total <= threshold) },
-                    onDragCancel = { onDragEnd(false) },
+                    onDragCancel = { onDragEnd(true) },
                 ) { change, dy ->
                     change.consume()
                     total += dy

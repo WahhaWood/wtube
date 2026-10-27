@@ -150,7 +150,6 @@ class PlaybackService : MediaSessionService() {
     /** A video that stopped for lack of network goes on by itself once the network is back, from the same spot. */
     private fun resumeAfterOutage() {
         val player = session?.player ?: return
-        if (!player.playWhenReady || player.playbackState == Player.STATE_ENDED) return
         val code = player.playerError?.errorCode ?: return
         if (code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
             code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
@@ -293,9 +292,6 @@ class PlaybackService : MediaSessionService() {
                 Autoplay.cancel()
                 return
             }
-            // ExoPlayer can leave playWhenReady=true at the end. A later lifecycle or network
-            // callback must not turn a completed item into an unexpected replay.
-            player.playWhenReady = false
             if (SleepTimer.sleep.value?.endOfVideo == true) {
                 SleepTimer.cancel()
             } else {
