@@ -25,7 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.core.graphics.drawable.toBitmap
 
 private const val SAMPLE = 32
-private const val HUE_BUCKETS = 12
+private const val HUE_BUCKETS = 24
 private val Cache = LruCache<String, Int>(64)
 private const val NONE = 0
 
@@ -54,10 +54,13 @@ private suspend fun dominantColor(context: android.content.Context, url: String)
 }
 
 /**
- * The hue bucket that carries the most saturated, mid-bright pixels, averaged into one colour; null when the
- * picture has none (monochrome covers).
+ * The hue that carries the most vivid, mid-bright pixels, averaged into one colour; null when the picture has
+ * none (monochrome covers). Covers run warm: faces (skin is an orange of middling saturation) and red text fill
+ * most of them, so that band is weighted down and saturation counts squared, which lets a cover's blue or green
+ * win whenever it has any.
  */
 internal fun dominantHue(bitmap: Bitmap): Int? {
+    val present = FloatArray(HUE_BUCKETS)
     val weight = FloatArray(HUE_BUCKETS)
     val hueSum = FloatArray(HUE_BUCKETS)
     val hsv = FloatArray(3)
@@ -65,11 +68,15 @@ internal fun dominantHue(bitmap: Bitmap): Int? {
         AndroidColor.colorToHSV(bitmap.getPixel(x, y), hsv)
         if (hsv[1] < 0.25f || hsv[2] < 0.2f) continue
         val bucket = (hsv[0] / 360f * HUE_BUCKETS).toInt().coerceAtMost(HUE_BUCKETS - 1)
-        val w = hsv[1] * hsv[2]
+        var w = hsv[1] * hsv[1] * hsv[2]
+        if (hsv[0] in 8f..50f && hsv[1] < 0.7f) w *= 0.2f
+        if (hsv[0] <= 50f || hsv[0] >= 345f) w *= 0.6f
+        present[bucket] += hsv[1] * hsv[2]
         weight[bucket] += w
         hueSum[bucket] += hsv[0] * w
     }
-    val best = weight.indices.maxByOrNull { weight[it] } ?: return null
-    if (weight[best] < SAMPLE * SAMPLE * 0.02f) return null
+    // A hue is scored together with its neighbours, so a colour spread over two buckets beats a narrow spike.
+    val best = weight.indices.maxByOrNull { weight[(it + HUE_BUCKETS - 1) % HUE_BUCKETS] * 0.5f + weight[it] + weight[(it + 1) % HUE_BUCKETS] * 0.5f } ?: return null
+    if (present[best] < SAMPLE * SAMPLE * 0.01f || weight[best] <= 0f) return null
     return AndroidColor.HSVToColor(floatArrayOf(hueSum[best] / weight[best], 0.6f, 0.85f))
 }

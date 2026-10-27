@@ -19,8 +19,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.21.1"
+        versionCode = 37
+        versionName = "0.21.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -88,6 +88,12 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+// The profile is collected on the phone next to the installed release: same id with another key would not install,
+// and the run uninstalls the app afterwards along with its history and login.
+androidComponents {
+    onVariants(selector().withBuildType("nonMinifiedRelease")) { it.applicationId.set("dev.wahha.wtube.bp") }
 }
 
 dependencies {

@@ -19,7 +19,7 @@ class BaselineProfileGenerator {
     val rule = BaselineProfileRule()
 
     @Test
-    fun generate() = rule.collect(packageName = "dev.wahha.wtube", includeInStartupProfile = true) {
+    fun generate() = rule.collect(packageName = "dev.wahha.wtube.bp", includeInStartupProfile = true) {
         pressHome()
         startActivityAndWait()
         device.wait(Until.hasObject(By.desc("Поиск")), TIMEOUT_MS)

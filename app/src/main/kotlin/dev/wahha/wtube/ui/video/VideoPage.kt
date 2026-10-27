@@ -59,7 +59,9 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -446,6 +448,8 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
 internal fun AmbientGlow(thumbnail: String?) {
     if (thumbnail == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
     val background = MaterialTheme.colorScheme.background
+    // The blurred cover is mostly skin and red text, i.e. orange; the hue comes from the cover accent instead.
+    val hue = ColorFilter.tint(MaterialTheme.colorScheme.primary, BlendMode.Hue)
     val top = systemTop()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val height = top + maxWidth * 9f / 16f + 240.dp
@@ -454,6 +458,7 @@ internal fun AmbientGlow(thumbnail: String?) {
                 model = thumbnail,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                colorFilter = hue,
                 modifier = Modifier.matchParentSize().blur(72.dp, BlurredEdgeTreatment.Rectangle).alpha(0.6f),
             )
             Box(
