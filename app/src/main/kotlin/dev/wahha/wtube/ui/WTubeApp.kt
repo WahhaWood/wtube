@@ -297,9 +297,9 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
     var savedVideo by rememberSaveable { mutableStateOf<String?>(null) }
     var savedExpanded by rememberSaveable { mutableStateOf(false) }
     val restored = remember { savedVideo to savedExpanded }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(connection.player) {
         val (id, expanded) = restored
-        if (id != null && video.id == null && connection.player?.currentMediaItem == null) {
+        if (id != null && video.id == null && connection.player != null && connection.player?.currentMediaItem == null) {
             connection.restoring = id
             video.open(id)
             if (expanded) sheet.expand() else sheet.snapCollapsed()

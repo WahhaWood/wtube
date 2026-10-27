@@ -128,6 +128,15 @@ fun SettingsScreen() {
             }
         }
 
+        item { SectionHeader(stringResource(R.string.settings_network)) }
+        item {
+            ValueRow(
+                stringResource(R.string.dpi_title),
+                stringResource(if (settings.dpiBypass) R.string.settings_dpi_on else R.string.dpi_off),
+                onClick = nav.openBypass,
+            )
+        }
+
         item { SectionHeader(stringResource(R.string.settings_playback)) }
         item { ValueRow(stringResource(R.string.settings_quality), qualityLabel(settings.maxQuality)) { sheet = SettingsSheet.Quality } }
         item { ValueRow(stringResource(R.string.settings_quality_mobile), qualityLabel(settings.maxQualityMobile)) { sheet = SettingsSheet.QualityMobile } }
@@ -192,15 +201,6 @@ fun SettingsScreen() {
                 settings.liquidGlass && GlassSupported,
                 Settings.LiquidGlass,
                 enabled = GlassSupported,
-            )
-        }
-
-        item { SectionHeader(stringResource(R.string.settings_network)) }
-        item {
-            ValueRow(
-                stringResource(R.string.dpi_title),
-                stringResource(if (settings.dpiBypass) R.string.settings_dpi_on else R.string.dpi_off),
-                onClick = nav.openBypass,
             )
         }
 
