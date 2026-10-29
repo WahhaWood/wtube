@@ -1,9 +1,14 @@
 package dev.wahha.wtube
 
+import androidx.datastore.preferences.core.mutablePreferencesOf
 import dev.wahha.wtube.data.AppSettings
+import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.capLongSide
 import dev.wahha.wtube.data.qualityCap
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -31,5 +36,35 @@ class SettingsTest {
         assertEquals(1080, qualityCap(settings, metered = false))
         assertEquals(720, qualityCap(settings, metered = true))
         assertEquals(2160, qualityCap(AppSettings(maxQuality = 360, maxQualityMobile = 2160), metered = true))
+    }
+
+    // Every field away from its default, so a field left out of the store's write or read comes back changed.
+    private val changed = AppSettings(
+        maxQuality = 1080, maxQualityMobile = 360, speed = 1.5f, subtitles = true, subtitleLanguage = "en",
+        subtitleSize = 3, subtitleBackground = false, doubleTapSeconds = 30, autoplay = false,
+        resumePlayback = false, backgroundPlayback = false, pictureInPicture = false, ambientMode = false,
+        liquidGlass = false, saveHistory = false, reportWatching = false, sponsorBlock = false,
+        sponsorCategories = setOf("intro"), showDislikes = false, font = 2, textSize = 0, pureBlack = true,
+        hideWatched = true, coverAccent = false, deArrow = true, updateCheck = false, dpiBypass = true,
+    )
+
+    @Test
+    fun fixtureChangesEveryField() {
+        val json = Json { encodeDefaults = true }
+        val defaults = json.encodeToJsonElement(AppSettings.serializer(), AppSettings()).jsonObject
+        val all = json.encodeToJsonElement(AppSettings.serializer(), changed).jsonObject
+        for ((name, value) in all) assertNotEquals("$name is left at its default here", defaults[name], value)
+    }
+
+    @Test
+    fun everySettingSurvivesTheStore() = with(Settings) {
+        val prefs = mutablePreferencesOf()
+        prefs.write(changed)
+        assertEquals(changed, prefs.toSettings())
+    }
+
+    @Test
+    fun emptyStoreGivesDefaults() = with(Settings) {
+        assertEquals(AppSettings(), mutablePreferencesOf().toSettings())
     }
 }

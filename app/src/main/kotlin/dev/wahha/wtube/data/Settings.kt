@@ -2,6 +2,7 @@ package dev.wahha.wtube.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -136,38 +137,40 @@ object Settings {
     /** Replaces every setting with [settings] at once (a restored backup). */
     suspend fun restore(settings: AppSettings) {
         val store = store ?: return
-        store.edit { prefs ->
-            prefs[MaxQuality] = settings.maxQuality
-            prefs[MaxQualityMobile] = settings.maxQualityMobile
-            prefs[Speed] = settings.speed
-            prefs[Subtitles] = settings.subtitles
-            prefs[SubtitleLanguage] = settings.subtitleLanguage
-            prefs[SubtitleSize] = settings.subtitleSize
-            prefs[SubtitleBackground] = settings.subtitleBackground
-            prefs[DoubleTapSeconds] = settings.doubleTapSeconds
-            prefs[Autoplay] = settings.autoplay
-            prefs[ResumePlayback] = settings.resumePlayback
-            prefs[BackgroundPlayback] = settings.backgroundPlayback
-            prefs[PictureInPicture] = settings.pictureInPicture
-            prefs[AmbientMode] = settings.ambientMode
-            prefs[LiquidGlass] = settings.liquidGlass
-            prefs[SaveHistory] = settings.saveHistory
-            prefs[ReportWatching] = settings.reportWatching
-            prefs[SponsorBlockOn] = settings.sponsorBlock
-            prefs[SponsorCategories] = settings.sponsorCategories
-            prefs[ShowDislikes] = settings.showDislikes
-            prefs[Font] = settings.font
-            prefs[TextSize] = settings.textSize
-            prefs[PureBlack] = settings.pureBlack
-            prefs[HideWatched] = settings.hideWatched
-            prefs[CoverAccent] = settings.coverAccent
-            prefs[UpdateCheck] = settings.updateCheck
-            prefs[DeArrowOn] = settings.deArrow
-            prefs[DpiBypass] = settings.dpiBypass
-        }
+        store.edit { it.write(settings) }
     }
 
-    private fun Preferences.toSettings(): AppSettings {
+    internal fun MutablePreferences.write(settings: AppSettings) {
+        this[MaxQuality] = settings.maxQuality
+        this[MaxQualityMobile] = settings.maxQualityMobile
+        this[Speed] = settings.speed
+        this[Subtitles] = settings.subtitles
+        this[SubtitleLanguage] = settings.subtitleLanguage
+        this[SubtitleSize] = settings.subtitleSize
+        this[SubtitleBackground] = settings.subtitleBackground
+        this[DoubleTapSeconds] = settings.doubleTapSeconds
+        this[Autoplay] = settings.autoplay
+        this[ResumePlayback] = settings.resumePlayback
+        this[BackgroundPlayback] = settings.backgroundPlayback
+        this[PictureInPicture] = settings.pictureInPicture
+        this[AmbientMode] = settings.ambientMode
+        this[LiquidGlass] = settings.liquidGlass
+        this[SaveHistory] = settings.saveHistory
+        this[ReportWatching] = settings.reportWatching
+        this[SponsorBlockOn] = settings.sponsorBlock
+        this[SponsorCategories] = settings.sponsorCategories
+        this[ShowDislikes] = settings.showDislikes
+        this[Font] = settings.font
+        this[TextSize] = settings.textSize
+        this[PureBlack] = settings.pureBlack
+        this[HideWatched] = settings.hideWatched
+        this[CoverAccent] = settings.coverAccent
+        this[UpdateCheck] = settings.updateCheck
+        this[DeArrowOn] = settings.deArrow
+        this[DpiBypass] = settings.dpiBypass
+    }
+
+    internal fun Preferences.toSettings(): AppSettings {
         val defaults = AppSettings()
         return AppSettings(
             maxQuality = this[MaxQuality] ?: defaults.maxQuality,

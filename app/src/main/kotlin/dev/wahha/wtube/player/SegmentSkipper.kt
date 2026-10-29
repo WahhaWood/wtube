@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.Segment
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.SponsorBlock
 import dev.wahha.wtube.data.VideoSegments
@@ -69,11 +70,11 @@ class SegmentSkipper(private val context: Context, private val scope: CoroutineS
         val current = SponsorBlock.current.value ?: return
         if (current.videoId != player.currentMediaItem?.mediaId) return
         val position = player.currentPosition
-        val inside = current.segments.firstOrNull { position in it }
-        setMuted(inside?.mute == true)
-        if (inside != null && !inside.mute && previous !in inside && position - inside.startMs < ENTRY_WINDOW_MS) {
-            player.seekTo(inside.endMs)
-            Notices.show(R.string.sb_skipped, context.getString(sponsorCategoryLabel(inside.category)))
+        setMuted(current.segments.firstOrNull { position in it }?.mute == true)
+        val skip = segmentToSkip(current.segments, position, previous)
+        if (skip != null) {
+            player.seekTo(skip.endMs)
+            Notices.show(R.string.sb_skipped, context.getString(sponsorCategoryLabel(skip.category)))
             // A segment right after this one starts where it ends, and must be skipped too.
             previous = -1
             return
@@ -90,9 +91,19 @@ class SegmentSkipper(private val context: Context, private val scope: CoroutineS
 
     private companion object {
         const val TICK_MS = 250L
-        // Playback reaches a segment within a tick or two of its start; deeper in means a seek.
-        const val ENTRY_WINDOW_MS = 1_500L
     }
+}
+
+// Playback reaches a segment within a tick or two of its start; deeper in means a seek.
+private const val ENTRY_WINDOW_MS = 1_500L
+
+/**
+ * The segment to skip at [position], given the [previous] tick's position (-1 for none): one that playback
+ * ran into just now. Muted segments play, and so does one the user sought into or was already in.
+ */
+fun segmentToSkip(segments: List<Segment>, position: Long, previous: Long): Segment? {
+    val inside = segments.firstOrNull { position in it } ?: return null
+    return inside.takeIf { !it.mute && previous !in it && position - it.startMs < ENTRY_WINDOW_MS }
 }
 
 fun sponsorCategoryLabel(category: String): Int = when (category) {

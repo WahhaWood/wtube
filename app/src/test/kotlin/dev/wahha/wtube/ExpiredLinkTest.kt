@@ -13,7 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.IOException
 
-/** On the device: the check needs a real [Uri], which the JVM tests' android.jar stubs do not have. */
+/** Under Robolectric: the check needs a real [Uri], which the android.jar stubs do not have. */
 @RunWith(AndroidJUnit4::class)
 class ExpiredLinkTest {
     private fun httpError(code: Int): PlaybackException = ExoPlaybackException.createForSource(

@@ -214,7 +214,10 @@ class AppTest {
 
     private fun keepScreenOnInWindowManager(): Boolean {
         val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("dumpsys window windows")
-        return ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }.contains("KEEP_SCREEN_ON")
+        val dump = ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }
+        // Only this app's windows: another app's (a phone's TikTok, say) may keep the screen on in the background.
+        val app = ApplicationProvider.getApplicationContext<android.content.Context>().packageName
+        return dump.split("Window #").any { "package=$app " in it && "KEEP_SCREEN_ON" in it }
     }
 
     private fun launchVideo() {

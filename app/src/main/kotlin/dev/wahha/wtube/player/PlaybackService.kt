@@ -189,6 +189,8 @@ class PlaybackService : MediaSessionService() {
     private suspend fun playUpcoming(upcoming: Upcoming) {
         delay(upcoming.atMs - SystemClock.elapsedRealtime())
         val player = session?.player ?: return
+        // The timer's own wake-up pauses and clears the countdown.
+        if (!mayPlayUpcoming(upcoming.atMs, SleepTimer.sleep.value)) return
         val item = runCatching { mediaItem(upcoming.video.id) }.getOrNull()
         Autoplay.cancel()
         if (item == null) return

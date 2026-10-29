@@ -123,11 +123,28 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
 
+/** Where [VideoViewModel] gets a video's page from; tests give it a fake. */
+internal interface VideoSource {
+    suspend fun video(id: String): VideoDetails
+    suspend fun watch(id: String): Watch
+    suspend fun comments(id: String, page: Page?): PageOf<Comment>
+    suspend fun dislikes(id: String): Long
+
+    object Live : VideoSource {
+        override suspend fun video(id: String) = YouTube.video(id)
+        override suspend fun watch(id: String) = Actions.watch(id)
+        override suspend fun comments(id: String, page: Page?) = YouTube.comments(id, page)
+        override suspend fun dislikes(id: String) = Dislikes.of(id)
+    }
+}
+
 /**
  * The video on the player sheet. One per activity rather than one per video: the sheet collapses and
  * expands without reloading, and opening another video replaces this one.
  */
-class VideoViewModel : ViewModel() {
+class VideoViewModel internal constructor(private val source: VideoSource) : ViewModel() {
+    constructor() : this(VideoSource.Live)
+
     var id by mutableStateOf<String?>(null)
         private set
     var details by mutableStateOf<VideoDetails?>(null)
@@ -226,16 +243,16 @@ class VideoViewModel : ViewModel() {
         job?.cancel()
         job = viewModelScope.launch {
             try {
-                val watch = async { runCatching { Actions.watch(id) }.getOrNull() }
+                val watch = async { runCatching { source.watch(id) }.getOrNull() }
                 if (Settings.current.value.showDislikes) {
-                    launch { runCatching { Dislikes.of(id) }.onSuccess { if (this@VideoViewModel.id == id) dislikes = it } }
+                    launch { runCatching { source.dislikes(id) }.onSuccess { if (this@VideoViewModel.id == id) dislikes = it } }
                 }
                 if (Settings.current.value.deArrow) {
                     launch { runCatching { DeArrow.title(id) }.onSuccess { if (this@VideoViewModel.id == id) betterTitle = it } }
                 }
                 this@VideoViewModel.watch = watch
                 val details = try {
-                    YouTube.video(id)
+                    source.video(id)
                 } catch (e: Exception) {
                     // Offline, a downloaded video still has its page: what was saved with the download.
                     (Downloads.finished(id, audioOnly = false) ?: Downloads.finished(id, audioOnly = true))?.let { offlineDetails(it.video) } ?: throw e
@@ -263,8 +280,8 @@ class VideoViewModel : ViewModel() {
      * no comments token or the anonymous request failed.
      */
     private suspend fun loadComments(id: String, page: Page?): PageOf<Comment> {
-        if (page != null && !Feeds.isCursor(page)) return YouTube.comments(id, page)
-        val token = if (page == null) commentSorts.getOrNull(commentSort) ?: watch?.await()?.commentsToken ?: return YouTube.comments(id, null) else null
+        if (page != null && !Feeds.isCursor(page)) return source.comments(id, page)
+        val token = if (page == null) commentSorts.getOrNull(commentSort) ?: watch?.await()?.commentsToken ?: return source.comments(id, null) else null
         val result = try {
             Actions.comments(token, page)
         } catch (e: CancellationException) {
@@ -273,7 +290,7 @@ class VideoViewModel : ViewModel() {
             if (page != null || Account.active != null) throw e
             Log.w("Video", "InnerTube comments failed, extractor instead: ${errorDetail(e)}")
             ErrorLog.note("[video] InnerTube comments failed, extractor instead: ${errorDetail(e)}")
-            return YouTube.comments(id, null)
+            return source.comments(id, null)
         }
         if (page == null) {
             commentBox = result.createParams
@@ -300,7 +317,7 @@ class VideoViewModel : ViewModel() {
             if (Feeds.isCursor(at)) {
                 Actions.comments(null, at).let { PageOf(it.comments, it.continuation?.let(Feeds::cursor)) }
             } else {
-                YouTube.comments(id, at)
+                source.comments(id, at)
             }
         }.also { it.refresh() }
     }

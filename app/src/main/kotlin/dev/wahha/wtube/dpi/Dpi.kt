@@ -131,13 +131,12 @@ object Dpi {
     internal val probeResolver get() = resolver
     private val resolver by lazy { Resolver({ dohClient }, note = ::log) }
     private var cancelledOn: String? = null
-    private val deaths = ArrayDeque<Long>()
+    private val deaths = Restarts()
     private val failures = ArrayDeque<Long>()
     private var lastRecheck = 0L
     private var recheck: Job? = null
-    private val firstRoute = CountDownLatch(1)
-    @Volatile private var firstRouteGaveUp = false
-    private val backupDeaths = Array(3) { ArrayDeque<Long>() }
+    private val firstRoute = FirstRoute(FIRST_ROUTE_WAIT_MS)
+    private val backupDeaths = Array(SLOTS) { Restarts() }
 
     val state: StateFlow<DpiState> = mutableState.asStateFlow()
     val presets: StateFlow<StrategyList> = mutablePresets.asStateFlow()
@@ -198,10 +197,7 @@ object Dpi {
      * waited [FIRST_ROUTE_WAIT_MS]), so it does not go directly while byedpi is still starting.
      */
     fun awaitFirstRoute() {
-        // After one timeout the wait is over for good: the route may never come (no network), and every
-        // request would otherwise wait the full time again.
-        if (!::app.isInitialized || firstRouteGaveUp) return
-        if (!firstRoute.await(FIRST_ROUTE_WAIT_MS, TimeUnit.MILLISECONDS)) firstRouteGaveUp = true
+        if (::app.isInitialized) firstRoute.await()
     }
 
     private suspend fun apply(inputs: Inputs) {
@@ -210,7 +206,7 @@ object Dpi {
             stopMain()
             setRoute(null)
             mutableState.value = DpiState.Off
-            firstRoute.countDown()
+            firstRoute.arrived()
             return
         }
         if (inputs.presets.strategies.isEmpty()) return
@@ -218,7 +214,7 @@ object Dpi {
             stopMain()
             setRoute(proxy)
             mutableState.value = DpiState.CustomProxy
-            firstRoute.countDown()
+            firstRoute.arrived()
             return
         }
         val key = inputs.network
@@ -229,7 +225,7 @@ object Dpi {
         }
         if (inputs.customArgs.isNotBlank()) {
             Strategies.validate(inputs.customArgs)?.let { runMain(listOf(CUSTOM to it)) }
-            firstRoute.countDown()
+            firstRoute.arrived()
             return
         }
         when (val saved = inputs.saved) {
@@ -237,11 +233,11 @@ object Dpi {
                 stopMain()
                 setRoute(null)
                 mutableState.value = DpiState.NotNeeded
-                firstRoute.countDown()
+                firstRoute.arrived()
             }
             null -> {
                 // A search takes a minute; requests go directly meanwhile, as they always did.
-                firstRoute.countDown()
+                firstRoute.arrived()
                 if (cancelledOn == key) mutableState.value = DpiState.Cancelled else search(key, inputs.presets.strategies)
             }
             else -> {
@@ -252,7 +248,7 @@ object Dpi {
                     store.forget(key)
                 } else {
                     runMain(slots)
-                    firstRoute.countDown()
+                    firstRoute.arrived()
                 }
             }
         }
@@ -340,11 +336,8 @@ object Dpi {
         log("byedpi backup ${slotLabels[slot]} died")
         slotArgs[slot] = null
         updateLive()
-        val now = System.currentTimeMillis()
         val recent = backupDeaths[slot.coerceIn(backupDeaths.indices)]
-        recent.addLast(now)
-        while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst()
-        if (recent.size >= 3) {
+        if (!recent.restartAfterDeath(System.currentTimeMillis())) {
             // Left empty until the network or the presets change and the slots are decided afresh.
             log("byedpi backup ${slotLabels[slot]} died 3 times in a minute, not restarting")
             recent.clear()
@@ -357,10 +350,7 @@ object Dpi {
     }
 
     private fun noteDeath() {
-        val now = System.currentTimeMillis()
-        deaths.addLast(now)
-        while (deaths.isNotEmpty() && now - deaths.first() > 60_000) deaths.removeFirst()
-        if (deaths.size >= 3) {
+        if (!deaths.restartAfterDeath(System.currentTimeMillis())) {
             mutableState.value = DpiState.EngineFailed
             return
         }
@@ -729,4 +719,40 @@ private class ProbeRelays(count: Int) : java.io.Closeable {
     }
 
     override fun close() = relays.forEach { it.close() }
+}
+
+/** Deaths of one byedpi process: restart it after each, unless it died [LIMIT] times within [WINDOW_MS]. */
+internal class Restarts {
+    private val recent = ArrayDeque<Long>()
+
+    /** Notes a death at [now]; false means give up. */
+    fun restartAfterDeath(now: Long): Boolean {
+        recent.addLast(now)
+        while (recent.isNotEmpty() && now - recent.first() > WINDOW_MS) recent.removeFirst()
+        return recent.size < LIMIT
+    }
+
+    fun clear() = recent.clear()
+
+    private companion object {
+        const val LIMIT = 3
+        const val WINDOW_MS = 60_000L
+    }
+}
+
+/**
+ * Holds requests made right after launch until the bypass has its first route, at most [waitMs]. After one
+ * timeout the wait is over for good: the route may never come (no network), and every request would
+ * otherwise wait the full time again.
+ */
+internal class FirstRoute(private val waitMs: Long) {
+    private val latch = CountDownLatch(1)
+    @Volatile private var gaveUp = false
+
+    fun arrived() = latch.countDown()
+
+    fun await() {
+        if (gaveUp) return
+        if (!latch.await(waitMs, TimeUnit.MILLISECONDS)) gaveUp = true
+    }
 }

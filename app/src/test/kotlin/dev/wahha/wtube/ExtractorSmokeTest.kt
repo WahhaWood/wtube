@@ -217,12 +217,14 @@ class ExtractorSmokeTest {
 
     @Test
     fun liveChatAndReplayLoadAnonymously() = runBlocking {
-        val live = YouTube.kiosk("live").items.filterIsInstance<VideoItem>().first { it.isLive }
-        val chat = Actions.watch(live.id, session = null).chat
-        println("live chat of ${live.id}: $chat")
-        assertTrue(chat != null && !chat.replay)
-        val page = LiveChat.page(chat!!.token, replay = false)
-        assertTrue(page.continuation != null && page.modes.size == 2)
+        // Some streams have the chat off or without the Top/Live switch: one of the first few must have both.
+        val lives = YouTube.kiosk("live").items.filterIsInstance<VideoItem>().filter { it.isLive }.take(6)
+        val withChat = lives.firstOrNull { live ->
+            val chat = Actions.watch(live.id, session = null).chat
+            println("live chat of ${live.id}: $chat")
+            chat != null && !chat.replay && LiveChat.page(chat.token, replay = false).let { it.continuation != null && it.modes.size == 2 }
+        }
+        assertTrue("no chat with both modes among ${lives.map { it.id }}", withChat != null)
         // Lofi Girl's past streams keep their chat replay.
         val channel = YouTube.channel("https://www.youtube.com/@LofiGirl")
         val past = YouTube.channelTab(channel.tabs.first { it.kind == "livestreams" }).items.filterIsInstance<VideoItem>().first { !it.isLive && it.duration > 0 }

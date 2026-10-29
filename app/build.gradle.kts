@@ -19,8 +19,8 @@ android {
         applicationId = "dev.wahha.wtube"
         minSdk = 26
         targetSdk = 36
-        versionCode = 38
-        versionName = "0.22.0"
+        versionCode = 39
+        versionName = "0.23.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Shown in Settings → О приложении.
         buildConfigField("String", "EXTRACTOR_VERSION", "\"${libs.versions.newpipeExtractor.get().take(7)}\"")
@@ -66,6 +66,8 @@ android {
     testOptions {
         // OkHttp probes android.util.Log on the JVM; stubs returning defaults keep the smoke tests quiet.
         unitTests.isReturnDefaultValues = true
+        // Robolectric: the few JVM tests that need a real framework (Uri, Compose UI).
+        unitTests.isIncludeAndroidResources = true
     }
 
     // Findings that existed when lint joined CI; new ones fail the build.
@@ -139,6 +141,10 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.androidx.test.ext.junit)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

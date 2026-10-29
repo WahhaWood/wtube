@@ -70,6 +70,21 @@ class StreamSelectorTest {
         assertEquals(listOf(137, 136), picked.map { it.itag })
     }
 
+    // Big Buck Bunny 60 fps: AV1 only from 720p60, so a 480p cap on mobile data would get 720p60.
+    @Test
+    fun skipsACodecWithoutLowQualities() {
+        val bbb = listOf(video(398, "av01.0.08M.08", 720, 60), video(399, "av01.0.09M.08", 1080, 60)) +
+            listOf(video(303, "vp9", 1080, 60), video(302, "vp9", 720, 60), video(244, "vp9", 480), video(243, "vp9", 360))
+        val picked = selectStreams(bbb, emptyList(), listOf(VideoCodec.AV1, VideoCodec.VP9, VideoCodec.AVC)).video
+        assertEquals(listOf(303, 302, 244, 243), picked.map { it.itag })
+    }
+
+    @Test
+    fun codecWithOnlyHighQualitiesStillPlaysWhenAlone() {
+        val onlyHigh = listOf(video(398, "av01.0.08M.08", 720, 60), video(399, "av01.0.09M.08", 1080, 60))
+        assertEquals(listOf(399, 398), selectStreams(onlyHigh, emptyList(), listOf(VideoCodec.AV1, VideoCodec.AVC)).video.map { it.itag })
+    }
+
     @Test
     fun noUsableCodecMeansNoVideo() {
         val onlyAv1 = streams.filter { it.codec.startsWith("av01") }

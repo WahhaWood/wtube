@@ -66,6 +66,12 @@ object PlayQueue {
 /** Pauses playback at [atMs] (elapsed realtime), or when the current video ends if [endOfVideo]. */
 class Sleep(val atMs: Long?, val endOfVideo: Boolean)
 
+/**
+ * Whether the next video due at [upcomingAtMs] may start: not when the sleep timer is due by then. Both
+ * wait on their own delays, and after a doze they wake together in either order; the timer must win.
+ */
+fun mayPlayUpcoming(upcomingAtMs: Long, sleep: Sleep?): Boolean = sleep?.atMs?.let { it > upcomingAtMs } ?: true
+
 object SleepTimer {
     private val state = MutableStateFlow<Sleep?>(null)
     val sleep: StateFlow<Sleep?> = state.asStateFlow()

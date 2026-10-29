@@ -1,5 +1,6 @@
 package dev.wahha.wtube.player
 
+import dev.wahha.wtube.data.Settings
 import org.schabi.newpipe.extractor.MediaFormat
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
@@ -28,7 +29,10 @@ fun selectStreams(
     codecPreference: List<VideoCodec>,
 ): StreamSelection {
     val usableVideo = videoOnly.filter { it.isPlayableDash() }
-    val codec = codecPreference.firstOrNull { c -> usableVideo.any { c.matches(it.codec) } }
+    // A codec that reaches down to the lowest quality cap, or the cap has nothing to pick and the player
+    // takes that codec's lowest: YouTube encodes some 60 fps videos in AV1 only from 720p60 up.
+    val codec = codecPreference.firstOrNull { c -> usableVideo.any { c.matches(it.codec) && it.height <= LOWEST_CAP } }
+        ?: codecPreference.firstOrNull { c -> usableVideo.any { c.matches(it.codec) } }
     val video = if (codec == null) emptyList() else usableVideo
         .filter { codec.matches(it.codec) }
         .distinctBy { it.itag }
@@ -58,6 +62,9 @@ fun selectAudio(audio: List<AudioStream>): List<List<AudioStream>> =
                 else -> 2
             }
         }
+
+/** The smallest of the quality caps in Settings. */
+private val LOWEST_CAP = Settings.QualityChoices.filter { it > 0 }.min()
 
 /** Progressive or OTF YouTube URLs with itag metadata: what the extractor's DASH manifest creators accept. */
 private fun Stream.isPlayableDash(): Boolean =

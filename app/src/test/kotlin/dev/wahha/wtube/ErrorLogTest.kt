@@ -21,6 +21,12 @@ class ErrorLogTest {
     }
 
     @Test
+    fun cutsEveryHashOfTheAuthHeader() {
+        val redacted = ErrorLog.redact("Authorization: SAPISIDHASH 1_aaa SAPISID1PHASH 1_bbb SAPISID3PHASH 1_ccc")
+        assertEquals("Authorization: SAPISIDHASH [cut] SAPISID1PHASH [cut] SAPISID3PHASH [cut]", redacted)
+    }
+
+    @Test
     fun leavesOrdinaryLinesAlone() {
         val line = "W PagedList: Page failed: IOException: timeout (youtube.com/watch?v=dQw4w9WgXcQ)"
         assertEquals(line, ErrorLog.redact(line))

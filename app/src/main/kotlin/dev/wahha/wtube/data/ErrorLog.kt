@@ -86,13 +86,14 @@ object ErrorLog {
 
     private val StreamLink = Regex("""https?://[^\s"'<>]*googlevideo\.com[^\s"'<>]*""")
     private val CookieValue = Regex("""\b(SAPISID|APISID|HSID|SSID|SID|SIDCC|LOGIN_INFO|__Secure-[\w-]+)=[^;\s]+""")
-    private val AuthHeader = Regex("""SAPISIDHASH\s+\S+""")
+    // The header carries one hash per scheme: SAPISIDHASH, SAPISID1PHASH, SAPISID3PHASH.
+    private val AuthHeader = Regex("""\b(SAPISID\w*HASH)\s+\S+""")
 
     /** Cuts stream links (they name the IP and session) and cookie values out of [text]. */
     fun redact(text: String): String = text
         .replace(StreamLink, "[googlevideo link]")
         .replace(CookieValue) { "${it.groupValues[1]}=[cut]" }
-        .replace(AuthHeader, "SAPISIDHASH [cut]")
+        .replace(AuthHeader) { "${it.groupValues[1]} [cut]" }
 
     private fun timestamp() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(Date())
 }
