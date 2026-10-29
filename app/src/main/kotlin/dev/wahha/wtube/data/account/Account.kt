@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -102,8 +104,10 @@ object Account {
         val current = state.value ?: return
         val candidate = current.copy(authUser = identity.authUser, pageId = identity.pageId, name = identity.name, avatar = identity.avatar, handle = null)
         val me = whoAmI(candidate) ?: throw SignInException()
-        if (state.value != current) return
-        save(candidate.copy(handle = me.byline, avatar = me.avatar ?: identity.avatar))
+        saving.withLock {
+            if (state.value != current) return
+            write(candidate.copy(handle = me.byline, avatar = me.avatar ?: identity.avatar))
+        }
     }
 
     suspend fun signOut() = save(null)
@@ -113,10 +117,15 @@ object Account {
         val current = state.value ?: return
         if (current.expired) return
         Log.i("Account", "Session no longer accepted")
-        scope.launch { save(current.copy(expired = true)) }
+        // Under the lock and only if nothing changed meanwhile: a sign-out in between must not bring the session back.
+        scope.launch { saving.withLock { if (state.value === current) write(current.copy(expired = true)) } }
     }
 
-    internal suspend fun save(session: Session?) {
+    private val saving = Mutex()
+
+    internal suspend fun save(session: Session?) = saving.withLock { write(session) }
+
+    private suspend fun write(session: Session?) {
         state.value = session
         val store = store ?: return
         store.edit { prefs ->

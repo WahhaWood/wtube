@@ -57,6 +57,7 @@ object History {
     }
 
     fun savePosition(id: String, positionMs: Long, finished: Boolean = false) = change { list ->
+        if (!Settings.current.value.saveHistory) return@change list
         val now = System.currentTimeMillis()
         list.map { if (it.video.id == id) it.copy(positionMs = positionMs, finished = it.finished || finished, positionAt = now) else it }
     }

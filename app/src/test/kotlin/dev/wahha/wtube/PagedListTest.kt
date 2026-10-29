@@ -29,6 +29,19 @@ class PagedListTest {
         assertTrue(list.endReached)
     }
 
+    @Test fun pageOfOnlyDuplicatesLoadsTheNextOne() {
+        val pages = mapOf(
+            null to PageOf(listOf("a", "b"), cursor("2")),
+            "2" to PageOf(listOf("a", "b"), cursor("3")),
+            "3" to PageOf(listOf("c"), null),
+        )
+        val list = list { pages.getValue(it?.id) }
+        list.refresh()
+        list.loadMore()
+        assertEquals(listOf("a", "b", "c"), list.items)
+        assertTrue(list.endReached)
+    }
+
     @Test fun emptyLastPageEndsTheList() {
         val list = list { if (it == null) PageOf(listOf("a"), cursor("2")) else PageOf(emptyList(), null) }
         list.refresh()

@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.account
 
+import dev.wahha.wtube.data.ErrorLog
 import android.annotation.SuppressLint
 import android.net.Uri
 import android.util.Log
@@ -99,6 +100,7 @@ fun LoginScreen() {
             } catch (e: Exception) {
                 val reason = errorDetail(e)
                 Log.w("Login", "Sign-in check failed: $reason")
+                ErrorLog.note("[login] sign-in check failed: $reason")
                 error = context.getString(errorMessage(e)) + "\n" + reason
             } finally {
                 busy = false
@@ -137,6 +139,7 @@ fun LoginScreen() {
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
+    var webView by remember { mutableStateOf<WebView?>(null) }
     AndroidView(
         modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
         factory = { context ->
@@ -144,6 +147,9 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
                 layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                @Suppress("DEPRECATION")
+                settings.saveFormData = false
+                webView = this
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                 webViewClient = object : WebViewClient() {
                     private var done = false
@@ -178,6 +184,10 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
                 ProxyController.getInstance().clearProxyOverride({}, {})
             }
+            // Leaving without a sign-in (back, an error) must not leave Google's cookies in the browser profile.
+            clearWebSession()
+            webView?.destroy()
+            webView = null
         }
     }
 }
@@ -220,9 +230,7 @@ private fun CookiePaste(busy: Boolean, onSubmit: (Map<String, String>) -> Unit) 
 
 /** Forgets everything the sign-in page stored, so the session lives only in the encrypted store. */
 fun clearWebSession() {
-    CookieManager.getInstance().apply {
-        removeAllCookies(null)
-        flush()
-    }
+    // flush() only after the removal is done, or the old cookies are written to disk.
+    CookieManager.getInstance().removeAllCookies { CookieManager.getInstance().flush() }
     WebStorage.getInstance().deleteAllData()
 }

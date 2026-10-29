@@ -7,7 +7,10 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.RemoteException
 import androidx.core.net.toUri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
@@ -83,7 +86,9 @@ class DpiProcess(context: Context, private val service: Class<out DpiService>) :
             if (lost.isCompleted || connection !== conn) throw IOException("byedpi exited at start")
             ready = true
         } catch (e: Exception) {
-            stop()
+            // Cancelled mid-start: stop() hops to Main and would throw at once in this coroutine, leaving the process.
+            withContext(NonCancellable) { stop() }
+            if (e is CancellationException && e !is TimeoutCancellationException) throw e
             throw if (e is IOException) e else IOException("byedpi did not start", e)
         }
         port

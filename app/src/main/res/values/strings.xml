@@ -350,7 +350,7 @@
     <string name="home_account_empty">YouTube не дал рекомендаций (возможно, выключена история просмотра), показаны свои</string>
     <string name="error_http">YouTube ответил ошибкой. Попробуйте позже.</string>
     <string name="error_unavailable">Видео недоступно</string>
-    <string name="error_age">Видео с возрастным ограничением: смотреть можно только со входом в аккаунт</string>
+    <string name="error_age">Видео с возрастным ограничением: WTube не может его открыть</string>
     <string name="error_geo">Недоступно в вашей стране</string>
     <string name="error_paid">Платный контент или только для спонсоров канала</string>
     <string name="error_private">Это приватное видео</string>

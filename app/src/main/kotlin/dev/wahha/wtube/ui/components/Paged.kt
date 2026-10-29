@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.components
 
+import dev.wahha.wtube.data.ErrorLog
 import android.util.Log
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -66,23 +67,28 @@ class PagedList<T>(
         val job = scope.launch {
             try {
                 var page = load(next)
-                val fresh = page.items.toMutableList()
-                // Filtering shorts can empty a page; keep going a little so the list does not stall.
+                val base = if (reset) emptyList() else items
+                var merged = (base + page.items).distinctBy(key)
+                // Filtering shorts can empty a page, and a page can hold only items we already have;
+                // keep going a little so the list does not stall.
                 var extra = 0
-                while (fresh.isEmpty() && page.next != null && extra++ < 3) {
+                var asked = next
+                while (merged.size == base.size && page.next != null && !page.next.sameAs(asked) && extra++ < 3) {
+                    asked = page.next
                     page = load(page.next)
-                    fresh += page.items
+                    merged = (merged + page.items).distinctBy(key)
                 }
                 val before = items.size
-                items = ((if (reset) emptyList() else items) + fresh).distinctBy(key)
+                items = merged
                 // The same cursor again with nothing new would loop forever: take it as the end.
-                val stuck = !reset && items.size == before && page.next != null && page.next?.id == next?.id && page.next?.url == next?.url
+                val stuck = !reset && items.size == before && page.next.sameAs(next)
                 next = page.next.takeUnless { stuck }
                 endReached = next == null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("PagedList", "Page failed: ${errorDetail(e)}")
+                ErrorLog.note("[feed] page failed: ${errorDetail(e)}")
                 if (reset) items = emptyList()
                 error = e
             }
@@ -116,3 +122,5 @@ fun LoadMoreEffect(listState: LazyListState, threshold: Int = 6, onLoadMore: () 
         snapshotFlow { nearEnd to total }.filter { it.first }.collect { loadMore() }
     }
 }
+
+private fun Page?.sameAs(other: Page?) = this != null && id == other?.id && url == other?.url

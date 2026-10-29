@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.home
 
+import dev.wahha.wtube.data.ErrorLog
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,6 +90,7 @@ class HomeViewModel : ViewModel() {
         } catch (e: Exception) {
             if (seeds.isEmpty()) throw e
             Log.w("Home", "Account home failed, local recommendations instead: ${errorDetail(e)}")
+            ErrorLog.note("[home] account home failed, local recommendations instead: ${errorDetail(e)}")
             Notices.show(R.string.home_account_failed, errorDetail(e))
             null
         }

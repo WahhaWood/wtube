@@ -25,6 +25,7 @@ import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
 import okhttp3.EventListener
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -101,7 +102,15 @@ object Dpi {
     private lateinit var backups: List<DpiProcess>
     private lateinit var probes: List<DpiProcess>
     // Lazy: Http.client reports to this object in JVM tests too, where there is no main thread.
-    private val scope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    private val scope by lazy {
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
+                // A BindException from the relay or a DataStore error must not take the app down with it.
+                ErrorLog.note("[dpi] ${e::class.java.simpleName}: ${e.message}")
+                mutableState.value = DpiState.EngineFailed
+            },
+        )
+    }
     private val mutableState = MutableStateFlow<DpiState>(DpiState.Off)
     private val network = MutableStateFlow<String?>(null)
     @Volatile private var validated = false
@@ -127,6 +136,8 @@ object Dpi {
     private var lastRecheck = 0L
     private var recheck: Job? = null
     private val firstRoute = CountDownLatch(1)
+    @Volatile private var firstRouteGaveUp = false
+    private val backupDeaths = Array(3) { ArrayDeque<Long>() }
 
     val state: StateFlow<DpiState> = mutableState.asStateFlow()
     val presets: StateFlow<StrategyList> = mutablePresets.asStateFlow()
@@ -187,7 +198,10 @@ object Dpi {
      * waited [FIRST_ROUTE_WAIT_MS]), so it does not go directly while byedpi is still starting.
      */
     fun awaitFirstRoute() {
-        if (::app.isInitialized) firstRoute.await(FIRST_ROUTE_WAIT_MS, TimeUnit.MILLISECONDS)
+        // After one timeout the wait is over for good: the route may never come (no network), and every
+        // request would otherwise wait the full time again.
+        if (!::app.isInitialized || firstRouteGaveUp) return
+        if (!firstRoute.await(FIRST_ROUTE_WAIT_MS, TimeUnit.MILLISECONDS)) firstRouteGaveUp = true
     }
 
     private suspend fun apply(inputs: Inputs) {
@@ -326,6 +340,16 @@ object Dpi {
         log("byedpi backup ${slotLabels[slot]} died")
         slotArgs[slot] = null
         updateLive()
+        val now = System.currentTimeMillis()
+        val recent = backupDeaths[slot.coerceIn(backupDeaths.indices)]
+        recent.addLast(now)
+        while (recent.isNotEmpty() && now - recent.first() > 60_000) recent.removeFirst()
+        if (recent.size >= 3) {
+            // Left empty until the network or the presets change and the slots are decided afresh.
+            log("byedpi backup ${slotLabels[slot]} died 3 times in a minute, not restarting")
+            recent.clear()
+            return
+        }
         scope.launch {
             delay(RESTART_DELAY_MS)
             requests.value++

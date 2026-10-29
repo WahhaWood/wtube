@@ -132,10 +132,10 @@ object Downloads {
     fun finished(videoId: String, audioOnly: Boolean): Download? =
         find(Download.key(videoId, audioOnly))?.takeIf { it.state == DownloadState.DONE && File(it.file).exists() }
 
-    /** The queued download added first. */
     /** Puts the running download back in the queue, parts kept: the service was stopped by the system. */
     internal fun pauseRunning() = change { list -> list.map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it } }
 
+    /** The queued download added first. */
     internal fun next(): Download? = state.value.filter { it.state == DownloadState.QUEUED }.minByOrNull { it.addedAt }
 
     internal fun find(key: String): Download? = state.value.firstOrNull { it.key == key }

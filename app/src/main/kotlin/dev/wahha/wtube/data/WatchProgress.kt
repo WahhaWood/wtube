@@ -24,7 +24,7 @@ data class AccountPosition(val positionMs: Long, val finished: Boolean, val seen
 /**
  * How far each video was watched, here and on the account's other devices. The phone's own place comes
  * from [History]; the account's from the lists it loads (home, subscriptions, history, playlists), which
- * mark started videos. Whichever was seen last wins, so a video left on the computer goes on from there.
+ * mark started videos. The account wins only when it is further than the phone (a video left on another device) or finished; see [accountWins].
  * The account's places live only as long as the process: every list loads them afresh.
  */
 object WatchProgress {
@@ -57,7 +57,7 @@ object WatchProgress {
             }
             if (session != null) for ((id, position) in account) {
                 val local = entries.firstOrNull { it.video.id == id }
-                if (local != null && local.savedAt() >= position.seenAt) continue
+                if (!accountWins(local, position)) continue
                 val duration = local?.video?.duration?.times(1000L) ?: durations[id] ?: 0
                 result[id] = if (position.finished) 1f else if (duration > 0) (position.positionMs.toFloat() / duration).coerceIn(0f, 1f) else continue
             }
@@ -85,17 +85,32 @@ object WatchProgress {
         accountState.update { it + found }
     }
 
-    /** Where to start [id]: the account's place when it is newer than the phone's, else the phone's; 0 from the start. */
+    /**
+     * Where to start [id]: the account's place when it is further than the phone's (another device watched on),
+     * else the phone's; 0 from the start.
+     */
     fun resumeMs(id: String): Long {
         val local = History.entryOf(id)
         val account = accountState.value[id]?.takeIf { Account.session.value != null }
-        if (account != null && (local == null || account.seenAt > local.savedAt())) return account.positionMs
+        if (account != null && accountWins(local, account)) return account.positionMs
         return local?.positionMs ?: 0
+    }
+
+    /**
+     * YouTube gives no time for a mark, only when we loaded it ([AccountPosition.seenAt]), so "newer" cannot be
+     * told. The account wins when the phone has no place, when it went [LEAD_MS] further, or when it finished
+     * a video the phone has not and the phone's place is older than the load.
+     */
+    internal fun accountWins(local: HistoryEntry?, account: AccountPosition): Boolean = when {
+        local == null -> true
+        account.finished -> !local.finished && local.savedAt() < account.seenAt
+        else -> account.positionMs > local.positionMs + LEAD_MS
     }
 
     // Opening a video moves watchedAt but not the place in it; entries from before 0.12 have no time and lose.
     private fun HistoryEntry.savedAt() = positionAt
 
+    private const val LEAD_MS = 30_000L
     private const val FINISHED_PERCENT = 95
     private const val FINISHED_TAIL_MS = 15_000L
 }

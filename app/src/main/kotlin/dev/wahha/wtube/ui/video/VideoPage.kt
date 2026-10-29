@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.video
 
+import dev.wahha.wtube.data.ErrorLog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -73,6 +74,7 @@ import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.ui.icon.PlaylistPlay
+import dev.wahha.wtube.player.NextVideo
 import dev.wahha.wtube.player.PlayQueue
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.AppLocale
@@ -270,6 +272,7 @@ class VideoViewModel : ViewModel() {
         } catch (e: Exception) {
             if (page != null || Account.active != null) throw e
             Log.w("Video", "InnerTube comments failed, extractor instead: ${errorDetail(e)}")
+            ErrorLog.note("[video] InnerTube comments failed, extractor instead: ${errorDetail(e)}")
             return YouTube.comments(id, null)
         }
         if (page == null) {
@@ -379,18 +382,11 @@ class VideoViewModel : ViewModel() {
     val hasNext: Boolean
         get() = PlayQueue.items.value.isNotEmpty() || nextCandidates().isNotEmpty()
 
-    // Related videos "next" and autoplay may pick: not live, not this one, not hidden.
-    private fun nextCandidates(): List<VideoItem> {
-        val hidden = Hidden.items.value
-        return details?.related.orEmpty().filterIsInstance<VideoItem>().filter { !it.isLive && it.id != id && hidden.allows(it) }
-    }
+    private fun nextCandidates(): List<VideoItem> = NextVideo.candidates(details?.related.orEmpty(), id.orEmpty(), Hidden.items.value)
 
     /** The video "next" plays: the queue's first, else the first related one not watched yet, as autoplay picks. */
     fun playNext() {
-        val next = PlayQueue.pop() ?: nextCandidates().let { related ->
-            val watched = History.entries.value.mapTo(HashSet()) { it.video.id }
-            related.firstOrNull { it.id !in watched } ?: related.firstOrNull()
-        }
+        val next = PlayQueue.pop() ?: NextVideo.pick(nextCandidates(), History.entries.value.mapTo(HashSet()) { it.video.id }, orWatched = true)
         next?.let { open(it.id) }
     }
 

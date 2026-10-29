@@ -325,7 +325,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
         }
     }
     val barAway by animateFloatAsState(if (barScrolledAway) 1f else 0f, tween(BAR_HIDE_MS), label = "bar_away")
-    val bottomInset =BottomBarSpace + if (sheetOpen) MiniPlayerHeight + MiniPlayerGap else 0.dp
+    val bottomInset = BottomBarSpace + if (sheetOpen) MiniPlayerHeight + MiniPlayerGap else 0.dp
 
     CompositionLocalProvider(
         LocalLiquidGlass provides glass,

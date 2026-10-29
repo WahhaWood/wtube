@@ -201,6 +201,12 @@ object Settings {
     }
 }
 
+/**
+ * The long side of a [cap]-p video: 16:9 rounded, so 480 gives 854 (YouTube's 854×480) and not 853.
+ * The limit is on the long side, so vertical videos are capped by their short side and 21:9 ones pass.
+ */
+fun capLongSide(cap: Int): Int = (cap * 16 + 8) / 9
+
 /** The automatic quality cap for the current network, by the short side in pixels; null = none. */
 fun qualityCap(settings: AppSettings, metered: Boolean): Int? =
     (if (metered) settings.maxQualityMobile else settings.maxQuality).takeIf { it > 0 }

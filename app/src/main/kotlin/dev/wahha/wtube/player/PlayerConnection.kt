@@ -81,6 +81,7 @@ class PlayerConnection(context: Context) {
     }
 
     fun stop() {
+        restoring = null
         Autoplay.cancel()
         SleepTimer.cancel()
         player?.run {

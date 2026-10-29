@@ -2,6 +2,7 @@
 
 package dev.wahha.wtube.player
 
+import dev.wahha.wtube.data.ErrorLog
 import androidx.media3.datasource.FileDataSource
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
@@ -82,6 +83,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
             // Never throw here: it would crash the session thread. A source with no extractor fails on
             // prepare instead, and the player reports an ordinary error.
             Log.e(TAG, "No stream info for ${mediaItem.mediaId}")
+            ErrorLog.note("[player] no stream info for ${mediaItem.mediaId}")
             return progressive(mediaItem)
         }
 
@@ -98,6 +100,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
             // Rare: no DASH-able streams. Fall back to the best muxed progressive stream.
             val muxed = info.videoStreams.filter { it.isUrl }.maxByOrNull { it.height }
             Log.w(TAG, "No DASH streams for ${info.id}, muxed fallback: ${muxed?.height}p")
+            ErrorLog.note("[player] no DASH streams for ${info.id}, muxed fallback: ${muxed?.height}p")
             progressive(mediaItem.buildUpon().setUri(muxed?.content.orEmpty()).build())
         }
         return withSubtitles(main, info)

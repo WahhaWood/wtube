@@ -1,5 +1,6 @@
 package dev.wahha.wtube.download
 
+import dev.wahha.wtube.data.ErrorLog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.MediaFormat as StreamFormat
@@ -42,7 +44,6 @@ import org.schabi.newpipe.extractor.stream.VideoStream
 import okhttp3.Call
 import okhttp3.Request
 import okhttp3.Response
-import dev.wahha.wtube.player.sameLanguage
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -143,13 +144,14 @@ class DownloadService : Service() {
             val download = Downloads.next() ?: break
             try {
                 Downloads.update(download) { it.copy(state = DownloadState.RUNNING, error = null) }
-                fetch(download)
+                fetchWithRetry(download)
                 Downloads.update(download) { it.copy(state = DownloadState.DONE, bytes = it.total) }
             } catch (e: CancellationException) {
                 // Removed or queued again meanwhile: nothing to report, the queue goes on.
                 if (Downloads.isCurrent(download)) throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Download failed: ${errorDetail(e)}")
+                ErrorLog.note("[download] failed: ${errorDetail(e)}")
                 Downloads.update(download) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
             }
         }
@@ -158,14 +160,32 @@ class DownloadService : Service() {
         stopSelf()
     }
 
+    /**
+     * A route change in [Dpi] cancels the calls to YouTube and a network switch drops them: both surface as
+     * an IOException. The parts on disk stay, so a retry goes on from where it broke.
+     */
+    private suspend fun fetchWithRetry(download: Download) {
+        var attempt = 0
+        while (true) {
+            try {
+                return fetch(download)
+            } catch (e: IOException) {
+                if (e is Unavailable || attempt >= RETRY_PAUSES_MS.size) throw e
+                Log.w(TAG, "Download interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
+                ErrorLog.note("[download] interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
+                delay(RETRY_PAUSES_MS[attempt++])
+            }
+        }
+    }
+
     private suspend fun fetch(download: Download) {
         val (videoPart, audioPart) = Downloads.partsOf(download).let { it[1] to it[2] }
         File(download.file).parentFile?.mkdirs()
         var info = YouTube.streamInfo(download.video.id)
         var refreshed = false
         while (true) {
-            val audio = bestAudio(info.audioStreams, download.audio) ?: throw IOException("No AAC sound for this video")
-            val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw IOException("No H.264 stream")
+            val audio = bestAudio(info.audioStreams, download.audio) ?: throw Unavailable("No AAC sound for this video")
+            val video = if (download.audioOnly) null else videoFor(info, download.quality) ?: throw Unavailable("No H.264 stream")
             val total = length(audio) + (video?.let(::length) ?: 0)
             Downloads.update(download) { it.copy(total = total, quality = video?.height ?: it.quality) }
             try {
@@ -174,7 +194,7 @@ class DownloadService : Service() {
                 break
             } catch (e: ExpiredException) {
                 // Stream URLs live a few hours; a download resumed later needs fresh ones, once.
-                if (refreshed) throw IOException("YouTube refused the stream (HTTP 403)")
+                if (refreshed) throw Unavailable("YouTube refused the stream (HTTP 403)")
                 refreshed = true
                 YouTube.forget(download.video.id)
                 info = YouTube.streamInfo(download.video.id)
@@ -244,6 +264,7 @@ class DownloadService : Service() {
         const val NOTIFICATION_ID = 2
         // Up to 4 MB per request: like the player's segment requests, which googlevideo serves at full speed.
         const val CHUNK_BYTES = 4L * 1024 * 1024
+        val RETRY_PAUSES_MS = longArrayOf(2_000, 5_000, 15_000)
     }
 }
 
@@ -286,6 +307,9 @@ internal fun mux(video: File, audio: File, out: File) {
 }
 
 /** The stream URL is no longer accepted (googlevideo answered 403). */
+/** A failure a retry cannot fix. */
+internal class Unavailable(message: String) : IOException(message)
+
 internal class ExpiredException : IOException("Stream URL expired")
 
 /**

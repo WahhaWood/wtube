@@ -1,5 +1,6 @@
 package dev.wahha.wtube.player
 
+import dev.wahha.wtube.ui.components.errorDetail
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -46,6 +47,7 @@ import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.WatchProgress
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube
+import dev.wahha.wtube.data.capLongSide
 import dev.wahha.wtube.data.qualityCap
 import dev.wahha.wtube.data.watchUrl
 import dev.wahha.wtube.download.Downloads
@@ -73,6 +75,7 @@ import kotlinx.coroutines.launch
 class PlaybackService : MediaSessionService() {
     private val scope = MainScope()
     private var session: MediaSession? = null
+    private lateinit var exo: ExoPlayer
     private var videoDecoder: String? = null
     private var audioDecoder: String? = null
 
@@ -87,6 +90,7 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        exo = player
         // The original audio over dubs (and over auto-dubs in the phone's language); human captions over
         // auto-generated ones of the same language.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -166,7 +170,7 @@ class PlaybackService : MediaSessionService() {
         val player = session?.player ?: return
         val settings = Settings.current.value
         val cap = qualityCap(settings, connectivity.isActiveNetworkMetered)
-        val longSide = cap?.let { it * 16 / 9 } ?: Int.MAX_VALUE
+        val longSide = cap?.let(::capLongSide) ?: Int.MAX_VALUE
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setMaxVideoSize(longSide, longSide)
             .setPreferredTextLanguage(settings.subtitleLanguage)
@@ -176,6 +180,8 @@ class PlaybackService : MediaSessionService() {
 
     private suspend fun sleepAt(atMs: Long) {
         delay(atMs - SystemClock.elapsedRealtime())
+        // Within the end screen's countdown pause() changes nothing, and the next video would start.
+        Autoplay.cancel()
         session?.player?.pause()
         SleepTimer.cancel()
     }
@@ -231,9 +237,7 @@ class PlaybackService : MediaSessionService() {
         val watched = History.entries.value.mapTo(HashSet()) { it.video.id }
         val hidden = Hidden.items.value
         val related = runCatching { YouTube.video(id).related }.getOrDefault(emptyList())
-            .filterIsInstance<VideoItem>()
-            .filter { !it.isLive && it.id != id && hidden.allows(it) }
-        return related.firstOrNull { it.id !in watched } ?: related.firstOrNull()?.takeIf { orWatched }
+        return NextVideo.pick(NextVideo.candidates(related, id, hidden), watched, orWatched)
     }
 
     /**
@@ -278,6 +282,7 @@ class PlaybackService : MediaSessionService() {
                     mediaItem(id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Refreshing $id failed", e)
+                    ErrorLog.note("[player] refreshing $id failed: ${errorDetail(e)}")
                     return@launch
                 }
                 if (player.currentMediaItem?.mediaId != id) return@launch
@@ -385,7 +390,8 @@ class PlaybackService : MediaSessionService() {
 
     /** "Stats for nerds": what is playing and how, straight from the ExoPlayer the controller cannot see. */
     private fun stats(): Bundle {
-        val player = session?.player as? ExoPlayer ?: return Bundle.EMPTY
+        if (!::exo.isInitialized) return Bundle.EMPTY
+        val player = exo
         return Bundle().apply {
             player.videoFormat?.let { f ->
                 putString(STAT_VIDEO, "${f.codecs ?: f.sampleMimeType} ${f.width}×${f.height}@${f.frameRate.toInt()}")
@@ -422,7 +428,7 @@ class PlaybackService : MediaSessionService() {
             Log.i(TAG, "Limited media controller: ${controller.packageName}")
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setAvailableSessionCommands(SessionCommands.EMPTY)
-                .setAvailablePlayerCommands(Player.Commands.Builder().addAll(Player.COMMAND_PLAY_PAUSE, Player.COMMAND_STOP).build())
+                .setAvailablePlayerCommands(Player.Commands.Builder().add(Player.COMMAND_PLAY_PAUSE).build())
                 .build()
         }
 

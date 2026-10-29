@@ -1,12 +1,19 @@
 package dev.wahha.wtube
 
 import dev.wahha.wtube.data.AppSettings
+import dev.wahha.wtube.data.capLongSide
 import dev.wahha.wtube.data.qualityCap
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsTest {
+    @Test
+    fun capLongSideKeepsTheStandardWidths() {
+        val expected = mapOf(144 to 256, 240 to 427, 360 to 640, 480 to 854, 720 to 1280, 1080 to 1920, 1440 to 2560, 2160 to 3840)
+        expected.forEach { (cap, width) -> assertEquals("cap $cap", width, capLongSide(cap)) }
+    }
+
     @Test
     fun noCapByDefaultOnWifi() {
         assertNull(qualityCap(AppSettings(), metered = false))

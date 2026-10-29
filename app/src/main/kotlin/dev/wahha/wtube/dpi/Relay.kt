@@ -67,7 +67,7 @@ class Relay(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         runCatching { server.close() }
-        open.toList().forEach { runCatching { it.close() } }
+        open.forEach { runCatching { it.close() } }
         pool.shutdownNow()
     }
 

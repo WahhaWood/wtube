@@ -110,6 +110,7 @@ import dev.wahha.wtube.ui.icon.Fullscreen
 import dev.wahha.wtube.ui.icon.FullscreenExit
 import dev.wahha.wtube.ui.icon.Pause
 import dev.wahha.wtube.ui.icon.PlayArrow
+import dev.wahha.wtube.ui.icon.Refresh
 import dev.wahha.wtube.ui.icon.Replay
 import dev.wahha.wtube.ui.icon.Settings
 import dev.wahha.wtube.ui.icon.WIcons
@@ -436,6 +437,15 @@ fun VideoPlayer(
                 onClose = { statsOpen = false },
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 48.dp).fillMaxWidth(0.75f),
             )
+        }
+
+        // A mini player has no room for the message; a retry button is all it needs.
+        if (!roomy && state.error != null) {
+            Box(Modifier.fillMaxSize().background(colors.scrim.copy(alpha = 0.6f)), contentAlignment = Alignment.Center) {
+                IconButton(onClick = onRetry) {
+                    Icon(WIcons.Refresh, contentDescription = stringResource(R.string.retry), tint = colors.onSurface)
+                }
+            }
         }
 
         if (roomy) state.error?.let { error ->
