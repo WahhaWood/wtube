@@ -102,8 +102,10 @@ import dev.wahha.wtube.ui.account.LoginScreen
 import dev.wahha.wtube.ui.channel.ChannelScreen
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
+import dev.wahha.wtube.ui.components.LocalTabState
 import dev.wahha.wtube.ui.components.Navigator
 import dev.wahha.wtube.ui.components.Notices
+import dev.wahha.wtube.ui.components.TAB_RESET
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.downloads.DownloadsScreen
 import dev.wahha.wtube.ui.feed.FeedScreen
@@ -353,10 +355,10 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                     popEnterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageBackIn(axisShift) },
                     popExitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageBackOut(axisShift) },
                 ) {
-                    composable<Home> { Page { HomeScreen() } }
-                    composable<Subscriptions> { Page { SubscriptionsScreen() } }
-                    composable<Search> { Page { SearchScreen() } }
-                    composable<Library> { Page { LibraryScreen() } }
+                    composable<Home> { entry -> TabPage(entry) { HomeScreen() } }
+                    composable<Subscriptions> { entry -> TabPage(entry) { SubscriptionsScreen() } }
+                    composable<Search> { entry -> TabPage(entry) { SearchScreen() } }
+                    composable<Library> { entry -> TabPage(entry) { LibraryScreen() } }
                     composable<Channel> { entry -> Page { ChannelScreen(entry.toRoute<Channel>().url) } }
                     composable<Playlist> { entry -> Page { PlaylistScreen(entry.toRoute<Playlist>().url) } }
                     composable<SettingsRoute> { Page { SettingsScreen() } }
@@ -388,9 +390,9 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                 searchSelected = destination.isOn(Search::class),
                 onTabSelected = {
                     haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    navController.navigateToTab(TabRoutes[it])
+                    navController.selectTab(TabRoutes[it])
                 },
-                onSearch = { navController.navigateToTab(Search) },
+                onSearch = { navController.selectTab(Search) },
                 gapAbove = if (sheetOpen) MiniPlayerGap else 0.dp,
                 modifier = Modifier.align(Alignment.BottomCenter).offset {
                     // Slides away under the video as the sheet opens, on the sheet's own progress, and
@@ -428,6 +430,18 @@ private fun NavController.navigateToTab(route: Any) = navigate(route) {
     restoreState = true
 }
 
+// A tap on the open tab: a page opened inside it goes back to the tab first, the tab itself starts over.
+private fun NavController.selectTab(route: Any) {
+    // Tabs replace each other above Home, so at most one of them is on the back stack.
+    val tab = listOf(Subscriptions, Search, Library).firstNotNullOfOrNull { runCatching { getBackStackEntry(it) }.getOrNull() }
+        ?: getBackStackEntry(Home)
+    when {
+        !tab.destination.hasRoute(route::class) -> navigateToTab(route)
+        tab != currentBackStackEntry -> popBackStack(tab.destination.id, inclusive = false)
+        else -> tab.savedStateHandle[TAB_RESET] = true
+    }
+}
+
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.betweenTopLevel(): Boolean =
     TopLevelRoutes.any { initialState.destination.hasRoute(it) } && TopLevelRoutes.any { targetState.destination.hasRoute(it) }
 
@@ -457,6 +471,12 @@ private fun pageBackIn(shift: Int): EnterTransition =
 @Composable
 private fun Page(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
+}
+
+/** A tab's page; tapping its open tab again resets it through [LocalTabState]. */
+@Composable
+private fun TabPage(entry: NavBackStackEntry, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalTabState provides entry.savedStateHandle) { Page(content) }
 }
 
 @Composable

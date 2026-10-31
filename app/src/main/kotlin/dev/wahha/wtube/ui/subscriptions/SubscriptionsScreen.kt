@@ -61,6 +61,7 @@ import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.ScreenHeader
+import dev.wahha.wtube.ui.components.TabResetEffect
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.AccountCircle
@@ -122,6 +123,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
     val videos = vm.videos
     val listState = rememberLazyListState()
     LoadMoreEffect(listState) { videos.loadMore() }
+    TabResetEffect { listState.animateScrollToItem(0) }
     val active = session?.expired == false
     val settings by Settings.current.collectAsStateWithLifecycle()
     val history by History.entries.collectAsStateWithLifecycle()

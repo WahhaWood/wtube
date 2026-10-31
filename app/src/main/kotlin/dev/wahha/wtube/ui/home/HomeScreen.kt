@@ -52,6 +52,7 @@ import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.ScreenHeader
 import dev.wahha.wtube.ui.icon.Home
 import dev.wahha.wtube.ui.icon.WIcons
+import dev.wahha.wtube.ui.components.TabResetEffect
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
 
@@ -139,6 +140,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     }
     val listState = rememberLazyListState()
     LoadMoreEffect(listState) { feed.loadMore() }
+    TabResetEffect { listState.animateScrollToItem(0) }
 
     PullToRefreshBox(
         isRefreshing = feed.refreshing,

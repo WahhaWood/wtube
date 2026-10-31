@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -57,6 +58,7 @@ import dev.wahha.wtube.ui.components.ScreenHeader
 import dev.wahha.wtube.ui.components.Thumbnail
 import dev.wahha.wtube.ui.components.ThumbnailAnchor
 import dev.wahha.wtube.ui.components.VideoOrigin
+import dev.wahha.wtube.ui.components.TabResetEffect
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.ChevronRight
@@ -109,9 +111,12 @@ fun LibraryScreen(vm: LibraryViewModel = viewModel()) {
     val nav = LocalNavigator.current
     LaunchedEffect(session) { vm.sync(session) }
     val signedIn = session?.expired == false
+    val listState = rememberLazyListState()
+    TabResetEffect { listState.animateScrollToItem(0) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(
             top = systemTop(),
             bottom = systemBottom() + LocalBottomInset.current,

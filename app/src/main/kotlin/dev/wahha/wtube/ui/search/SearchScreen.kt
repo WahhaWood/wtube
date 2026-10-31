@@ -74,6 +74,7 @@ import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.ui.components.PagedList
+import dev.wahha.wtube.ui.components.TabResetEffect
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.glass.CapsuleShape
 import dev.wahha.wtube.ui.icon.Close
@@ -128,6 +129,12 @@ class SearchViewModel : ViewModel() {
         query = ""
         suggestions = emptyList()
     }
+
+    /** Back to an empty search, as when the tab is first opened. */
+    fun clear() {
+        reset()
+        submitted = null
+    }
 }
 
 @Composable
@@ -142,6 +149,11 @@ fun SearchScreen(vm: SearchViewModel = viewModel()) {
     // Typing shows suggestions; submitting (or leaving the field) shows results.
     val showSuggestions = focused && (vm.submitted == null || vm.query != vm.submitted)
     LaunchedEffect(Unit) { if (vm.submitted == null) focus.requestFocus() }
+    TabResetEffect {
+        vm.clear()
+        focus.requestFocus()
+        keyboard?.show()
+    }
     val leaveField = {
         keyboard?.hide()
         focusManager.clearFocus()
