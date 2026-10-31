@@ -24,7 +24,11 @@ class PictureInPicture(private val activity: ComponentActivity) {
     fun setEnabled(value: Boolean) {
         if (!supported || enabled == value) return
         enabled = value
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) activity.setPictureInPictureParams(params())
+        // The player's dispose turns it off while the activity is being destroyed, and the system then
+        // throws "Can't find activity for token": nothing is left to set it on.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !activity.isDestroyed && !activity.isFinishing) {
+            runCatching { activity.setPictureInPictureParams(params()) }
+        }
     }
 
     fun onUserLeaveHint() {

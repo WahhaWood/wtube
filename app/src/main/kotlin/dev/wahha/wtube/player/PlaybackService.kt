@@ -53,6 +53,7 @@ import dev.wahha.wtube.data.watchUrl
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.dpi.Dpi
 import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -323,6 +324,28 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        /**
+         * "The video jumps back a couple of seconds by itself" has no known cause yet: every backward jump
+         * within one video goes to the event log with its reason, who asked for it (this app's package for
+         * the seek bar and double taps, another app for a headset or the system, "player" for the service
+         * itself) and what the player was doing, so the shared log tells which one it was.
+         */
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            val id = newPosition.mediaItem?.mediaId ?: return
+            if (oldPosition.mediaItem?.mediaId != id) return
+            val back = oldPosition.positionMs - newPosition.positionMs
+            if (back < BACK_JUMP_NOTE_MS) return
+            val by = session?.controllerForCurrentRequest?.packageName ?: "player"
+            val ahead = (player.bufferedPosition - player.currentPosition) / 1000
+            ErrorLog.note(
+                "[player] jumped back %.1f s (%.1f → %.1f s) on %s: %s by %s, state %d, playing %b, speed %.2f, %d s buffered, %dp, route %s".format(
+                    Locale.ROOT, back / 1000.0, oldPosition.positionMs / 1000.0, newPosition.positionMs / 1000.0, id,
+                    discontinuityName(reason), by, player.playbackState, player.isPlaying, player.playbackParameters.speed, ahead,
+                    exo.videoFormat?.height ?: 0, Http.route ?: "direct",
+                ),
+            )
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                 // A quality, dub or caption track picked by hand belongs to the previous video.
@@ -460,6 +483,7 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "PlaybackService"
         private const val REFRESH_AGAIN_MS = 10 * 60_000L
+        private const val BACK_JUMP_NOTE_MS = 1_000L
         private const val STALL_NOTE_MS = 15_000L
         const val AUTOPLAY_DELAY_MS = 8_000L
         val StatsCommand = SessionCommand("dev.wahha.wtube.STATS", Bundle.EMPTY)
@@ -497,3 +521,14 @@ fun resumePosition(videoId: String): Long {
 /** googlevideo answers 403 (sometimes 410) once a stream link has expired or no longer matches the session. */
 fun PlaybackException.isExpiredLink(): Boolean = generateSequence<Throwable>(this) { it.cause }
     .any { it is HttpDataSource.InvalidResponseCodeException && (it.responseCode == 403 || it.responseCode == 410) }
+
+private fun discontinuityName(reason: Int): String = when (reason) {
+    Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> "auto transition"
+    Player.DISCONTINUITY_REASON_SEEK -> "seek"
+    Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT -> "seek adjustment"
+    Player.DISCONTINUITY_REASON_SKIP -> "skip"
+    Player.DISCONTINUITY_REASON_REMOVE -> "item replaced"
+    Player.DISCONTINUITY_REASON_INTERNAL -> "internal"
+    Player.DISCONTINUITY_REASON_SILENCE_SKIP -> "silence skip"
+    else -> "reason $reason"
+}

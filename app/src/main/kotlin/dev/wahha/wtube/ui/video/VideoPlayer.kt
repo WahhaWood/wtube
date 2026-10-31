@@ -13,6 +13,9 @@ import dev.wahha.wtube.ui.icon.SkipPrevious
 import androidx.compose.foundation.Canvas
 import dev.wahha.wtube.data.Segment
 import dev.wahha.wtube.data.SponsorBlock
+import android.app.Activity
+import android.media.AudioManager
+import android.provider.Settings.System as SystemSettings
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -75,6 +78,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -128,11 +132,15 @@ private const val SEEK_DRAG_SPAN_MS = 120_000L
 // The player plays a stream some 15 s behind its newest segment; within this it counts as live.
 private const val LIVE_EDGE_MS = 30_000L
 private const val BOOST_SPEED = 2f
+// A window brightness of 0 turns some screens fully dark.
+private const val MIN_BRIGHTNESS = 0.01f
+/** Strips at the top and bottom of a fullscreen video where a vertical swipe never sets a level. */
+private val LEVEL_EDGE = 48.dp
 
 /** Consecutive double taps on one side add up: "+10 с", "+20 с"... */
 private class SeekBurst(val forward: Boolean, val seconds: Int, val key: Int)
 
-private enum class DragMode { Seek, Pinch }
+private enum class DragMode { Seek, Level, Pinch }
 
 /**
  * The video surface with our own controls, after the YouTube app: gradients top and bottom instead of a
@@ -140,8 +148,10 @@ private enum class DragMode { Seek, Pinch }
  *
  * Gestures: tap toggles the controls, double tap on either half seeks by the step from Settings, a long
  * press plays at 2x while held, a horizontal drag seeks with a storyboard preview, and in fullscreen a pinch
- * switches fit / fill. Vertical drags are left to the sheet (collapse, fullscreen) in [PlayerSheet]; no
- * volume or brightness swipes, the user found them getting in the way.
+ * switches fit / fill. In fullscreen a clearly vertical drag on a side sets brightness or volume (each can be
+ * turned off, sides, zone width and sensitivity are in Settings: they once got in the way, so the middle and
+ * the top and bottom strips are never theirs). Other vertical drags are left to the sheet (collapse,
+ * fullscreen) in [PlayerSheet].
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -185,6 +195,9 @@ fun VideoPlayer(
     var boosting by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     var fill by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    // Volume or brightness while a swipe changes it.
+    var level by remember { mutableStateOf<Pair<LevelKind, Float>?>(null) }
     // A short message in the middle (zoom, autoplay), as a string resource; 0 when none.
     var hint by remember { mutableIntStateOf(0) }
     val ended = state.playbackState == Player.STATE_ENDED
@@ -211,9 +224,17 @@ fun VideoPlayer(
             hint = 0
         }
     }
-    // The fill zoom only lasts while fullscreen.
+    // The fill zoom and a swiped brightness only last while fullscreen; a remembered brightness comes back with it.
     DisposableEffect(fullscreen) {
-        onDispose { fill = false }
+        val window = (context as? Activity)?.window
+        val saved = Settings.current.value.takeIf { it.gestureRememberBrightness && it.gestureBrightness }?.gestureBrightnessLevel
+        if (fullscreen && window != null && saved != null && saved >= 0f) {
+            window.attributes = window.attributes.apply { screenBrightness = saved.coerceIn(MIN_BRIGHTNESS, 1f) }
+        }
+        onDispose {
+            fill = false
+            if (fullscreen) window?.let { it.attributes = it.attributes.apply { screenBrightness = -1f } }
+        }
     }
 
     val description = stringResource(
@@ -289,10 +310,14 @@ fun VideoPlayer(
                         )
                     }
                     .pointerInput(player, fullscreen) {
+                        val audio = context.getSystemService(AudioManager::class.java)
+                        val window = (context as? Activity)?.window
+                        val edge = LEVEL_EDGE.toPx()
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             var total = Offset.Zero
                             var mode: DragMode? = null
+                            var kind: LevelKind? = null
                             // Decide whose drag it is once it passes the touch slop; vertical drags stay
                             // unconsumed for the sheet.
                             while (mode == null) {
@@ -307,7 +332,14 @@ fun VideoPlayer(
                                 total += change.positionChange()
                                 if (total.getDistance() > viewConfiguration.touchSlop) {
                                     val horizontal = abs(total.x) > abs(total.y)
+                                    kind = if (fullscreen && isLevelDrag(total.x, total.y)) {
+                                        levelSwipeAt(down.position.x, down.position.y, size.width.toFloat(), size.height.toFloat(), edge, Settings.current.value)
+                                            ?.takeIf { it == LevelKind.Volume || window != null }
+                                    } else {
+                                        null
+                                    }
                                     mode = when {
+                                        kind != null -> DragMode.Level
                                         horizontal && state.duration > 0 && player.isCurrentMediaItemSeekable -> DragMode.Seek
                                         else -> return@awaitEachGesture
                                     }
@@ -329,6 +361,34 @@ fun VideoPlayer(
                                     if (completed) player.seekTo((fraction * duration).toLong())
                                     scrub = null
                                     interaction++
+                                }
+                                DragMode.Level -> {
+                                    val swiping = checkNotNull(kind)
+                                    val prefs = Settings.current.value
+                                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                    val min = if (swiping == LevelKind.Brightness) MIN_BRIGHTNESS else 0f
+                                    var value = when (swiping) {
+                                        LevelKind.Volume -> audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
+                                        LevelKind.Brightness -> checkNotNull(window).attributes.screenBrightness.takeIf { it >= 0f }
+                                            ?: (SystemSettings.getInt(context.contentResolver, SystemSettings.SCREEN_BRIGHTNESS, 128) / 255f).coerceIn(min, 1f)
+                                    }
+                                    level = swiping to value
+                                    drag(down.id) { change ->
+                                        val next = levelAfter(value, change.positionChange().y, size.height.toFloat(), prefs, min)
+                                        if (prefs.gestureHaptics && next != value && (next == 1f || next == min)) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                        }
+                                        value = next
+                                        when (swiping) {
+                                            // No system volume panel: the badge shows the level.
+                                            LevelKind.Volume -> audio.setStreamVolume(AudioManager.STREAM_MUSIC, (value * max).roundToInt(), 0)
+                                            LevelKind.Brightness -> checkNotNull(window).let { w -> w.attributes = w.attributes.apply { screenBrightness = value } }
+                                        }
+                                        level = swiping to value
+                                        change.consume()
+                                    }
+                                    if (swiping == LevelKind.Brightness && prefs.gestureRememberBrightness) Settings.set(Settings.GestureBrightnessLevel, value)
+                                    level = null
                                 }
                                 DragMode.Pinch -> {
                                     var zoom = 1f
@@ -418,6 +478,7 @@ fun VideoPlayer(
         if (showControls) {
             when {
                 boosting -> GestureBadge(WIcons.FastForward, "2x", Modifier.align(Alignment.TopCenter).padding(top = 16.dp))
+                level != null -> level?.let { (kind, value) -> LevelBadge(kind, value, Modifier.align(Alignment.Center)) }
                 hint != 0 -> GestureBadge(null, stringResource(hint), Modifier.align(Alignment.Center))
             }
         }

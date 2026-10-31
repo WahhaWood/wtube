@@ -150,6 +150,63 @@ fun SettingsScreen() {
             SwitchRow(stringResource(R.string.settings_pip), stringResource(R.string.settings_pip_summary), settings.pictureInPicture, Settings.PictureInPicture)
         }
 
+        item { SectionHeader(stringResource(R.string.settings_gestures)) }
+        item {
+            Text(
+                stringResource(R.string.settings_gestures_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+        val gestures = settings.gestureBrightness || settings.gestureVolume
+        item {
+            SwitchRow(
+                stringResource(R.string.settings_gesture_brightness),
+                stringResource(if (settings.gestureSwapSides) R.string.settings_gesture_right else R.string.settings_gesture_left),
+                settings.gestureBrightness,
+                Settings.GestureBrightness,
+            )
+        }
+        item {
+            SwitchRow(
+                stringResource(R.string.settings_gesture_volume),
+                stringResource(if (settings.gestureSwapSides) R.string.settings_gesture_left else R.string.settings_gesture_right),
+                settings.gestureVolume,
+                Settings.GestureVolume,
+            )
+        }
+        item {
+            ValueRow(stringResource(R.string.settings_gesture_sides), stringResource(gestureSidesName(settings.gestureSwapSides)), onClick = { sheet = SettingsSheet.GestureSides }.takeIf { gestures })
+        }
+        item {
+            ValueRow(stringResource(R.string.settings_gesture_zone), stringResource(GestureZoneNames[settings.gestureZone]), onClick = { sheet = SettingsSheet.GestureZone }.takeIf { gestures })
+        }
+        item {
+            ValueRow(
+                stringResource(R.string.settings_gesture_sensitivity),
+                stringResource(GestureSensitivityNames[settings.gestureSensitivity]),
+                onClick = { sheet = SettingsSheet.GestureSensitivity }.takeIf { gestures },
+            )
+        }
+        item {
+            SwitchRow(
+                stringResource(R.string.settings_gesture_remember),
+                stringResource(R.string.settings_gesture_remember_summary),
+                settings.gestureRememberBrightness,
+                Settings.GestureRememberBrightness,
+                enabled = settings.gestureBrightness,
+            )
+        }
+        item {
+            SwitchRow(
+                stringResource(R.string.settings_gesture_haptics),
+                stringResource(R.string.settings_gesture_haptics_summary),
+                settings.gestureHaptics,
+                Settings.GestureHaptics,
+                enabled = gestures,
+            )
+        }
+
         item { SectionHeader(stringResource(R.string.settings_subtitles)) }
         item {
             SwitchRow(stringResource(R.string.settings_subtitles_on), stringResource(R.string.settings_subtitles_on_summary), settings.subtitles, Settings.Subtitles)
@@ -309,6 +366,30 @@ fun SettingsScreen() {
             Settings.SubtitleSize,
             dismiss,
         )
+        SettingsSheet.GestureSides -> ChoiceSheet(
+            stringResource(R.string.settings_gesture_sides),
+            listOf(false, true),
+            settings.gestureSwapSides,
+            { stringResource(gestureSidesName(it)) },
+            Settings.GestureSwapSides,
+            dismiss,
+        )
+        SettingsSheet.GestureZone -> ChoiceSheet(
+            stringResource(R.string.settings_gesture_zone),
+            Settings.GestureZones.indices.toList(),
+            settings.gestureZone,
+            { stringResource(GestureZoneNames[it]) },
+            Settings.GestureZone,
+            dismiss,
+        )
+        SettingsSheet.GestureSensitivity -> ChoiceSheet(
+            stringResource(R.string.settings_gesture_sensitivity),
+            Settings.GestureSpans.indices.toList(),
+            settings.gestureSensitivity,
+            { stringResource(GestureSensitivityNames[it]) },
+            Settings.GestureSensitivity,
+            dismiss,
+        )
         SettingsSheet.SponsorCategories -> SponsorCategoriesSheet(settings.sponsorCategories, dismiss)
         SettingsSheet.Hidden -> HiddenSheet(hidden, dismiss)
         SettingsSheet.Font ->
@@ -352,11 +433,24 @@ private suspend fun shareLog(context: Context) {
 private fun qualityLabel(maxQuality: Int): String =
     if (maxQuality == 0) stringResource(R.string.settings_quality_auto) else stringResource(R.string.settings_quality_max, maxQuality)
 
-private enum class SettingsSheet { Quality, QualityMobile, Speed, DoubleTap, SubtitleLanguage, SubtitleSize, SponsorCategories, Font, TextSize, Hidden }
+private enum class SettingsSheet {
+    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, Font, TextSize, Hidden,
+}
 
 // In the order of the theme's font families and text scales.
 private val FontNames = listOf(R.string.settings_font_inter, R.string.settings_font_system, R.string.settings_font_montserrat)
 private val TextSizeNames = listOf(R.string.settings_text_small, R.string.settings_text_normal, R.string.settings_text_large)
+
+// In the order of Settings.GestureZones and Settings.GestureSpans.
+private val GestureZoneNames = listOf(R.string.settings_gesture_zone_narrow, R.string.settings_gesture_zone_medium, R.string.settings_gesture_zone_wide)
+private val GestureSensitivityNames = listOf(
+    R.string.settings_gesture_sensitivity_low,
+    R.string.settings_gesture_sensitivity_normal,
+    R.string.settings_gesture_sensitivity_high,
+)
+
+private fun gestureSidesName(swapped: Boolean) =
+    if (swapped) R.string.settings_gesture_sides_swapped else R.string.settings_gesture_sides_default
 
 private val SpeedChoices = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 private val SubtitleLanguages = listOf("ru", "en", "uk", "be", "kk", "de", "fr", "es", "it", "pt", "pl", "tr", "ja", "ko", "zh")

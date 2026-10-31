@@ -70,6 +70,20 @@ class StreamSelectorTest {
         assertEquals(listOf(137, 136), picked.map { it.itag })
     }
 
+    // Issue #3: a phone whose AV1 decoder stops at 1080p60 got no 1440p or 4K, though its VP9 decoder plays them.
+    @Test
+    fun takesTheCodecTheDevicePlaysHighest() {
+        val uhd = listOf(video(401, "av01.0.12M.08", 2160, 60), video(399, "av01.0.09M.08", 1080, 60), video(394, "av01.0.00M.08", 144)) +
+            listOf(video(315, "vp9", 2160, 60), video(303, "vp9", 1080, 60), video(278, "vp9", 144))
+        val av1UpTo1080: (VideoCodec, Int, Int, Int) -> Boolean = { codec, _, height, _ -> codec != VideoCodec.AV1 || height <= 1080 }
+        val picked = selectStreams(uhd, emptyList(), listOf(VideoCodec.AV1, VideoCodec.VP9, VideoCodec.AVC), av1UpTo1080).video
+        assertEquals(listOf(315, 303, 278), picked.map { it.itag })
+
+        // Both reach 4K: the preferred codec stays.
+        val both = selectStreams(uhd, emptyList(), listOf(VideoCodec.AV1, VideoCodec.VP9, VideoCodec.AVC)).video
+        assertEquals(listOf(401, 399, 394), both.map { it.itag })
+    }
+
     // Big Buck Bunny 60 fps: AV1 only from 720p60, so a 480p cap on mobile data would get 720p60.
     @Test
     fun skipsACodecWithoutLowQualities() {

@@ -174,24 +174,37 @@ class AppTest {
         Settings.set(Settings.Speed, 1f)
     }
 
-    /** In fullscreen a vertical swipe on the right edge no longer changes the volume (the user found it in the way). */
+    /** In fullscreen an upward swipe on the right side raises the volume; turned off in Settings it does nothing. */
     @Test
-    fun fullscreenSwipeLeavesVolumeAlone() {
+    fun fullscreenSwipeSetsVolumeUnlessTurnedOff() {
         val audio = ApplicationProvider.getApplicationContext<android.content.Context>().getSystemService(AudioManager::class.java)
-        val before = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) / 2
-        audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
-        launchVideo()
-        val video = compose.onNodeWithTag("video_player")
-        if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
-            video.performTouchInput { click(Offset(width * 0.1f, centerY)) }
+        val original = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val half = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) / 2
+        try {
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, half, 0)
+            launchVideo()
+            val video = compose.onNodeWithTag("video_player")
+            if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
+                video.performTouchInput { click(Offset(width * 0.1f, centerY)) }
+            }
+            compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
+            compose.onNodeWithContentDescription("Во весь экран").performClick()
+            compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
+            compose.waitForIdle()
+            video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.3f), durationMillis = 300) }
+            compose.waitForIdle()
+            assertTrue(audio.getStreamVolume(AudioManager.STREAM_MUSIC) > half)
+
+            Settings.set(Settings.GestureVolume, false)
+            compose.waitUntil(UI_TIMEOUT) { !Settings.current.value.gestureVolume }
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, half, 0)
+            video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.3f), durationMillis = 300) }
+            compose.waitForIdle()
+            assertEquals(half, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+        } finally {
+            Settings.set(Settings.GestureVolume, true)
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, original, 0)
         }
-        compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
-        compose.onNodeWithContentDescription("Во весь экран").performClick()
-        compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
-        compose.waitForIdle()
-        video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.2f), durationMillis = 300) }
-        compose.waitForIdle()
-        assertEquals(before, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
     }
 
     /** A video that ends in fullscreen lets the screen sleep: the window manager must drop KEEP_SCREEN_ON. */

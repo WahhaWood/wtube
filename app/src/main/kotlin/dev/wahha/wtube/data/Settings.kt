@@ -66,6 +66,22 @@ data class AppSettings(
     val updateCheck: Boolean = true,
     /** Send YouTube through byedpi (dpi/) where it is blocked or throttled. */
     val dpiBypass: Boolean = false,
+    /** Fullscreen: a vertical swipe on the brightness side sets the screen brightness for the video. */
+    val gestureBrightness: Boolean = true,
+    /** Fullscreen: a vertical swipe on the volume side sets the media volume. */
+    val gestureVolume: Boolean = true,
+    /** Volume on the left and brightness on the right, instead of the other way round. */
+    val gestureSwapSides: Boolean = false,
+    /** Index into [Settings.GestureZones]: how far in from each side the swipes reach. */
+    val gestureZone: Int = 1,
+    /** Index into [Settings.GestureSpans]: how long a swipe goes from 0 to 100%. */
+    val gestureSensitivity: Int = 1,
+    /** Bring the brightness set by a swipe back the next time a video goes fullscreen. */
+    val gestureRememberBrightness: Boolean = false,
+    /** That brightness, 0..1; below 0 when none was set. */
+    val gestureBrightnessLevel: Float = -1f,
+    /** A tick under the finger at 0 and 100%. */
+    val gestureHaptics: Boolean = true,
 )
 
 /** User settings in DataStore, mirrored into [current] so the player and UI read them synchronously. */
@@ -97,6 +113,14 @@ object Settings {
     val UpdateCheck = booleanPreferencesKey("update_check")
     val DeArrowOn = booleanPreferencesKey("dearrow")
     val DpiBypass = booleanPreferencesKey("dpi_bypass")
+    val GestureBrightness = booleanPreferencesKey("gesture_brightness")
+    val GestureVolume = booleanPreferencesKey("gesture_volume")
+    val GestureSwapSides = booleanPreferencesKey("gesture_swap_sides")
+    val GestureZone = intPreferencesKey("gesture_zone")
+    val GestureSensitivity = intPreferencesKey("gesture_sensitivity")
+    val GestureRememberBrightness = booleanPreferencesKey("gesture_remember_brightness")
+    val GestureBrightnessLevel = floatPreferencesKey("gesture_brightness_level")
+    val GestureHaptics = booleanPreferencesKey("gesture_haptics")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -104,6 +128,12 @@ object Settings {
     /** Choices for [MaxQuality] and [MaxQualityMobile], 0 first. */
     val QualityChoices = listOf(0, 2160, 1440, 1080, 720, 480, 360)
     val DoubleTapChoices = listOf(5, 10, 15, 30)
+
+    /** Width of each side's swipe zone per [AppSettings.gestureZone], as a share of the video's width. */
+    val GestureZones = listOf(0.25f, 1f / 3, 0.5f)
+
+    /** Swipe length from 0 to 100% per [AppSettings.gestureSensitivity], as a share of the video's height: low, normal, high. */
+    val GestureSpans = listOf(1.2f, 0.8f, 0.5f)
 
     /** Caption text size per [AppSettings.subtitleSize], relative to the default. */
     val SubtitleScales = listOf(0.8f, 1f, 1.3f, 1.6f)
@@ -168,6 +198,14 @@ object Settings {
         this[UpdateCheck] = settings.updateCheck
         this[DeArrowOn] = settings.deArrow
         this[DpiBypass] = settings.dpiBypass
+        this[GestureBrightness] = settings.gestureBrightness
+        this[GestureVolume] = settings.gestureVolume
+        this[GestureSwapSides] = settings.gestureSwapSides
+        this[GestureZone] = settings.gestureZone
+        this[GestureSensitivity] = settings.gestureSensitivity
+        this[GestureRememberBrightness] = settings.gestureRememberBrightness
+        this[GestureBrightnessLevel] = settings.gestureBrightnessLevel
+        this[GestureHaptics] = settings.gestureHaptics
     }
 
     internal fun Preferences.toSettings(): AppSettings {
@@ -200,6 +238,14 @@ object Settings {
             updateCheck = this[UpdateCheck] ?: defaults.updateCheck,
             deArrow = this[DeArrowOn] ?: defaults.deArrow,
             dpiBypass = this[DpiBypass] ?: defaults.dpiBypass,
+            gestureBrightness = this[GestureBrightness] ?: defaults.gestureBrightness,
+            gestureVolume = this[GestureVolume] ?: defaults.gestureVolume,
+            gestureSwapSides = this[GestureSwapSides] ?: defaults.gestureSwapSides,
+            gestureZone = (this[GestureZone] ?: defaults.gestureZone).coerceIn(GestureZones.indices),
+            gestureSensitivity = (this[GestureSensitivity] ?: defaults.gestureSensitivity).coerceIn(GestureSpans.indices),
+            gestureRememberBrightness = this[GestureRememberBrightness] ?: defaults.gestureRememberBrightness,
+            gestureBrightnessLevel = this[GestureBrightnessLevel] ?: defaults.gestureBrightnessLevel,
+            gestureHaptics = this[GestureHaptics] ?: defaults.gestureHaptics,
         )
     }
 }

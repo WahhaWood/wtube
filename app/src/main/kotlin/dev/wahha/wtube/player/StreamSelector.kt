@@ -21,18 +21,26 @@ data class StreamSelection(val video: List<VideoStream>, val audio: List<List<Au
 
 /**
  * Picks streams for the merged manifest. A single codec per adaptation set keeps adaptive switching
- * seamless; [codecPreference] lists codecs the device decodes well, best first.
+ * seamless; [codecPreference] lists codecs the device decodes well, best first, and [decodes] says whether
+ * the device plays a codec at a width, height and frame rate.
  */
 fun selectStreams(
     videoOnly: List<VideoStream>,
     audio: List<AudioStream>,
     codecPreference: List<VideoCodec>,
+    decodes: (VideoCodec, Int, Int, Int) -> Boolean = { _, _, _, _ -> true },
 ): StreamSelection {
     val usableVideo = videoOnly.filter { it.isPlayableDash() }
     // A codec that reaches down to the lowest quality cap, or the cap has nothing to pick and the player
     // takes that codec's lowest: YouTube encodes some 60 fps videos in AV1 only from 720p60 up.
-    val codec = codecPreference.firstOrNull { c -> usableVideo.any { c.matches(it.codec) && it.height <= LOWEST_CAP } }
-        ?: codecPreference.firstOrNull { c -> usableVideo.any { c.matches(it.codec) } }
+    val candidates = codecPreference.filter { c -> usableVideo.any { c.matches(it.codec) && it.height <= LOWEST_CAP } }
+        .ifEmpty { codecPreference.filter { c -> usableVideo.any { c.matches(it.codec) } } }
+    // Of those, the one the device plays at the best quality, the preferred one on a tie: a phone whose
+    // AV1 decoder stops at 1080p60 may still play VP9 in 4K, and the player hides what it cannot decode.
+    fun best(c: VideoCodec): Int = usableVideo
+        .filter { c.matches(it.codec) && decodes(c, it.width.takeIf { w -> w > 0 } ?: (it.height * 16 / 9), it.height, it.fps) }
+        .maxOfOrNull { it.height * 1000 + it.fps } ?: -1
+    val codec = candidates.maxByOrNull(::best)
     val video = if (codec == null) emptyList() else usableVideo
         .filter { codec.matches(it.codec) }
         .distinctBy { it.itag }

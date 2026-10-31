@@ -222,7 +222,7 @@ internal fun UpNextOverlay(upcoming: Upcoming, onPlay: () -> Unit, onCancel: () 
     }
 }
 
-/** A pill in the middle of the video: the 2x while held, zoom mode. */
+/** A pill in the middle of the video: the 2x while held, zoom mode. Volume and brightness have their [LevelBadge]. */
 @Composable
 internal fun GestureBadge(icon: ImageVector?, text: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme

@@ -46,6 +46,8 @@ class SettingsTest {
         liquidGlass = false, saveHistory = false, reportWatching = false, sponsorBlock = false,
         sponsorCategories = setOf("intro"), showDislikes = false, font = 2, textSize = 0, pureBlack = true,
         hideWatched = true, coverAccent = false, deArrow = true, updateCheck = false, dpiBypass = true,
+        gestureBrightness = false, gestureVolume = false, gestureSwapSides = true, gestureZone = 2, gestureSensitivity = 0,
+        gestureRememberBrightness = true, gestureBrightnessLevel = 0.4f, gestureHaptics = false,
     )
 
     @Test

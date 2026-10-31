@@ -92,7 +92,8 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
                 .createMediaSource(mediaItem.buildUpon().setUri(info.hlsUrl).build())
         }
 
-        val selection = selectStreams(info.videoOnlyStreams, info.audioStreams, codecs)
+        val selection = selectStreams(info.videoOnlyStreams, info.audioStreams, codecs, ::deviceDecodes)
+        Log.i(TAG, "Video ${info.id}: ${selection.video.firstOrNull()?.codec} up to ${selection.video.firstOrNull()?.let { "${it.height}p${it.fps}" }}")
         val manifest = mergedManifest(info, selection)
         val main = if (manifest != null) {
             DashMediaSource.Factory(youtubeDataSource).configured().createMediaSource(manifest, mediaItem)
@@ -189,7 +190,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
  * then H.264, which every device decodes in hardware, then software decoders as a last resort.
  */
 private fun deviceCodecPreference(): List<VideoCodec> {
-    val decoders = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder }
+    val decoders = videoDecoders
     fun has(codec: VideoCodec, hardware: Boolean) = decoders.any { info ->
         info.supportedTypes.any { it.equals(codec.mimeType, ignoreCase = true) } && (!hardware || info.isHardware())
     }
@@ -202,6 +203,22 @@ private fun deviceCodecPreference(): List<VideoCodec> {
     }.distinct()
     Log.i(TAG, "Codec preference: $order")
     return order
+}
+
+private val videoDecoders by lazy { MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder } }
+
+/**
+ * Whether the device plays [codec] at [width] × [height] and [fps]: by its hardware decoders when it has
+ * any for the codec, as ExoPlayer prefers them, otherwise by the software ones. Either orientation counts.
+ */
+private fun deviceDecodes(codec: VideoCodec, width: Int, height: Int, fps: Int): Boolean {
+    val decoders = videoDecoders.filter { info -> info.supportedTypes.any { it.equals(codec.mimeType, ignoreCase = true) } }
+    val chosen = decoders.filter { it.isHardware() }.ifEmpty { decoders }
+    val rate = fps.coerceAtLeast(1).toDouble()
+    return chosen.any { info ->
+        val caps = runCatching { info.getCapabilitiesForType(codec.mimeType).videoCapabilities }.getOrNull() ?: return@any false
+        caps.areSizeAndRateSupported(width, height, rate) || caps.areSizeAndRateSupported(height, width, rate)
+    }
 }
 
 private fun MediaCodecInfo.isHardware(): Boolean =

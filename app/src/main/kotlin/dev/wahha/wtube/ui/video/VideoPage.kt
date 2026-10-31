@@ -251,6 +251,11 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
                     launch { runCatching { DeArrow.title(id) }.onSuccess { if (this@VideoViewModel.id == id) betterTitle = it } }
                 }
                 this@VideoViewModel.watch = watch
+                // A downloaded video plays from its file at once; the page fills in when the network answers,
+                // which on a poor connection takes minutes before it gives up.
+                if (this@VideoViewModel.details == null) {
+                    Downloads.finished(id, audioOnly = false)?.let { this@VideoViewModel.details = offlineDetails(it.video) }
+                }
                 val details = try {
                     source.video(id)
                 } catch (e: Exception) {
