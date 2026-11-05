@@ -125,13 +125,14 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /** Where [VideoViewModel] gets a video's page from; tests give it a fake. */
 internal interface VideoSource {
-    suspend fun video(id: String): VideoDetails
+    /** The page of video [id]; [onStreams] when the video can play already, ahead of the page. */
+    suspend fun video(id: String, onStreams: () -> Unit): VideoDetails
     suspend fun watch(id: String): Watch
     suspend fun comments(id: String, page: Page?): PageOf<Comment>
     suspend fun dislikes(id: String): Long
 
     object Live : VideoSource {
-        override suspend fun video(id: String) = YouTube.video(id)
+        override suspend fun video(id: String, onStreams: () -> Unit) = YouTube.video(id, onStreams)
         override suspend fun watch(id: String) = Actions.watch(id)
         override suspend fun comments(id: String, page: Page?) = YouTube.comments(id, page)
         override suspend fun dislikes(id: String) = Dislikes.of(id)
@@ -195,8 +196,16 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
     /** Replies of the threads opened in the comments sheet, by comment id. */
     val replies = mutableStateMapOf<String, PagedList<Comment>>()
 
-    /** Set by [open] until the sheet hands the video to the player, which needs [details] cached first. */
+    /** Set by [open] until the sheet hands the video to the player, which needs [details] or [streamsReady] first. */
     var playPending by mutableStateOf(false)
+        private set
+
+    /** The video whose streams came ahead of its page: the player need not wait for the page. */
+    var streamsReady by mutableStateOf<String?>(null)
+        private set
+
+    /** Started and not in the history yet: that takes the page. */
+    var recordPending by mutableStateOf(false)
         private set
 
     /** Videos opened before this one in this session, newest last: what "previous" goes back to. */
@@ -221,6 +230,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
             if (previous.size > MAX_PREVIOUS) previous.removeAt(0)
         }
         this.id = id
+        recordPending = false
         details = null
         state = null
         commentBox = null
@@ -240,6 +250,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
     fun load() {
         val id = id ?: return
         error = null
+        streamsReady = null
         job?.cancel()
         job = viewModelScope.launch {
             try {
@@ -257,7 +268,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
                     Downloads.finished(id, audioOnly = false)?.let { this@VideoViewModel.details = offlineDetails(it.video) }
                 }
                 val details = try {
-                    source.video(id)
+                    source.video(id) { viewModelScope.launch { if (this@VideoViewModel.id == id) streamsReady = id } }
                 } catch (e: Exception) {
                     // Offline, a downloaded video still has its page: what was saved with the download.
                     (Downloads.finished(id, audioOnly = false) ?: Downloads.finished(id, audioOnly = true))?.let { offlineDetails(it.video) } ?: throw e
@@ -399,6 +410,11 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
 
     fun playStarted() {
         playPending = false
+        recordPending = true
+    }
+
+    fun recorded() {
+        recordPending = false
     }
 
     val hasNext: Boolean
@@ -432,6 +448,8 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         replies.clear()
         heatmap = emptyList()
         playPending = false
+        recordPending = false
+        streamsReady = null
         previous.clear()
     }
 }

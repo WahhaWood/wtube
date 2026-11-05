@@ -38,15 +38,40 @@ fun selectStreams(
     // Of those, the one the device plays at the best quality, the preferred one on a tie: a phone whose
     // AV1 decoder stops at 1080p60 may still play VP9 in 4K, and the player hides what it cannot decode.
     fun best(c: VideoCodec): Int = usableVideo
-        .filter { c.matches(it.codec) && decodes(c, it.width.takeIf { w -> w > 0 } ?: (it.height * 16 / 9), it.height, it.fps) }
-        .maxOfOrNull { it.height * 1000 + it.fps } ?: -1
+        .filter { c.matches(it.codec) && it.decodedBy(c, decodes) }
+        .maxOfOrNull { it.rank } ?: -1
     val codec = candidates.maxByOrNull(::best)
     val video = if (codec == null) emptyList() else usableVideo
         .filter { codec.matches(it.codec) }
         .distinctBy { it.itag }
-        .sortedByDescending { it.height * 1000 + it.fps }
+        .sortedByDescending { it.rank }
     return StreamSelection(video, selectAudio(audio))
 }
+
+/**
+ * One line for the event log on what YouTube offers and what the device decodes, per codec, e.g.
+ * `VP9 2160p60/1440p30, AVC 1080p60/1080p60`: a quality missing from the menu is explained at once.
+ * A codec without a decoder on the device shows `-` as its decodable best.
+ */
+fun describeCodecs(
+    videoOnly: List<VideoStream>,
+    codecPreference: List<VideoCodec>,
+    decodes: (VideoCodec, Int, Int, Int) -> Boolean,
+): String {
+    val usableVideo = videoOnly.filter { it.isPlayableDash() }
+    fun label(stream: VideoStream?) = stream?.let { "${it.height}p${it.fps}" } ?: "-"
+    return VideoCodec.entries.mapNotNull { c ->
+        val streams = usableVideo.filter { c.matches(it.codec) }
+        if (streams.isEmpty()) return@mapNotNull null
+        val decodable = if (c in codecPreference) streams.filter { it.decodedBy(c, decodes) } else emptyList()
+        "$c ${label(streams.maxByOrNull { it.rank })}/${label(decodable.maxByOrNull { it.rank })}"
+    }.joinToString(", ")
+}
+
+private val VideoStream.rank get() = height * 1000 + fps
+
+private fun VideoStream.decodedBy(codec: VideoCodec, decodes: (VideoCodec, Int, Int, Int) -> Boolean): Boolean =
+    decodes(codec, width.takeIf { it > 0 } ?: (height * 16 / 9), height, fps)
 
 /**
  * Every audio track (dubs, auto-dubs and descriptions of videos that have them), the original first.

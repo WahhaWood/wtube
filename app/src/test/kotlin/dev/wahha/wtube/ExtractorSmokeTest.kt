@@ -75,6 +75,17 @@ class ExtractorSmokeTest {
     }
 
     /** The bytes really come: the same POST + range parameter request the player's data source sends. */
+    /** The start of a video relies on the order of the extractor's requests: this says when that changes. */
+    @Test
+    fun streamsComeAheadOfThePage() = runBlocking {
+        var early: org.schabi.newpipe.extractor.stream.StreamInfo? = null
+        val full = YouTube.streamInfo("aqz-KE-bpKQ".also { YouTube.forget(it) }) { early = YouTube.cachedStreamInfo("aqz-KE-bpKQ") }
+        val streams = checkNotNull(early) { "No streams ahead of the page" }
+        assertTrue(streams.videoOnlyStreams.isNotEmpty() && streams.audioStreams.isNotEmpty())
+        assertEquals(full.name, streams.name)
+        assertEquals(full.uploaderName, streams.uploaderName)
+    }
+
     @Test
     fun streamUrlServesRangeRequests() = runBlocking {
         val info = YouTube.streamInfo("jNQXAC9IVRw")

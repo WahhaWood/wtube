@@ -19,8 +19,10 @@ import java.util.Locale
  */
 object ErrorLog {
     private const val MAX_CRASH_BYTES = 64 * 1024
-    // Warnings and errors from everyone in the process, plus our own notable events at info level.
-    private val LogcatFilter = listOf("PlaybackService:I", "Account:I", "*:W")
+    // Warnings and errors from everyone in the process, plus our own notable events at info level. libc only
+    // from errors up: MIUI floods it with property-access warnings, thousands per video, fatal signals are F.
+    // gralloc4 only when fatal: MediaTek logs "Empty SMPTE 2094-40 data" as an error for every video frame.
+    private val LogcatFilter = listOf("PlaybackService:I", "WTubeSource:I", "Account:I", "libc:E", "gralloc4:F", "*:W")
     private const val MAX_EVENT_BYTES = 64 * 1024
     private var crashes: File? = null
     private var events: File? = null

@@ -47,6 +47,9 @@ internal fun levelSwipeAt(x: Float, y: Float, width: Float, height: Float, edge:
     return kind.takeIf { enabled }
 }
 
+/** A horizontal drag over the video seeks, in any size of the player, unless every level swipe is turned off. */
+internal fun seekSwipeEnabled(settings: AppSettings): Boolean = settings.gestureBrightness || settings.gestureVolume
+
 /** Clearly up or down: a diagonal drag is a seek or nothing, never a level change by accident. */
 internal fun isLevelDrag(dx: Float, dy: Float): Boolean = abs(dy) > abs(dx) * 1.5f
 

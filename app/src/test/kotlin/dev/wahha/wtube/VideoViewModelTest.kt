@@ -7,6 +7,7 @@ import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.innertube.Watch
 import dev.wahha.wtube.ui.video.VideoSource
 import dev.wahha.wtube.ui.video.VideoViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -32,9 +33,14 @@ class VideoViewModelTest {
     private class FakeSource : VideoSource {
         val fetched = mutableListOf<String>()
         val failing = mutableSetOf<String>()
+        var streamsThenWait: CompletableDeferred<Unit>? = null
 
-        override suspend fun video(id: String): VideoDetails {
+        override suspend fun video(id: String, onStreams: () -> Unit): VideoDetails {
             fetched += id
+            streamsThenWait?.let {
+                onStreams()
+                it.await()
+            }
             if (id in failing) throw IOException("offline")
             val item = VideoItem(id, "title $id", null, "c", null, null, duration = 60, views = 1, uploaded = null, isLive = false)
             return VideoDetails(item, "", likes = 1, subscribers = 1, uploadedAt = null, related = emptyList(), chapters = emptyList(), storyboard = emptyList())
@@ -100,5 +106,27 @@ class VideoViewModelTest {
         vm.playPrevious()
         assertEquals("a", vm.id)
         assertFalse(vm.hasPrevious)
+    }
+
+    @Test
+    fun streamsAheadOfThePageCanStartTheVideo() {
+        val page = CompletableDeferred<Unit>()
+        source.streamsThenWait = page
+        vm.open("a")
+        assertEquals("a", vm.streamsReady)
+        assertNull(vm.details)
+        assertTrue(vm.playPending)
+        vm.playStarted()
+        assertTrue(vm.recordPending)
+        page.complete(Unit)
+        assertEquals("a", vm.details?.item?.id)
+    }
+
+    @Test
+    fun anotherVideoForgetsThePendingHistoryEntry() {
+        vm.open("a")
+        vm.playStarted()
+        vm.open("b")
+        assertFalse(vm.recordPending)
     }
 }

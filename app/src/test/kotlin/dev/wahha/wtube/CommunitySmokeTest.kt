@@ -9,7 +9,7 @@ import org.junit.Test
 class CommunitySmokeTest {
     @Test
     fun liveSponsorBlockAndDislikes() = runBlocking {
-        val segments = SponsorBlock.segments("601HYb7gFz0", setOf("sponsor"))
+        val segments = SponsorBlock.segments("thODYqd9G9U", setOf("sponsor"))
         val dislikes = Dislikes.of("dQw4w9WgXcQ")
         println("sponsorblock: $segments, dislikes: $dislikes")
         assertTrue(segments.isNotEmpty() && segments.all { it.category == "sponsor" })

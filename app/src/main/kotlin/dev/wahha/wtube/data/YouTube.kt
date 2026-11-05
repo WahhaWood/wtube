@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.schabi.newpipe.extractor.Image
@@ -84,31 +85,69 @@ object YouTube {
 
     suspend fun suggestions(query: String): List<String> = io { service.suggestionExtractor.suggestionList(query) }
 
-    private val streamCache = object : LinkedHashMap<String, Pair<Long, StreamInfo>>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, StreamInfo>>) = size > 20
+    /** [complete] is false for streams that came ahead of the page: the player can use them, nothing else can. */
+    private class CachedInfo(val at: Long, val info: StreamInfo, val complete: Boolean)
+
+    private val streamCache = object : LinkedHashMap<String, CachedInfo>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedInfo>) = size > 20
     }
 
     /**
      * The full stream info, shared by the video screen and the player so one watch costs one fetch.
-     * Stream URLs expire after a few hours, so cached entries live for [STREAM_TTL_MS].
+     * Stream URLs expire after a few hours, so cached entries live for [STREAM_TTL_MS]. [onStreams] says when
+     * [cachedStreamInfo] can already serve the player, ahead of the rest, if it can.
      */
-    suspend fun streamInfo(id: String): StreamInfo {
+    suspend fun streamInfo(id: String, onStreams: (() -> Unit)? = null): StreamInfo {
         synchronized(streamCache) {
-            streamCache[id]?.let { (at, info) -> if (System.currentTimeMillis() - at < STREAM_TTL_MS) return info }
+            streamCache[id]?.takeIf { it.complete && System.currentTimeMillis() - it.at < STREAM_TTL_MS }?.let { return it.info }
         }
-        val info = io { StreamInfo.getInfo(service, watchUrl(id)) }
-        synchronized(streamCache) { streamCache[id] = System.currentTimeMillis() to info }
+        val info = withContext(Dispatchers.IO) {
+            val scope = this
+            NewPipeDownloader.observer.set(onStreams?.let { ready -> EarlyStreams { kept -> scope.launch { keepEarly(id, kept, ready) } } })
+            try {
+                StreamInfo.getInfo(service, watchUrl(id))
+            } finally {
+                NewPipeDownloader.observer.remove()
+            }
+        }
+        synchronized(streamCache) { streamCache[id] = CachedInfo(System.currentTimeMillis(), info, complete = true) }
         return info
     }
 
+    /** The same extraction answered from [kept]: the streams without the page, for the player; then [onStreams]. */
+    private fun keepEarly(id: String, kept: EarlyStreams, onStreams: () -> Unit) {
+        NewPipeDownloader.replay.set(kept)
+        val info = try {
+            StreamInfo.getInfo(service, watchUrl(id)).takeIf { it.videoOnlyStreams.isNotEmpty() || it.hlsUrl.isNotEmpty() }
+        } catch (e: Exception) {
+            ErrorLog.note("[player] no early streams for $id: ${e.javaClass.simpleName}: ${e.message.orEmpty().take(120)}")
+            null
+        } finally {
+            NewPipeDownloader.replay.remove()
+        }
+        if (info == null) return
+        synchronized(streamCache) {
+            if (streamCache[id]?.complete == true) return
+            streamCache[id] = CachedInfo(System.currentTimeMillis(), info, complete = false)
+        }
+        onStreams()
+    }
+
     /** Drops [id] from the cache, so the next fetch gets fresh stream URLs (they expire after a few hours). */
-    fun forget(id: String) = synchronized(streamCache) { streamCache.remove(id) }
+    fun forget(id: String) {
+        synchronized(streamCache) { streamCache.remove(id) }
+    }
 
     /** Last fetched info for [id], without network; the player's media source factory runs synchronously. */
-    fun cachedStreamInfo(id: String): StreamInfo? = synchronized(streamCache) { streamCache[id]?.second }
+    fun cachedStreamInfo(id: String): StreamInfo? = synchronized(streamCache) { streamCache[id]?.info }
 
-    suspend fun video(id: String): VideoDetails {
-        val info = streamInfo(id)
+    /** Video [id] from streams that came ahead of its page, for the notification: only the WEB client has thumbnails. */
+    fun earlyItem(id: String): VideoItem? = synchronized(streamCache) { streamCache[id]?.takeUnless { it.complete }?.info }
+        ?.toVideoItem(id)?.let { it.copy(thumbnail = it.thumbnail ?: "https://i.ytimg.com/vi/$id/hqdefault.jpg") }
+
+    /** The page of video [id]; [onStreams] says when it can play already, ahead of the page, if it can. */
+    suspend fun video(id: String, onStreams: (() -> Unit)? = null): VideoDetails {
+        val info = streamInfo(id, onStreams)
         return VideoDetails(
             item = info.toVideoItem(id),
             description = info.description?.content.orEmpty(),

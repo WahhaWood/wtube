@@ -93,7 +93,13 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
         }
 
         val selection = selectStreams(info.videoOnlyStreams, info.audioStreams, codecs, ::deviceDecodes)
-        Log.i(TAG, "Video ${info.id}: ${selection.video.firstOrNull()?.codec} up to ${selection.video.firstOrNull()?.let { "${it.height}p${it.fps}" }}")
+        // Into the event file: "why no 4K on my phone" is answered by the decoder's own limits, and the
+        // shared logcat often keeps only the last minute.
+        val picked = VideoCodec.entries.firstOrNull { it.matches(selection.video.firstOrNull()?.codec) }
+        ErrorLog.note(
+            "[player] ${info.id}: ${describeCodecs(info.videoOnlyStreams, codecs, ::deviceDecodes)} (offered/decodable); " +
+                "picked $picked by ${picked?.let(::decoderNames)}, order ${codecs.joinToString(">")}",
+        )
         val manifest = mergedManifest(info, selection)
         val main = if (manifest != null) {
             DashMediaSource.Factory(youtubeDataSource).configured().createMediaSource(manifest, mediaItem)
@@ -212,14 +218,20 @@ private val videoDecoders by lazy { MediaCodecList(MediaCodecList.REGULAR_CODECS
  * any for the codec, as ExoPlayer prefers them, otherwise by the software ones. Either orientation counts.
  */
 private fun deviceDecodes(codec: VideoCodec, width: Int, height: Int, fps: Int): Boolean {
-    val decoders = videoDecoders.filter { info -> info.supportedTypes.any { it.equals(codec.mimeType, ignoreCase = true) } }
-    val chosen = decoders.filter { it.isHardware() }.ifEmpty { decoders }
     val rate = fps.coerceAtLeast(1).toDouble()
-    return chosen.any { info ->
+    return decodersFor(codec).any { info ->
         val caps = runCatching { info.getCapabilitiesForType(codec.mimeType).videoCapabilities }.getOrNull() ?: return@any false
         caps.areSizeAndRateSupported(width, height, rate) || caps.areSizeAndRateSupported(height, width, rate)
     }
 }
+
+/** The decoders [deviceDecodes] judges [codec] by: the hardware ones when there are any, as ExoPlayer prefers them. */
+private fun decodersFor(codec: VideoCodec): List<MediaCodecInfo> {
+    val decoders = videoDecoders.filter { info -> info.supportedTypes.any { it.equals(codec.mimeType, ignoreCase = true) } }
+    return decoders.filter { it.isHardware() }.ifEmpty { decoders }
+}
+
+private fun decoderNames(codec: VideoCodec): String = decodersFor(codec).joinToString("+") { it.name }.ifEmpty { "none" }
 
 private fun MediaCodecInfo.isHardware(): Boolean =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

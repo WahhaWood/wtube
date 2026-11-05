@@ -39,6 +39,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dev.wahha.wtube.MainActivity
+import dev.wahha.wtube.R
 import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.Http
@@ -52,6 +53,7 @@ import dev.wahha.wtube.data.qualityCap
 import dev.wahha.wtube.data.watchUrl
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.dpi.Dpi
+import dev.wahha.wtube.ui.components.Notices
 import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Job
@@ -272,6 +274,7 @@ class PlaybackService : MediaSessionService() {
             // Into the app's own event file: on some phones the shared logcat is nearly empty.
             val causes = generateSequence(error.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}" }
             ErrorLog.note("[player] ${error.errorCodeName} on $id, route ${Http.route ?: "direct"}: $causes")
+            if (error.errorCode in DecoderErrors && dropPickedQuality(id)) return
             if (!error.isExpiredLink()) return
             val now = SystemClock.elapsedRealtime()
             refreshed?.let { (lastId, at) -> if (lastId == id && now - at < REFRESH_AGAIN_MS) return }
@@ -309,6 +312,22 @@ class PlaybackService : MediaSessionService() {
             } else {
                 scheduleNext(player)
             }
+        }
+
+        /**
+         * The quality menu also offers qualities above what the decoder claims; one picked by hand that the
+         * decoder then fails at goes back to auto, from the same spot, with a toast. False without such a pick.
+         */
+        private fun dropPickedQuality(id: String): Boolean {
+            val params = player.trackSelectionParameters
+            val picked = params.overrides.values.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.trackIndices.isNotEmpty() } ?: return false
+            val format = picked.mediaTrackGroup.getFormat(picked.trackIndices.first())
+            val label = "${format.height}p"
+            ErrorLog.note("[player] decoder failed at $label ${format.codecs} on $id, quality back to auto")
+            player.trackSelectionParameters = params.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
+            player.prepare()
+            Notices.show(R.string.player_quality_failed, label)
+            return true
         }
 
         /** A throttled stream trickles instead of failing, so no error ever says why; a long wait is noted too. */
@@ -393,7 +412,7 @@ class PlaybackService : MediaSessionService() {
     private suspend fun mediaItem(id: String): MediaItem {
         Downloads.finished(id, audioOnly = false)?.let { return item(it.video, Uri.fromFile(File(it.file))) }
         val details = try {
-            YouTube.video(id).item
+            YouTube.earlyItem(id) ?: YouTube.video(id).item
         } catch (e: Exception) {
             val sound = Downloads.finished(id, audioOnly = true) ?: throw e
             return item(sound.video, Uri.fromFile(File(sound.file)))
@@ -485,6 +504,13 @@ class PlaybackService : MediaSessionService() {
         private const val REFRESH_AGAIN_MS = 10 * 60_000L
         private const val BACK_JUMP_NOTE_MS = 1_000L
         private const val STALL_NOTE_MS = 15_000L
+        private val DecoderErrors = setOf(
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        )
         const val AUTOPLAY_DELAY_MS = 8_000L
         val StatsCommand = SessionCommand("dev.wahha.wtube.STATS", Bundle.EMPTY)
         const val STAT_VIDEO = "video"

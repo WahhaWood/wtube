@@ -257,11 +257,16 @@ fun PlayerSheet(
     val details = vm.details
     val colors = MaterialTheme.colorScheme
 
-    // Hand the video to the player once its stream info is cached (the session reads it from there).
-    LaunchedEffect(details, player, vm.playPending) {
-        if (details != null && player != null && vm.playPending) {
+    // Hand the video to the player once its stream info is cached (the session reads it from there), which
+    // may be ahead of the page; the history takes the page.
+    LaunchedEffect(details, vm.streamsReady, player, vm.playPending, vm.recordPending) {
+        val id = vm.id
+        if (id != null && player != null && vm.playPending && (details != null || vm.streamsReady == id)) {
             vm.playStarted()
-            connection.play(details.item.id)
+            connection.play(id)
+        }
+        if (details != null && vm.recordPending) {
+            vm.recorded()
             History.record(details.item)
         }
     }

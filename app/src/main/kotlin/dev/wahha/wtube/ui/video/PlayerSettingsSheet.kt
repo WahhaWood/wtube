@@ -138,11 +138,14 @@ internal fun PlayerSettingsSheet(player: Player, state: PlayerState, onStats: ()
                         onDismiss()
                     }
                     if (video != null) {
+                        // Qualities above what the decoder claims too, marked: the claims of some phones (MediaTek)
+                        // are lower than what they play. Auto never picks those; a decoder that fails at one sends
+                        // the player back to auto (PlaybackService).
                         (0 until video.length)
-                            .filter { video.isTrackSupported(it) }
                             .sortedByDescending { video.getTrackFormat(it).height }
                             .forEach { index ->
-                                OptionRow(qualityLabel(video.getTrackFormat(index)), selected = qualityOverridden && video.isTrackSelected(index)) {
+                                val hint = if (video.isTrackSupported(index)) null else stringResource(R.string.player_quality_beyond_device)
+                                OptionRow(qualityLabel(video.getTrackFormat(index)), selected = qualityOverridden && video.isTrackSelected(index), hint = hint) {
                                     update { setOverrideForType(TrackSelectionOverride(video.mediaTrackGroup, index)) }
                                     onDismiss()
                                 }
@@ -345,18 +348,20 @@ private fun SheetHeader(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun OptionRow(label: String, selected: Boolean, hint: String? = null, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (selected) colors.primary else colors.onSurface,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) colors.primary else colors.onSurface,
+            )
+            if (hint != null) Text(hint, style = MaterialTheme.typography.bodySmall)
+        }
         if (selected) Icon(WIcons.Check, contentDescription = null, tint = colors.primary)
     }
 }

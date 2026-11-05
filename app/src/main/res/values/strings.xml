@@ -71,6 +71,8 @@
     <string name="player_quality">Качество</string>
     <string name="player_quality_auto">Авто</string>
     <string name="player_quality_auto_current">Авто (%1$s)</string>
+    <string name="player_quality_beyond_device">Выше заявленного телефоном, может не пойти</string>
+    <string name="player_quality_failed">Телефон не потянул %1$s, качество снова «Авто»</string>
     <string name="player_speed">Скорость</string>
     <string name="player_speed_normal">Обычная</string>
     <string name="player_speed_slower">Медленнее</string>
@@ -205,7 +207,7 @@
     <string name="settings_pip">Картинка в картинке</string>
     <string name="settings_pip_summary">При сворачивании видео уходит в маленькое окно</string>
     <string name="settings_gestures">Жесты в полноэкранном режиме</string>
-    <string name="settings_gestures_hint">Проведите вверх или вниз у края видео. Середина экрана и полосы сверху и снизу остаются за обычными жестами: свайп вниз по центру по-прежнему выходит из полноэкранного режима.</string>
+    <string name="settings_gestures_hint">Проведите вверх или вниз у края видео. Середина экрана и полосы сверху и снизу остаются за обычными жестами: свайп вниз по центру по-прежнему выходит из полноэкранного режима. Если выключить и яркость, и громкость, свайп вбок по видео перестанет перематывать; ползунок перемотки работает всегда.</string>
     <string name="settings_gesture_brightness">Яркость свайпом</string>
     <string name="settings_gesture_volume">Громкость свайпом</string>
     <string name="settings_gesture_left">У левого края</string>

@@ -1,6 +1,7 @@
 package dev.wahha.wtube
 
 import dev.wahha.wtube.player.VideoCodec
+import dev.wahha.wtube.player.describeCodecs
 import dev.wahha.wtube.player.selectAudio
 import dev.wahha.wtube.player.selectStreams
 import org.junit.Assert.assertEquals
@@ -141,5 +142,19 @@ class StreamSelectorTest {
     fun audioWithoutTrackInfoKeepsEverything() {
         val picked = selectAudio(listOf(audio(140, 128), audio(139, 48))).single()
         assertEquals(listOf(140, 139), picked.map { it.itag })
+    }
+
+    @Test
+    fun describesOfferedAndDecodableBestPerCodec() {
+        val videos = listOf(
+            video(401, "av01.0.12M.08", 2160, 60),
+            video(315, "vp9", 2160, 60),
+            video(308, "vp9", 1440, 60),
+            video(303, "vp9", 1080, 60),
+            video(299, "avc1.64002a", 1080, 60),
+        )
+        val line = describeCodecs(videos, listOf(VideoCodec.VP9, VideoCodec.AVC)) { codec, _, height, _ -> codec != VideoCodec.AV1 && height <= 1080 }
+        // AV1 has no decoder here; VP9 and H.264 stop at 1080p60, what issue #3's phone reports for 60 fps.
+        assertEquals("AV1 2160p60/-, VP9 2160p60/1080p60, AVC 1080p60/1080p60", line)
     }
 }

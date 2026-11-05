@@ -147,8 +147,8 @@ private enum class DragMode { Seek, Level, Pinch }
  * flat dim, round buttons in the middle, a hairline of progress while the controls are hidden.
  *
  * Gestures: tap toggles the controls, double tap on either half seeks by the step from Settings, a long
- * press plays at 2x while held, a horizontal drag seeks with a storyboard preview, and in fullscreen a pinch
- * switches fit / fill. In fullscreen a clearly vertical drag on a side sets brightness or volume (each can be
+ * press plays at 2x while held, a horizontal drag seeks with a storyboard preview (off together with the
+ * level swipes, [seekSwipeEnabled]; the seek bar always works), and in fullscreen a pinch switches fit / fill. In fullscreen a clearly vertical drag on a side sets brightness or volume (each can be
  * turned off, sides, zone width and sensitivity are in Settings: they once got in the way, so the middle and
  * the top and bottom strips are never theirs). Other vertical drags are left to the sheet (collapse,
  * fullscreen) in [PlayerSheet].
@@ -340,7 +340,7 @@ fun VideoPlayer(
                                     }
                                     mode = when {
                                         kind != null -> DragMode.Level
-                                        horizontal && state.duration > 0 && player.isCurrentMediaItemSeekable -> DragMode.Seek
+                                        horizontal && seekSwipeEnabled(Settings.current.value) && state.duration > 0 && player.isCurrentMediaItemSeekable -> DragMode.Seek
                                         else -> return@awaitEachGesture
                                     }
                                     change.consume()

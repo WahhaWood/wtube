@@ -5,6 +5,7 @@ import dev.wahha.wtube.ui.video.LevelKind
 import dev.wahha.wtube.ui.video.isLevelDrag
 import dev.wahha.wtube.ui.video.levelAfter
 import dev.wahha.wtube.ui.video.levelSwipeAt
+import dev.wahha.wtube.ui.video.seekSwipeEnabled
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -59,5 +60,13 @@ class LevelSwipeTest {
         assertEquals(1f, levelAfter(0f, -500f, height, AppSettings(gestureSensitivity = 2)), 1e-4f)
         assertEquals(0.25f, levelAfter(0.5f, 300f, height, AppSettings(gestureSensitivity = 0)), 1e-4f)
         assertEquals(0.01f, levelAfter(0.1f, 900f, height, AppSettings(), min = 0.01f), 1e-4f)
+    }
+
+    @Test
+    fun seekSwipeGoesOnlyWithBothLevelSwipesOff() {
+        assertTrue(seekSwipeEnabled(AppSettings()))
+        assertTrue(seekSwipeEnabled(AppSettings(gestureBrightness = false)))
+        assertTrue(seekSwipeEnabled(AppSettings(gestureVolume = false)))
+        assertFalse(seekSwipeEnabled(AppSettings(gestureBrightness = false, gestureVolume = false)))
     }
 }
