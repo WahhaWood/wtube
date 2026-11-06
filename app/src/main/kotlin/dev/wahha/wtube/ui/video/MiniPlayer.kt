@@ -47,6 +47,8 @@ internal fun MiniPlayerContent(
     author: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    // False when the video could not be opened at all: its play button would do nothing.
+    canPlay: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     Box(modifier) {
@@ -59,7 +61,7 @@ internal fun MiniPlayerContent(
                 Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(author, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Box(contentAlignment = Alignment.Center) {
+            if (canPlay) Box(contentAlignment = Alignment.Center) {
                 if (state.playbackState == Player.STATE_BUFFERING) {
                     CircularProgressIndicator(Modifier.size(36.dp), color = colors.primary, strokeWidth = 2.dp)
                 }

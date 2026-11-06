@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.components
 
+import dev.wahha.wtube.data.MembersOnly
 import androidx.compose.runtime.LaunchedEffect
 import dev.wahha.wtube.data.ErrorLog
 import androidx.compose.animation.core.LinearEasing
@@ -67,7 +68,8 @@ fun errorMessage(error: Throwable): Int {
             is ActionRejectedException -> return R.string.error_rejected
             is AgeRestrictedContentException -> return R.string.error_age
             is GeographicRestrictionException -> return R.string.error_geo
-            is PaidContentException, is YoutubeMusicPremiumContentException -> return R.string.error_paid
+            is PaidContentException -> return if (MembersOnly.refused(e)) R.string.error_members else R.string.error_paid
+            is YoutubeMusicPremiumContentException -> return R.string.error_paid
             is PrivateContentException -> return R.string.error_private
             is SignInConfirmNotBotException -> return R.string.error_bot
             is ContentNotAvailableException -> return R.string.error_unavailable

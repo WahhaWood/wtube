@@ -116,7 +116,7 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
     fun download(audioOnly: Boolean, quality: Int) {
         viewModelScope.launch {
             try {
-                val videos = allVideos().filter { !it.isLive && it.duration > 0 }
+                val videos = allVideos().filter { !it.isLive && !it.membersOnly && it.duration > 0 }
                 val queued = Downloads.enqueueAll(videos, audioOnly, quality)
                 if (queued > 0) Notices.show(R.string.downloads_playlist_queued, queued.toString()) else Notices.show(R.string.downloads_playlist_nothing)
             } catch (e: CancellationException) {
@@ -131,8 +131,13 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
     fun playAll(shuffle: Boolean, open: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val videos = allVideos().let { if (shuffle) it.shuffled() else it }
-                val first = videos.firstOrNull() ?: return@launch
+                val all = allVideos()
+                val videos = all.filterNot { it.membersOnly }.let { if (shuffle) it.shuffled() else it }
+                val first = videos.firstOrNull()
+                if (first == null) {
+                    if (all.isNotEmpty()) Notices.show(R.string.members_only_playlist)
+                    return@launch
+                }
                 PlayQueue.replace(videos.drop(1))
                 open(first.id)
             } catch (e: CancellationException) {

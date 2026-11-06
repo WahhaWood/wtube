@@ -27,6 +27,8 @@ data class VideoItem(
     val isLive: Boolean,
     /** Epoch millis, approximate for "N days ago" sources. */
     val uploadedAt: Long? = null,
+    /** Only the channel's members can watch it (also while members get it first); see [MembersOnly]. */
+    val membersOnly: Boolean = false,
 ) : Item {
     override val url: String get() = watchUrl(id)
 }

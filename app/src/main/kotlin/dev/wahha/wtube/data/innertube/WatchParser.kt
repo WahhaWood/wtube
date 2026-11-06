@@ -16,9 +16,18 @@ data class VideoState(val like: LikeStatus, val channelId: String?, val subscrib
  * The watch page as the account sees it: [state] (null on the anonymous page), the token of the first
  * comments page (null when off) and the "Most replayed" graph: intensities 0..1 of equal slices of the
  * video, in order (empty when YouTube has none, as for new or short videos); [chat] for live streams
- * and past ones with a chat replay.
+ * and past ones with a chat replay; [video] says what the video is.
  */
-class Watch(val state: VideoState?, val commentsToken: String?, val heatmap: List<Float> = emptyList(), val chat: ChatSource? = null)
+class Watch(
+    val state: VideoState?,
+    val commentsToken: String?,
+    val heatmap: List<Float> = emptyList(),
+    val chat: ChatSource? = null,
+    val video: WatchVideo? = null,
+)
+
+/** The video as the watch page names it. The page answers for a video that will not play too, when the extractor has nothing. */
+class WatchVideo(val title: String?, val channelName: String?, val channelUrl: String?)
 
 /** One of the account's playlists in "Save to"; [contains] says whether the video is in it already. */
 data class PlaylistOption(val id: String, val title: String, val contains: Boolean, val privacy: String?)
@@ -48,13 +57,22 @@ object WatchParser {
             ?: FeedParser.findFirst(FeedParser.findFirst(secondary, "videoOwnerRenderer"), "browseEndpoint")?.getString("browseId")
         val subscribed = button?.takeIf { it.isBoolean("subscribed") }?.getBoolean("subscribed") ?: subscribedEntity(updates)
         val comments = FeedParser.findFirst(contents, "itemSectionRenderer") { it.getString("sectionIdentifier") == "comment-item-section" }
+        val owner = FeedParser.findFirst(secondary, "videoOwnerRenderer")
         return Watch(
             state = VideoState(LikeStatus.entries.firstOrNull { it.name == like } ?: LikeStatus.INDIFFERENT, channelId, subscribed),
             commentsToken = comments?.let(::continuationToken),
             heatmap = heatmap(updates),
             chat = chat(contents),
+            video = WatchVideo(
+                title = titleOf(FeedParser.findFirst(contents, "videoPrimaryInfoRenderer")),
+                channelName = titleOf(owner),
+                channelUrl = channelId?.let { "https://www.youtube.com/channel/$it" },
+            ),
         )
     }
+
+    // A reshaped title must not cost the rest of the page.
+    private fun titleOf(renderer: JsonObject?): String? = runCatching { renderer?.let { getTextFromObject(it.getObject("title")) } }.getOrNull()
 
     // The chat sits in the conversation bar; without a reload token it is off.
     private fun chat(contents: Any?): ChatSource? {

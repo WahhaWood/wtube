@@ -1,5 +1,7 @@
 package dev.wahha.wtube.ui.search
 
+import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Settings
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -307,8 +309,9 @@ private fun SuggestionRow(
 private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
     val results = vm.results
     val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val settings by Settings.current.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    LoadMoreEffect(listState) { results.loadMore() }
+    LoadMoreEffect(listState, loaded = results.items.size) { results.loadMore() }
     OnScrollEffect(listState, onScroll)
     LaunchedEffect(vm.submitted) { listState.scrollToItem(0) }
 
@@ -323,7 +326,7 @@ private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
             modifier = Modifier.fillMaxSize().testTag("search_results"),
             contentPadding = PaddingValues(top = 8.dp, bottom = bottom),
         ) {
-            items(results.items.filter(hidden::allows), key = { it.url }) { ItemView(it, recommended = true) }
+            items(results.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { it.url }) { ItemView(it, recommended = true) }
             item(key = "footer") { ListFooter(results.loading, results.error, results::retry) }
             item { Spacer(Modifier.height(8.dp)) }
         }

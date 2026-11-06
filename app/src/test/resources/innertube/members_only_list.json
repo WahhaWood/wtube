@@ -1,0 +1,308 @@
+{
+ "contents": {
+  "sectionListRenderer": {
+   "contents": [
+    {
+     "lockupViewModel": {
+      "contentImage": {
+       "thumbnailViewModel": {
+        "image": {
+         "sources": [
+          {
+           "url": "https://i.ytimg.com/vi/B-AGO9R8t-A/hqdefault.jpg?sqp=-oaymwEiCKgBEF5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLDQDpiVHw2ndI5xR3TS9xHJvnunaA",
+           "width": 168,
+           "height": 94
+          },
+          {
+           "url": "https://i.ytimg.com/vi/B-AGO9R8t-A/hqdefault.jpg?sqp=-oaymwEiCMQBEG5IWvKriqkDFQgBFQAAAAAYASUAAMhCPQCAokN4AQ==&rs=AOn4CLCLDccckuGwWIJ89oZYaw5dqBQ-sA",
+           "width": 196,
+           "height": 110
+          },
+          {
+           "url": "https://i.ytimg.com/vi/B-AGO9R8t-A/hqdefault.jpg?sqp=-oaymwEjCPYBEIoBSFryq4qpAxUIARUAAAAAGAElAADIQj0AgKJDeAE=&rs=AOn4CLCPllGxUzf4v_8hTnZYzKtXqhSA1A",
+           "width": 246,
+           "height": 138
+          },
+          {
+           "url": "https://i.ytimg.com/vi/B-AGO9R8t-A/hqdefault.jpg?sqp=-oaymwEjCNACELwBSFryq4qpAxUIARUAAAAAGAElAADIQj0AgKJDeAE=&rs=AOn4CLAAI5EGLufL_MTyINI3INIo2qt8JQ",
+           "width": 336,
+           "height": 188
+          }
+         ]
+        },
+        "overlays": [
+         {
+          "thumbnailBottomOverlayViewModel": {
+           "badges": [
+            {
+             "thumbnailBadgeViewModel": {
+              "text": "4:02",
+              "badgeStyle": "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT",
+              "animationActivationTargetId": "B-AGO9R8t-A",
+              "animationActivationEntityKey": "Eh8veW91dHViZS9hcHAvd2F0Y2gvcGxheWVyX3N0YXRlIMMCKAE%3D",
+              "lottieData": {
+               "url": "https://www.gstatic.com/youtube/img/lottie/audio_indicator/audio_indicator_v2.json",
+               "settings": {
+                "loop": true,
+                "autoplay": true
+               }
+              },
+              "animatedText": "Now playing",
+              "animationActivationEntitySelectorType": "THUMBNAIL_BADGE_ANIMATION_ENTITY_SELECTOR_TYPE_PLAYER_STATE"
+             }
+            }
+           ]
+          }
+         },
+         {
+          "thumbnailHoverOverlayToggleActionsViewModel": {
+           "buttons": [
+            {
+             "toggleButtonViewModel": {
+              "defaultButtonViewModel": {
+               "buttonViewModel": {
+                "iconName": "WATCH_LATER",
+                "accessibilityText": "Watch later",
+                "style": "BUTTON_VIEW_MODEL_STYLE_OVERLAY_DARK",
+                "type": "BUTTON_VIEW_MODEL_TYPE_TONAL",
+                "buttonSize": "BUTTON_VIEW_MODEL_SIZE_COMPACT",
+                "state": "BUTTON_VIEW_MODEL_STATE_ACTIVE"
+               }
+              },
+              "toggledButtonViewModel": {
+               "buttonViewModel": {
+                "iconName": "CHECK",
+                "accessibilityText": "Added",
+                "style": "BUTTON_VIEW_MODEL_STYLE_OVERLAY_DARK",
+                "type": "BUTTON_VIEW_MODEL_TYPE_TONAL",
+                "buttonSize": "BUTTON_VIEW_MODEL_SIZE_COMPACT",
+                "state": "BUTTON_VIEW_MODEL_STATE_ACTIVE"
+               }
+              },
+              "isToggled": false
+             }
+            },
+            {
+             "toggleButtonViewModel": {
+              "defaultButtonViewModel": {
+               "buttonViewModel": {
+                "iconName": "ADD_TO_QUEUE_TAIL",
+                "accessibilityText": "Add to queue",
+                "style": "BUTTON_VIEW_MODEL_STYLE_OVERLAY_DARK",
+                "type": "BUTTON_VIEW_MODEL_TYPE_TONAL",
+                "buttonSize": "BUTTON_VIEW_MODEL_SIZE_COMPACT",
+                "state": "BUTTON_VIEW_MODEL_STATE_ACTIVE"
+               }
+              },
+              "toggledButtonViewModel": {
+               "buttonViewModel": {
+                "iconName": "CHECK",
+                "accessibilityText": "Added",
+                "style": "BUTTON_VIEW_MODEL_STYLE_OVERLAY_DARK",
+                "type": "BUTTON_VIEW_MODEL_TYPE_TONAL",
+                "buttonSize": "BUTTON_VIEW_MODEL_SIZE_COMPACT",
+                "state": "BUTTON_VIEW_MODEL_STATE_ACTIVE"
+               }
+              },
+              "isToggled": false
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "lockupMetadataViewModel": {
+        "title": {
+         "content": "Новогоднее обращение для спонсоров канала"
+        },
+        "image": {
+         "decoratedAvatarViewModel": {
+          "avatar": {
+           "avatarViewModel": {
+            "image": {
+             "sources": [
+              {
+               "url": "https://yt3.ggpht.com/ytc/AIdro_nMah7yP3VsY2niLkXQjc_PXmhlOy6LEFWe1voFpvs9ruA=s68-c-k-c0x00ffffff-no-rj",
+               "width": 68,
+               "height": 68
+              }
+             ]
+            },
+            "avatarImageSize": "AVATAR_SIZE_M"
+           }
+          },
+          "a11yLabel": "Go to channel varlamov"
+         }
+        },
+        "metadata": {
+         "contentMetadataViewModel": {
+          "metadataRows": [
+           {
+            "metadataParts": [
+             {
+              "text": {
+               "content": "varlamov",
+               "attachmentRuns": [
+                {
+                 "startIndex": 8,
+                 "length": 0,
+                 "element": {
+                  "type": {
+                   "imageType": {
+                    "image": {
+                     "sources": [
+                      {
+                       "clientResource": {
+                        "imageName": "CHECK_CIRCLE_FILLED"
+                       },
+                       "width": 14,
+                       "height": 14
+                      }
+                     ]
+                    }
+                   }
+                  },
+                  "properties": {
+                   "layoutProperties": {
+                    "height": {
+                     "value": 14,
+                     "unit": "DIMENSION_UNIT_POINT"
+                    },
+                    "width": {
+                     "value": 14,
+                     "unit": "DIMENSION_UNIT_POINT"
+                    },
+                    "margin": {
+                     "left": {
+                      "value": 4,
+                      "unit": "DIMENSION_UNIT_POINT"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 "alignment": "ALIGNMENT_VERTICAL_CENTER"
+                }
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "metadataParts": [
+             {
+              "text": {
+               "content": "10 months ago"
+              },
+              "accessibilityLabel": "10 months ago"
+             }
+            ]
+           },
+           {
+            "badges": [
+             {
+              "badgeViewModel": {
+               "badgeText": "Members only",
+               "badgeStyle": "BADGE_MEMBERS_ONLY",
+               "iconName": "SPONSORSHIP_STAR"
+              }
+             }
+            ]
+           }
+          ],
+          "delimiter": " • "
+         }
+        },
+        "menuButton": {
+         "buttonViewModel": {
+          "iconName": "MORE_VERT",
+          "accessibilityText": "More actions",
+          "style": "BUTTON_VIEW_MODEL_STYLE_MONO",
+          "type": "BUTTON_VIEW_MODEL_TYPE_TEXT",
+          "buttonSize": "BUTTON_VIEW_MODEL_SIZE_DEFAULT",
+          "state": "BUTTON_VIEW_MODEL_STATE_ACTIVE"
+         }
+        }
+       }
+      },
+      "contentId": "B-AGO9R8t-A",
+      "contentType": "LOCKUP_CONTENT_TYPE_VIDEO"
+     }
+    },
+    {
+     "videoRenderer": {
+      "videoId": "membersOld1",
+      "title": {
+       "runs": [
+        {
+         "text": "Old renderer, members only"
+        }
+       ]
+      },
+      "ownerText": {
+       "runs": [
+        {
+         "text": "varlamov"
+        }
+       ]
+      },
+      "lengthText": {
+       "simpleText": "4:01"
+      },
+      "thumbnail": {
+       "thumbnails": [
+        {
+         "url": "https://i.ytimg.com/vi/membersOld1/hq720.jpg",
+         "width": 720,
+         "height": 404
+        }
+       ]
+      },
+      "badges": [
+       {
+        "metadataBadgeRenderer": {
+         "style": "BADGE_STYLE_TYPE_MEMBERS_ONLY",
+         "label": "Members only"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "videoRenderer": {
+      "videoId": "publicVideo1",
+      "title": {
+       "runs": [
+        {
+         "text": "Old renderer, for everyone"
+        }
+       ]
+      },
+      "ownerText": {
+       "runs": [
+        {
+         "text": "varlamov"
+        }
+       ]
+      },
+      "lengthText": {
+       "simpleText": "4:01"
+      },
+      "thumbnail": {
+       "thumbnails": [
+        {
+         "url": "https://i.ytimg.com/vi/publicVideo1/hq720.jpg",
+         "width": 720,
+         "height": 404
+        }
+       ]
+      }
+     }
+    }
+   ]
+  }
+ }
+}

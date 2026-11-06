@@ -1,5 +1,6 @@
 package dev.wahha.wtube.data
 
+import org.schabi.newpipe.extractor.stream.ContentAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -294,6 +295,7 @@ object YouTube {
                 isLive = streamType.isLive() || liveWithoutDuration && duration < 0 && streamType == StreamType.VIDEO_STREAM &&
                     uploadDate?.offsetDateTime()?.isAfter(java.time.OffsetDateTime.now()) != true,
                 uploadedAt = uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli(),
+                membersOnly = contentAvailability == ContentAvailability.MEMBERSHIP,
             )
         }
         // A row YouTube sent without its title is not worth showing.

@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.video
 
+import dev.wahha.wtube.ui.components.MembersBadge
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Size
@@ -180,6 +181,8 @@ fun VideoPlayer(
     showControls: Boolean = true,
     // The video could not be opened at all (the page shows why): nothing is loading, so no spinner.
     loadFailed: Boolean = false,
+    // YouTube refused the video to non-members: nothing to control, only the reason and the way out.
+    membersOnly: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val settings by Settings.current.collectAsStateWithLifecycle()
@@ -498,6 +501,19 @@ fun VideoPlayer(
                 onClose = { statsOpen = false },
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 48.dp).fillMaxWidth(0.75f),
             )
+        }
+
+        if (membersOnly && roomy) {
+            Box(Modifier.fillMaxSize().background(colors.scrim.copy(alpha = 0.45f))) {
+                IconButton(onClick = onCollapse, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
+                    Icon(
+                        WIcons.ExpandMore,
+                        contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_collapse),
+                        tint = colors.onSurface,
+                    )
+                }
+                MembersBadge(Modifier.align(Alignment.Center))
+            }
         }
 
         // A mini player has no room for the message; a retry button is all it needs.

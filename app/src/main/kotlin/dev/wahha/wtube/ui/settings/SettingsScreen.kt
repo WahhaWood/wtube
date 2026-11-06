@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.settings
 
+import dev.wahha.wtube.data.MembersOnly
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -285,6 +286,9 @@ fun SettingsScreen() {
             SwitchRow(stringResource(R.string.settings_hide_watched), stringResource(R.string.settings_hide_watched_summary), settings.hideWatched, Settings.HideWatched)
         }
         item {
+            ValueRow(stringResource(R.string.settings_members_only), stringResource(MembersOnlyNames.getValue(settings.membersOnly))) { sheet = SettingsSheet.MembersOnly }
+        }
+        item {
             val summary = if (hidden.channels.isEmpty() && hidden.videos.isEmpty()) {
                 stringResource(R.string.settings_hidden_none)
             } else {
@@ -391,6 +395,14 @@ fun SettingsScreen() {
             dismiss,
         )
         SettingsSheet.SponsorCategories -> SponsorCategoriesSheet(settings.sponsorCategories, dismiss)
+        SettingsSheet.MembersOnly -> ChoiceSheet(
+            stringResource(R.string.settings_members_only),
+            MembersOnly.Choices,
+            settings.membersOnly,
+            { stringResource(MembersOnlyNames.getValue(it)) },
+            Settings.MembersOnlyFilter,
+            dismiss,
+        )
         SettingsSheet.Hidden -> HiddenSheet(hidden, dismiss)
         SettingsSheet.Font ->
             ChoiceSheet(stringResource(R.string.settings_font), FontNames.indices.toList(), settings.font, { stringResource(FontNames[it]) }, Settings.Font, dismiss)
@@ -434,7 +446,7 @@ private fun qualityLabel(maxQuality: Int): String =
     if (maxQuality == 0) stringResource(R.string.settings_quality_auto) else stringResource(R.string.settings_quality_max, maxQuality)
 
 private enum class SettingsSheet {
-    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, Font, TextSize, Hidden,
+    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, MembersOnly, Font, TextSize, Hidden,
 }
 
 // In the order of the theme's font families and text scales.
@@ -447,6 +459,12 @@ private val GestureSensitivityNames = listOf(
     R.string.settings_gesture_sensitivity_low,
     R.string.settings_gesture_sensitivity_normal,
     R.string.settings_gesture_sensitivity_high,
+)
+
+private val MembersOnlyNames = mapOf(
+    MembersOnly.SHOW to R.string.settings_members_only_show,
+    MembersOnly.HIDE_RECOMMENDED to R.string.settings_members_only_hide_recommended,
+    MembersOnly.HIDE_FEEDS to R.string.settings_members_only_hide_feeds,
 )
 
 private fun gestureSidesName(swapped: Boolean) =

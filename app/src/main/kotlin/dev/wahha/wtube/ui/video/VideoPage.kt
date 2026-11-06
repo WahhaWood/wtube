@@ -1,5 +1,7 @@
 package dev.wahha.wtube.ui.video
 
+import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.innertube.WatchVideo
 import dev.wahha.wtube.data.ErrorLog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.imePadding
@@ -214,6 +216,10 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
 
     private var job: Job? = null
     private var watch: Deferred<Watch?>? = null
+
+    /** What the watch page says of a video YouTube refused to non-members; null until it answers. */
+    var membersOnly by mutableStateOf<WatchVideo?>(null)
+        private set
     // The rating YouTube reported, to move the like count by what changed here.
     private var ratedBefore = LikeStatus.INDIFFERENT
 
@@ -250,6 +256,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
     fun load() {
         val id = id ?: return
         error = null
+        membersOnly = null
         streamsReady = null
         job?.cancel()
         job = viewModelScope.launch {
@@ -286,6 +293,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
                 throw e
             } catch (e: Exception) {
                 error = e
+                if (MembersOnly.refused(e)) membersOnly = watch?.await()?.video
             }
         }
     }
@@ -441,6 +449,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         id = null
         details = null
         error = null
+        membersOnly = null
         comments = null
         state = null
         commentBox = null
@@ -470,6 +479,7 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
                 ChatContent(chat, onClose = { vm.chatOpen = false }, modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding())
             }
             details != null && comments != null -> Details(vm, details, comments, onSeek)
+            error != null && MembersOnly.refused(error) -> MembersOnlyPage(vm.id.orEmpty(), vm.membersOnly)
             error != null -> ErrorState(error, vm::load)
             else -> FeedSkeleton(Modifier.padding(top = 16.dp), compact = true)
         }
@@ -528,6 +538,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
     val ours = downloads.filter { it.video.id == video.id }
     val queue by PlayQueue.items.collectAsStateWithLifecycle()
     val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val settings by Settings.current.collectAsStateWithLifecycle()
     if (commentsOpen) CommentsSheet(vm, comments, onLink, onDismiss = { commentsOpen = false })
     if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     if (queueOpen) QueueSheet(onDismiss = { queueOpen = false })
@@ -617,7 +628,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
         }
         item(key = "comments") { CommentsPreview(comments, onOpen = { commentsOpen = true }) }
         item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
-        items(details.related.filter(hidden::allows), key = { "related_" + it.url }) { ItemView(it, recommended = true) }
+        items(details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
     }
 }
 

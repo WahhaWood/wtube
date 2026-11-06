@@ -1,5 +1,16 @@
 package dev.wahha.wtube.ui.channel
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import dev.wahha.wtube.data.VideoItem
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.LocalContentColor
+import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.ui.components.openInYouTube
+import dev.wahha.wtube.ui.icon.Star
 import dev.wahha.wtube.ui.glass.CapsuleShape
 import java.util.Date
 import java.time.ZoneId
@@ -90,7 +101,7 @@ import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 
 /** What the channel page shows under its header: one of the extractor's tabs, the search, or About. */
-enum class ChannelSection { TAB, SEARCH, ABOUT }
+enum class ChannelSection { TAB, MEMBERS, SEARCH, ABOUT }
 
 class ChannelViewModel(private val url: String) : ViewModel() {
     var details by mutableStateOf<ChannelDetails?>(null)
@@ -106,7 +117,7 @@ class ChannelViewModel(private val url: String) : ViewModel() {
     var extras by mutableStateOf<ChannelExtras?>(null)
         private set
 
-    /** Index into [ChannelExtras.videoSorts]: 0 Latest (the extractor's own list), 1 Popular, 2 Oldest. */
+    /** Index into [ChannelExtras.videoSorts]: 0 is Latest, the extractor's own list. */
     var videoSort by mutableIntStateOf(0)
         private set
 
@@ -127,22 +138,32 @@ class ChannelViewModel(private val url: String) : ViewModel() {
     val list: PagedList<Item>?
         get() = when (section) {
             ChannelSection.ABOUT -> null
+            ChannelSection.MEMBERS -> details?.id?.let { id ->
+                paged("members") { page -> if (page == null) Channels.membersVideos(id) else Feeds.more(page) }
+            }
             ChannelSection.SEARCH -> searched?.let { query ->
                 val id = details?.id ?: return null
                 paged("search:$query") { page -> if (page == null) Channels.search(id, query) else Feeds.more(page) }
             }
             ChannelSection.TAB -> tab?.let { t ->
-                // Latest is the extractor's list; Popular and Oldest come from YouTube's sort chips.
-                val token = extras?.videoSorts?.getOrNull(videoSort)?.takeIf { t.kind == ChannelTabs.VIDEOS && videoSort > 0 }
+                // Latest is the extractor's list; the others come from YouTube's chips.
+                val token = extras?.videoSorts?.getOrNull(videoSort)?.token?.takeIf { t.kind == ChannelTabs.VIDEOS && videoSort > 0 }
                 paged(if (token == null) t.kind else "${t.kind}#$videoSort") { page ->
                     when {
-                        page != null && Feeds.isCursor(page) -> Feeds.more(page)
-                        token != null -> Channels.sortedVideos(token)
+                        page != null && Feeds.isCursor(page) -> Feeds.more(page).ofThisChannel()
+                        token != null -> Channels.sortedVideos(token).ofThisChannel()
                         else -> YouTube.channelTab(t, page)
                     }
                 }
             }
         }
+
+    // A chip's list leaves the channel's name out of its rows, and the row's first part, the views, would
+    // be read as the name; the extractor fills it in only for its own lists.
+    private fun ItemsPage.ofThisChannel(): ItemsPage {
+        val channel = details ?: return this
+        return ItemsPage(items.map { if (it is VideoItem) it.copy(channelName = channel.name, channelUrl = channel.url) else it }, next)
+    }
 
     private fun paged(key: String, load: suspend (Page?) -> ItemsPage): PagedList<Item> =
         lists.getOrPut(key) { PagedList(viewModelScope, Item::url, load).also { it.refresh() } }
@@ -181,6 +202,10 @@ class ChannelViewModel(private val url: String) : ViewModel() {
         videoSort = index
     }
 
+    fun openMembers() {
+        section = ChannelSection.MEMBERS
+    }
+
     fun openSearch() {
         section = ChannelSection.SEARCH
     }
@@ -210,7 +235,13 @@ class ChannelViewModel(private val url: String) : ViewModel() {
     }
 }
 
-private val SortLabels = listOf(R.string.channel_sort_latest, R.string.channel_sort_popular, R.string.channel_sort_oldest)
+// By YouTube's English titles; one that is not here shows as YouTube wrote it.
+private val VideoChipLabels = mapOf(
+    "Latest" to R.string.channel_sort_latest,
+    "Popular" to R.string.channel_sort_popular,
+    "Oldest" to R.string.channel_sort_oldest,
+    "Public" to R.string.channel_sort_public,
+)
 
 private val TabLabels = mapOf(
     ChannelTabs.VIDEOS to R.string.channel_tab_videos,
@@ -224,7 +255,9 @@ fun ChannelScreen(url: String) {
     val details = vm.details
     val list = vm.list
     val listState = rememberLazyListState()
-    LoadMoreEffect(listState) { list?.loadMore() }
+    LoadMoreEffect(listState, loaded = list?.items?.size ?: 0) { list?.loadMore() }
+    val settings by Settings.current.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Box(Modifier.fillMaxSize()) {
         when {
@@ -251,6 +284,14 @@ fun ChannelScreen(url: String) {
                                 label = { Text(stringResource(TabLabels.getValue(t.kind))) },
                             )
                         }
+                        if (vm.extras?.joinable == true) item(key = "members") {
+                            FilterChip(
+                                selected = vm.section == ChannelSection.MEMBERS,
+                                onClick = vm::openMembers,
+                                label = { Text(stringResource(R.string.channel_tab_members)) },
+                                leadingIcon = { Icon(WIcons.Star, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            )
+                        }
                         item(key = "search") {
                             FilterChip(
                                 selected = vm.section == ChannelSection.SEARCH,
@@ -269,17 +310,34 @@ fun ChannelScreen(url: String) {
                     }
                 }
                 val sorts = vm.extras?.videoSorts.orEmpty()
-                if (vm.section == ChannelSection.TAB && vm.tab?.kind == ChannelTabs.VIDEOS && sorts.size == SortLabels.size) {
+                if (vm.section == ChannelSection.TAB && vm.tab?.kind == ChannelTabs.VIDEOS && sorts.size > 1) {
                     item(key = "sorts") {
-                        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SortLabels.forEachIndexed { index, label ->
+                        // Four chips with a channel's memberships: too wide for a phone in a large font.
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            sorts.forEachIndexed { index, chip ->
                                 FilterChip(
                                     selected = vm.videoSort == index,
                                     onClick = { vm.sortVideos(index) },
-                                    label = { Text(stringResource(label)) },
+                                    label = { Text(VideoChipLabels[chip.title]?.let { stringResource(it) } ?: chip.title) },
                                 )
                             }
                         }
+                    }
+                }
+                if (vm.section == ChannelSection.MEMBERS) {
+                    item(key = "members_join") {
+                        FilledTonalButton(
+                            onClick = { openInYouTube(context, MembersOnly.joinUrl(details.url)) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        ) {
+                            Text(stringResource(R.string.members_only_join), color = LocalContentColor.current, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                    if (list != null && list.items.isEmpty() && list.endReached && list.error == null) {
+                        item(key = "members_empty") { MessageState(WIcons.Star, stringResource(R.string.channel_members_empty)) }
                     }
                 }
                 if (vm.section == ChannelSection.SEARCH) {
@@ -301,7 +359,9 @@ fun ChannelScreen(url: String) {
                 }
                 if (list != null) {
                     if (list.initialLoading) item(key = "skeleton") { FeedSkeleton(compact = true) }
-                    items(list.items, key = { it.url }) { ItemView(it, compact = true) }
+                    // The members tab is where the filter sends people for these videos.
+                    val shown = if (vm.section == ChannelSection.MEMBERS) list.items else list.items.filter { MembersOnly.inFeeds(it, settings.membersOnly) }
+                    items(shown, key = { it.url }) { ItemView(it, compact = true) }
                     item(key = "footer") { ListFooter(list.loading && !list.initialLoading, list.error, list::retry) }
                 }
             }

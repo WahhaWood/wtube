@@ -1,5 +1,10 @@
 package dev.wahha.wtube.ui.components
 
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import androidx.core.net.toUri
+import dev.wahha.wtube.MainActivity
+import dev.wahha.wtube.ui.icon.Star
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -209,7 +214,7 @@ fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modif
             Icon(WIcons.MoreVert, contentDescription = stringResource(R.string.item_more), modifier = Modifier.size(20.dp))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
+            if (!video.membersOnly) DropdownMenuItem(
                 text = { Text(stringResource(R.string.queue_play_next)) },
                 leadingIcon = { Icon(WIcons.QueuePlayNext, contentDescription = null) },
                 onClick = {
@@ -222,7 +227,7 @@ fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modif
                     }
                 },
             )
-            DropdownMenuItem(
+            if (!video.membersOnly) DropdownMenuItem(
                 text = { Text(stringResource(R.string.queue_add)) },
                 leadingIcon = { Icon(WIcons.AddToQueue, contentDescription = null) },
                 onClick = {
@@ -263,7 +268,7 @@ fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modif
                     },
                 )
             }
-            if (!video.isLive) {
+            if (!video.isLive && !video.membersOnly) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.downloads_action)) },
                     leadingIcon = { Icon(WIcons.Download, contentDescription = null) },
@@ -303,6 +308,17 @@ fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modif
                 )
             }
         }
+    }
+}
+
+/** Opens a youtube.com [url] outside WTube, which would catch the link itself: in the YouTube app, else whatever else takes it. */
+fun openInYouTube(context: Context, url: String) {
+    val view = Intent(Intent.ACTION_VIEW, url.toUri())
+    try {
+        context.startActivity(Intent(view).setPackage("com.google.android.youtube"))
+    } catch (_: ActivityNotFoundException) {
+        val us = arrayOf(ComponentName(context, MainActivity::class.java))
+        context.startActivity(Intent.createChooser(view, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, us))
     }
 }
 
@@ -441,6 +457,7 @@ fun VerifiedBadge() {
 @Composable
 internal fun BoxScope.VideoBadge(video: VideoItem) {
     val colors = MaterialTheme.colorScheme
+    if (video.membersOnly) MembersBadge(Modifier.align(Alignment.TopStart).padding(6.dp))
     val (text, background) = when {
         video.isLive -> stringResource(R.string.live) to colors.error
         video.duration > 0 -> formatDuration(video.duration) to colors.scrim.copy(alpha = 0.75f)
@@ -454,6 +471,20 @@ internal fun BoxScope.VideoBadge(video: VideoItem) {
             .background(background, RoundedCornerShape(6.dp))
             .padding(horizontal = 5.dp, vertical = 1.dp),
     )
+}
+
+/** The star and "Для спонсоров" on a video only the channel's members can watch. */
+@Composable
+fun MembersBadge(modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier.background(colors.primary, RoundedCornerShape(6.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(WIcons.Star, contentDescription = null, modifier = Modifier.size(12.dp), tint = colors.onPrimary)
+        Text(stringResource(R.string.members_only_badge), style = MaterialTheme.typography.bodySmall, color = colors.onPrimary, maxLines = 1)
+    }
 }
 
 @Composable

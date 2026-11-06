@@ -106,7 +106,13 @@ class PagedList<T>(
 
 /** Calls [onLoadMore] when the last visible row is within [threshold] of the end. */
 @Composable
-fun LoadMoreEffect(listState: LazyListState, threshold: Int = 6, onLoadMore: () -> Unit) {
+fun LoadMoreEffect(
+    listState: LazyListState,
+    threshold: Int = 6,
+    // Items loaded so far, for a screen that filters them: a page it hides whole leaves the list the same size.
+    loaded: Int = 0,
+    onLoadMore: () -> Unit,
+) {
     val nearEnd by remember(listState) {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -117,9 +123,10 @@ fun LoadMoreEffect(listState: LazyListState, threshold: Int = 6, onLoadMore: () 
     val total by remember(listState) { derivedStateOf { listState.layoutInfo.totalItemsCount } }
     // The list behind the same state can change (a channel tab or sort): always page the current one.
     val loadMore by rememberUpdatedState(onLoadMore)
+    val loadedNow by rememberUpdatedState(loaded)
     LaunchedEffect(listState) {
         // Keyed on the size too: a page that leaves the list still near its end must load the next one.
-        snapshotFlow { nearEnd to total }.filter { it.first }.collect { loadMore() }
+        snapshotFlow { Triple(nearEnd, total, loadedNow) }.filter { it.first }.collect { loadMore() }
     }
 }
 

@@ -1,5 +1,8 @@
 package dev.wahha.wtube
 
+import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.innertube.WatchVideo
+import org.schabi.newpipe.extractor.exceptions.PaidContentException
 import dev.wahha.wtube.data.Comment
 import dev.wahha.wtube.data.PageOf
 import dev.wahha.wtube.data.VideoDetails
@@ -33,6 +36,7 @@ class VideoViewModelTest {
     private class FakeSource : VideoSource {
         val fetched = mutableListOf<String>()
         val failing = mutableSetOf<String>()
+        val refused = mutableSetOf<String>()
         var streamsThenWait: CompletableDeferred<Unit>? = null
 
         override suspend fun video(id: String, onStreams: () -> Unit): VideoDetails {
@@ -42,11 +46,12 @@ class VideoViewModelTest {
                 it.await()
             }
             if (id in failing) throw IOException("offline")
+            if (id in refused) throw PaidContentException("This video is only available for members of the channel of this video")
             val item = VideoItem(id, "title $id", null, "c", null, null, duration = 60, views = 1, uploaded = null, isLive = false)
             return VideoDetails(item, "", likes = 1, subscribers = 1, uploadedAt = null, related = emptyList(), chapters = emptyList(), storyboard = emptyList())
         }
 
-        override suspend fun watch(id: String) = Watch(state = null, commentsToken = null)
+        override suspend fun watch(id: String) = Watch(state = null, commentsToken = null, video = WatchVideo("title $id", "c", "https://www.youtube.com/channel/UCx"))
         override suspend fun comments(id: String, page: Page?) = PageOf<Comment>(emptyList(), null)
         override suspend fun dislikes(id: String) = 5L
     }
@@ -62,6 +67,28 @@ class VideoViewModelTest {
         assertTrue(vm.playPending)
         assertEquals(5L, vm.dislikes)
         assertNotNull(vm.comments)
+    }
+
+    @Test
+    fun aRefusedVideoGetsItsNameFromTheWatchPage() {
+        source.refused += "a"
+        vm.open("a")
+        assertTrue(MembersOnly.refused(vm.error!!))
+        assertEquals("title a", vm.membersOnly?.title)
+        assertNull(vm.details)
+
+        // The next video starts clean.
+        vm.open("b")
+        assertNull(vm.error)
+        assertNull(vm.membersOnly)
+    }
+
+    @Test
+    fun anOrdinaryFailureIsNotARefusal() {
+        source.failing += "a"
+        vm.open("a")
+        assertFalse(MembersOnly.refused(vm.error!!))
+        assertNull(vm.membersOnly)
     }
 
     @Test

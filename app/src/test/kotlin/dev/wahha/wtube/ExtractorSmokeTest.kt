@@ -1,5 +1,6 @@
 package dev.wahha.wtube
 
+import dev.wahha.wtube.data.MembersOnly
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.Transcript
 import dev.wahha.wtube.data.ChannelItem
@@ -188,7 +189,7 @@ class ExtractorSmokeTest {
         val channel = "UCSJ4gkVC6NrvII8umztf0Ow"
         val extras = Channels.extras(channel)
         assertEquals(3, extras.videoSorts.size)
-        val popular = Channels.sortedVideos(extras.videoSorts[1]).items.filterIsInstance<VideoItem>()
+        val popular = Channels.sortedVideos(extras.videoSorts[1].token).items.filterIsInstance<VideoItem>()
         val found = Channels.search(channel, "study").items.filterIsInstance<VideoItem>()
         val about = Channels.about(extras.aboutToken!!)
         println("channel: popular ${popular.size}, search ${found.size}, about videos ${about?.videos}, joined ${about?.joined}")
@@ -282,5 +283,27 @@ class ExtractorSmokeTest {
         assertTrue(channels.any { it is ChannelItem })
         val playlists = YouTube.search("lofi", YoutubeSearchQueryHandlerFactory.PLAYLISTS).items
         assertTrue(playlists.any { it is PlaylistItem })
+    }
+
+    // A channel with paid memberships: its automatic list is read without an account, marks its videos and
+    // the extractor refuses them as members-only. Nothing to check if the channel took them all down.
+    @Test
+    fun membersOnlyVideosAreMarkedAndRefused() = runBlocking {
+        val channel = "UC101o-vQ2iOj9vr00JUlyKw"
+        val extras = Channels.extras(channel)
+        assertTrue(extras.joinable)
+        assertEquals(listOf("Latest", "Popular", "Oldest", "Public"), extras.videoSorts.map { it.title })
+        // YouTube still obeys the sorts it offers no chip for here.
+        val popular = Channels.sortedVideos(extras.videoSorts[1].token).items.filterIsInstance<VideoItem>()
+        assertTrue(popular.size > 1 && popular.zipWithNext().all { (a, b) -> a.views >= b.views })
+        val oldest = Channels.sortedVideos(extras.videoSorts[2].token).items.filterIsInstance<VideoItem>()
+        val newest = Channels.sortedVideos(extras.videoSorts[0].token).items.filterIsInstance<VideoItem>()
+        assertTrue(oldest.isNotEmpty() && oldest.first().uploadedAt!! < newest.first().uploadedAt!!)
+        val video = Channels.membersVideos(channel).items.filterIsInstance<VideoItem>().firstOrNull()
+            ?: throw AssumptionViolatedException("No members-only videos on the channel any more")
+        assertTrue(video.membersOnly)
+        val refusal = runCatching { YouTube.video(video.id) }.exceptionOrNull()
+        assertTrue("Got $refusal", refusal != null && MembersOnly.refused(refusal))
+        assertEquals("varlamov", Actions.watch(video.id, null).video?.channelName)
     }
 }

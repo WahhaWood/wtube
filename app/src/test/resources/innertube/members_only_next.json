@@ -1,0 +1,62 @@
+{
+ "contents": {
+  "twoColumnWatchNextResults": {
+   "results": {
+    "results": {
+     "contents": [
+      {
+       "videoPrimaryInfoRenderer": {
+        "title": {
+         "runs": [
+          {
+           "text": "Новогоднее обращение для спонсоров канала"
+          }
+         ]
+        },
+        "badges": [
+         {
+          "metadataBadgeRenderer": {
+           "icon": {
+            "iconType": "SPONSORSHIP_STAR"
+           },
+           "style": "BADGE_STYLE_TYPE_MEMBERS_ONLY",
+           "label": "Members only",
+           "iconSourceUrl": "https://www.youtube.com/img/sponsorships/sponsors_default_badge.png"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "videoSecondaryInfoRenderer": {
+        "owner": {
+         "videoOwnerRenderer": {
+          "title": {
+           "runs": [
+            {
+             "text": "varlamov",
+             "navigationEndpoint": {
+              "browseEndpoint": {
+               "browseId": "UC101o-vQ2iOj9vr00JUlyKw",
+               "canonicalBaseUrl": "/@varlamov"
+              }
+             }
+            }
+           ]
+          },
+          "navigationEndpoint": {
+           "browseEndpoint": {
+            "browseId": "UC101o-vQ2iOj9vr00JUlyKw",
+            "canonicalBaseUrl": "/@varlamov"
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

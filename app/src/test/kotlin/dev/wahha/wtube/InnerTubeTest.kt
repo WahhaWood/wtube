@@ -204,7 +204,7 @@ class InnerTubeTest {
     fun channelVideosOfferSortsAndAbout() {
         val page = fixture("channel_videos.json")
         val extras = Channels.extras(page)
-        assertEquals(3, extras.videoSorts.size)
+        assertEquals(listOf("Latest", "Popular", "Oldest"), extras.videoSorts.map { it.title })
         assertNotNull(extras.aboutToken)
         assertEquals(3, FeedParser.page(page, timeAgo).items.toItems().filterIsInstance<VideoItem>().size)
     }

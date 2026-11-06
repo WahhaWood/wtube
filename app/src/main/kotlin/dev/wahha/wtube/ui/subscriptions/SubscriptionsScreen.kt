@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.subscriptions
 
+import dev.wahha.wtube.data.MembersOnly
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -122,7 +123,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
     LaunchedEffect(session) { vm.sync(session) }
     val videos = vm.videos
     val listState = rememberLazyListState()
-    LoadMoreEffect(listState) { videos.loadMore() }
+    LoadMoreEffect(listState, loaded = videos.items.size) { videos.loadMore() }
     TabResetEffect { listState.animateScrollToItem(0) }
     val active = session?.expired == false
     val settings by Settings.current.collectAsStateWithLifecycle()
@@ -167,7 +168,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
                             MessageState(WIcons.Subscriptions, stringResource(R.string.subscriptions_empty))
                         }
                         else -> {
-                            items(videos.items.filter { it !is VideoItem || it.id !in finished }, key = { it.url }) { ItemView(it) }
+                            items(videos.items.filter { (it !is VideoItem || it.id !in finished) && MembersOnly.inFeeds(it, settings.membersOnly) }, key = { it.url }) { ItemView(it) }
                             item(key = "footer") { ListFooter(videos.loading, videos.error, videos::retry) }
                         }
                     }

@@ -61,4 +61,22 @@ class LoadMoreTest {
         compose.runOnIdle { count = 12 }
         compose.runOnIdle { assertEquals(2, calls) }
     }
+
+    // A screen's filter can hide a whole page: the list keeps its size, and the next page must still load.
+    @Test
+    fun pageHiddenWholeLoadsTheNextOne() {
+        var calls = 0
+        var loaded by mutableStateOf(10)
+        val state = LazyListState()
+        compose.setContent {
+            LazyColumn(Modifier.height(200.dp).testTag("list"), state = state) {
+                items(10) { Text("item $it", Modifier.height(40.dp)) }
+            }
+            LoadMoreEffect(state, loaded = loaded) { calls++ }
+        }
+        compose.onNodeWithTag("list").performScrollToIndex(9)
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.runOnIdle { loaded = 20 }
+        compose.runOnIdle { assertEquals(2, calls) }
+    }
 }

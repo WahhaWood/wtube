@@ -58,6 +58,8 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** Leave videos played to their end out of the subscriptions feed. */
     val hideWatched: Boolean = false,
+    /** One of [MembersOnly.Choices]: how far members-only videos are left out of lists. */
+    val membersOnly: Int = MembersOnly.SHOW,
     /** Tint the player page and mini player with the current video's cover. */
     val coverAccent: Boolean = true,
     /** Community titles from DeArrow instead of clickbait on the video page. */
@@ -109,6 +111,7 @@ object Settings {
     val TextSize = intPreferencesKey("text_size")
     val PureBlack = booleanPreferencesKey("pure_black")
     val HideWatched = booleanPreferencesKey("hide_watched")
+    val MembersOnlyFilter = intPreferencesKey("members_only")
     val CoverAccent = booleanPreferencesKey("cover_accent")
     val UpdateCheck = booleanPreferencesKey("update_check")
     val DeArrowOn = booleanPreferencesKey("dearrow")
@@ -194,6 +197,7 @@ object Settings {
         this[TextSize] = settings.textSize
         this[PureBlack] = settings.pureBlack
         this[HideWatched] = settings.hideWatched
+        this[MembersOnlyFilter] = settings.membersOnly
         this[CoverAccent] = settings.coverAccent
         this[UpdateCheck] = settings.updateCheck
         this[DeArrowOn] = settings.deArrow
@@ -234,6 +238,7 @@ object Settings {
             textSize = this[TextSize] ?: defaults.textSize,
             pureBlack = this[PureBlack] ?: defaults.pureBlack,
             hideWatched = this[HideWatched] ?: defaults.hideWatched,
+            membersOnly = (this[MembersOnlyFilter] ?: defaults.membersOnly).coerceIn(MembersOnly.Choices.first(), MembersOnly.Choices.last()),
             coverAccent = this[CoverAccent] ?: defaults.coverAccent,
             updateCheck = this[UpdateCheck] ?: defaults.updateCheck,
             deArrow = this[DeArrowOn] ?: defaults.deArrow,

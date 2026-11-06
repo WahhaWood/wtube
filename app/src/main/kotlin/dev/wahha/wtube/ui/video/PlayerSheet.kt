@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.video
 
+import dev.wahha.wtube.data.MembersOnly
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
@@ -256,6 +257,8 @@ fun PlayerSheet(
     val state = LocalPlayerState.current
     val details = vm.details
     val colors = MaterialTheme.colorScheme
+    // YouTube's own picture of a video it refused: there is no stream to take one from.
+    val membersOnlyCover = vm.id?.takeIf { vm.error?.let(MembersOnly::refused) == true }?.let { "https://i.ytimg.com/vi/$it/hqdefault.jpg" }
 
     // Hand the video to the player once its stream info is cached (the session reads it from there), which
     // may be ahead of the page; the history takes the page.
@@ -452,9 +455,9 @@ fun PlayerSheet(
                             VideoPlayer(
                                 player = player,
                                 state = state,
-                                title = details?.item?.title,
-                                channel = details?.item?.channelName,
-                                thumbnail = details?.item?.thumbnail ?: state.metadata.artworkUri?.toString(),
+                                title = details?.item?.title ?: vm.membersOnly?.title,
+                                channel = details?.item?.channelName ?: vm.membersOnly?.channelName,
+                                thumbnail = details?.item?.thumbnail ?: membersOnlyCover ?: state.metadata.artworkUri?.toString(),
                                 storyboard = details?.storyboard.orEmpty(),
                                 chapters = details?.chapters.orEmpty(),
                                 heatmap = vm.heatmap,
@@ -468,7 +471,8 @@ fun PlayerSheet(
                                 },
                                 onNext = vm::playNext.takeIf { vm.hasNext },
                                 modifier = videoModifier,
-                                showControls = controlsShown && !inPictureInPicture && panel != FullscreenPanel.MoreVideos,
+                                showControls = controlsShown && !inPictureInPicture && panel != FullscreenPanel.MoreVideos && membersOnlyCover == null,
+                                membersOnly = membersOnlyCover != null,
                                 loadFailed = vm.error != null,
                                 fullscreenActions = { FullscreenActions(vm, onPanel = { panel = it }) },
                             )
@@ -503,9 +507,10 @@ fun PlayerSheet(
                         MiniPlayerContent(
                             player = player,
                             state = state,
-                            title = details?.item?.title ?: state.metadata.title?.toString().orEmpty(),
-                            author = details?.item?.channelName ?: state.metadata.artist?.toString().orEmpty(),
+                            title = details?.item?.title ?: vm.membersOnly?.title ?: state.metadata.title?.toString().orEmpty(),
+                            author = details?.item?.channelName ?: vm.membersOnly?.channelName ?: state.metadata.artist?.toString().orEmpty(),
                             onClose = onClose,
+                            canPlay = membersOnlyCover == null,
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = miniAlpha(progress()) }.testTag("mini_player"),
                         )
                     }

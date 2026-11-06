@@ -1,5 +1,7 @@
 package dev.wahha.wtube.ui.home
 
+import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.ErrorLog
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
@@ -135,11 +137,12 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val accountLoaded by Account.loaded.collectAsStateWithLifecycle()
     val session by Account.session.collectAsStateWithLifecycle()
     val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val settings by Settings.current.collectAsStateWithLifecycle()
     LaunchedEffect(historyLoaded, accountLoaded, session, entries.isEmpty()) {
         if (historyLoaded && accountLoaded) vm.sync(session, entries.isEmpty())
     }
     val listState = rememberLazyListState()
-    LoadMoreEffect(listState) { feed.loadMore() }
+    LoadMoreEffect(listState, loaded = feed.items.size) { feed.loadMore() }
     TabResetEffect { listState.animateScrollToItem(0) }
 
     PullToRefreshBox(
@@ -170,7 +173,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 vm.hasSource == null || feed.initialLoading -> item(key = "skeleton") { FeedSkeleton() }
                 feed.items.isEmpty() && feed.error != null -> item(key = "error") { ErrorState(feed.error!!, feed::retry) }
                 else -> {
-                    items(feed.items.filter(hidden::allows), key = { it.url }) { ItemView(it, recommended = true) }
+                    items(feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { it.url }) { ItemView(it, recommended = true) }
                     item(key = "footer") { ListFooter(feed.loading, feed.error, feed::retry) }
                 }
             }

@@ -6,9 +6,9 @@ import dev.wahha.wtube.data.VideoItem
 
 /** Which related video "next" and autoplay pick; one rule for the service and the video page. */
 object NextVideo {
-    /** The related videos that may play next: not live, not [currentId], not hidden. */
+    /** The related videos that may play next: not live, not members-only (they cannot play), not [currentId], not hidden. */
     fun candidates(related: List<Item>, currentId: String, hidden: HiddenItems): List<VideoItem> =
-        related.filterIsInstance<VideoItem>().filter { !it.isLive && it.id != currentId && hidden.allows(it) }
+        related.filterIsInstance<VideoItem>().filter { !it.isLive && !it.membersOnly && it.id != currentId && hidden.allows(it) }
 
     /** The first candidate not in [watched]; with [orWatched], else the first one at all. */
     fun pick(candidates: List<VideoItem>, watched: Set<String>, orWatched: Boolean): VideoItem? =
