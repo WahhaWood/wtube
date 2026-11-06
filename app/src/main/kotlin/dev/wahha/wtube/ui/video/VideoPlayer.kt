@@ -531,9 +531,8 @@ fun VideoPlayer(
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val cause = error.cause
                 Text(
-                    stringResource(if (cause != null) errorMessage(cause) else R.string.error_playback),
+                    stringResource(errorMessage(error)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurface,
                     textAlign = TextAlign.Center,

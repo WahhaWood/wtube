@@ -70,14 +70,20 @@ class PlayerConnection(context: Context) {
     }
 
     /** After a playback error: fetch fresh stream URLs and continue from the same spot. */
-    fun retry() {
+    fun retry(play: Boolean = true) {
         val player = player ?: return
         val id = player.currentMediaItem?.mediaId ?: return
         val position = player.currentPosition
         YouTube.forget(id)
         player.setMediaItem(MediaItem.Builder().setMediaId(id).build(), position)
         player.prepare()
-        player.play()
+        player.playWhenReady = play
+    }
+
+    /** Back in the app after playback failed behind it: picks up as [retry] does, and a paused video stays paused. */
+    fun recover() {
+        val player = player ?: return
+        if (player.playerError != null) retry(player.playWhenReady)
     }
 
     fun stop() {

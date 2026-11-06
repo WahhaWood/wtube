@@ -398,6 +398,7 @@
     <string name="error_bot">YouTube временно ограничил просмотр без входа с этого IP</string>
     <string name="error_extractor">YouTube что-то поменял, и данные не разобрались. Поможет обновление NewPipeExtractor.</string>
     <string name="error_playback">Не получилось воспроизвести видео</string>
+    <string name="error_unknown">Что-то пошло не так. Попробуйте ещё раз.</string>
     <string name="error_session">Сессия YouTube истекла. Войдите снова.</string>
     <string name="error_rejected">YouTube не выполнил действие</string>
     <!-- Account actions (0.5) -->

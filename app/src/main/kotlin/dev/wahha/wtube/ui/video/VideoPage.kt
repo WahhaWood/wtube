@@ -2,7 +2,9 @@ package dev.wahha.wtube.ui.video
 
 import dev.wahha.wtube.data.MembersOnly
 import dev.wahha.wtube.data.innertube.WatchVideo
+import dev.wahha.wtube.data.ErrorKind
 import dev.wahha.wtube.data.ErrorLog
+import dev.wahha.wtube.data.errorKind
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -251,6 +253,12 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         chatOpen = false
         comments = PagedList(viewModelScope, Comment::id) { loadComments(id, it) }
         load()
+    }
+
+    /** Back in the app: a page that failed behind it loads again by itself, unless YouTube refused it or asks to slow down. */
+    fun reloadIfFailed() {
+        val failed = error ?: return
+        if (errorKind(failed) !in setOf(ErrorKind.Restricted, ErrorKind.Antibot)) load()
     }
 
     fun load() {

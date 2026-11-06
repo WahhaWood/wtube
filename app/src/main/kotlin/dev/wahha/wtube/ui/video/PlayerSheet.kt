@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.compose.runtime.rememberUpdatedState
@@ -276,6 +277,13 @@ fun PlayerSheet(
     // A video that failed to open must not leave the previous one playing under its error.
     LaunchedEffect(vm.error, player) {
         if (vm.error != null && vm.playPending && player != null && player.currentMediaItem?.mediaId != vm.id) connection.stop()
+    }
+
+    // Links expire and the system takes decoders back while the app is away: coming back must not need a button.
+    LifecycleStartEffect(player) {
+        connection.recover()
+        vm.reloadIfFailed()
+        onStopOrDispose {}
     }
 
     // Orientation we forced with the fullscreen button; null follows the sensor, and a phone turned

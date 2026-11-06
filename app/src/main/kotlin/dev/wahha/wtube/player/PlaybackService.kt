@@ -268,6 +268,8 @@ class PlaybackService : MediaSessionService() {
     private inner class PlayerListener(private val player: Player) : Player.Listener {
         // The video whose links were last refreshed and when, so a link that keeps failing is refreshed only once.
         private var refreshed: Pair<String, Long>? = null
+        // The same for a decoder opened again: one that keeps failing stays on screen instead of looping.
+        private var reopened: Pair<String, Long>? = null
         private var stall: Job? = null
 
         /** Stream links expire after some hours: refetch them once and go on from the same spot, without a button. */
@@ -277,6 +279,10 @@ class PlaybackService : MediaSessionService() {
             val causes = generateSequence(error.cause) { it.cause }.take(4).joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message.orEmpty().take(120)}" }
             ErrorLog.note("[player] ${error.errorCodeName} on $id, route ${Http.route ?: "direct"}: $causes")
             if (error.errorCode in DecoderErrors && dropPickedQuality(id)) return
+            if (error.errorCode in DecoderLost) {
+                reopenDecoder(id)
+                return
+            }
             if (!error.isExpiredLink()) return
             val now = SystemClock.elapsedRealtime()
             refreshed?.let { (lastId, at) -> if (lastId == id && now - at < REFRESH_AGAIN_MS) return }
@@ -298,6 +304,15 @@ class PlaybackService : MediaSessionService() {
                 player.prepare()
                 player.playWhenReady = playWhenReady
             }
+        }
+
+        /** The system takes decoders back from an app in the background, and one can die with its surface: open it again, same spot. */
+        private fun reopenDecoder(id: String) {
+            val now = SystemClock.elapsedRealtime()
+            reopened?.let { (lastId, at) -> if (lastId == id && now - at < REFRESH_AGAIN_MS) return }
+            reopened = id to now
+            ErrorLog.note("[player] reopening the decoder of $id")
+            player.prepare()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -514,6 +529,11 @@ class PlaybackService : MediaSessionService() {
             PlaybackException.ERROR_CODE_DECODING_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        )
+        private val DecoderLost = setOf(
+            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_FAILED,
+            PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
         )
         const val AUTOPLAY_DELAY_MS = 8_000L
         val StatsCommand = SessionCommand("dev.wahha.wtube.STATS", Bundle.EMPTY)

@@ -43,14 +43,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.PlaybackException
+import com.grack.nanojson.JsonParserException
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.account.SessionExpiredException
 import dev.wahha.wtube.data.errorTag
 import dev.wahha.wtube.data.innertube.ActionRejectedException
+import dev.wahha.wtube.data.innertube.InnerTubeFormatException
 import dev.wahha.wtube.data.innertube.InnerTubeHttpException
 import dev.wahha.wtube.ui.icon.Error
 import dev.wahha.wtube.ui.icon.WIcons
 import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException
+import org.schabi.newpipe.extractor.exceptions.ExtractionException
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 import org.schabi.newpipe.extractor.exceptions.GeographicRestrictionException
 import org.schabi.newpipe.extractor.exceptions.PaidContentException
@@ -78,7 +82,13 @@ fun errorMessage(error: Throwable): Int {
             is IOException -> return R.string.error_network
         }
     }
-    return R.string.error_extractor
+    // Only what really failed to parse may blame the extractor: a player or app failure is not cured by updating it.
+    val unparsed = generateSequence(error) { it.cause }.any { it is ExtractionException || it is InnerTubeFormatException || it is JsonParserException }
+    return when {
+        unparsed -> R.string.error_extractor
+        error is PlaybackException -> R.string.error_playback
+        else -> R.string.error_unknown
+    }
 }
 
 /**
