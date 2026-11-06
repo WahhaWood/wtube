@@ -85,6 +85,24 @@ class StreamSelectorTest {
         assertEquals(listOf(401, 399, 394), both.map { it.itag })
     }
 
+    // A phone with hardware VP9 up to 1080p and only software AV1, which claims 4K and then cannot keep up.
+    @Test
+    fun softwareDecoderClaimingMoreDoesNotBeatHardware() {
+        val uhd = listOf(video(401, "av01.0.12M.08", 2160, 60), video(394, "av01.0.00M.08", 144)) +
+            listOf(video(315, "vp9", 2160, 60), video(303, "vp9", 1080, 60), video(278, "vp9", 144))
+        val decodes: (VideoCodec, Int, Int, Int) -> Boolean = { codec, _, height, _ -> codec == VideoCodec.AV1 || height <= 1080 }
+        val picked = selectStreams(uhd, emptyList(), listOf(VideoCodec.VP9, VideoCodec.AVC, VideoCodec.AV1), decodes) { it != VideoCodec.AV1 }.video
+        assertEquals(listOf(315, 303, 278), picked.map { it.itag })
+    }
+
+    // No hardware decoder can play the video at all: software is better than nothing.
+    @Test
+    fun softwareDecoderIsTakenWhenHardwareHasNothing() {
+        val onlyAv1 = listOf(video(401, "av01.0.12M.08", 2160, 60), video(394, "av01.0.00M.08", 144))
+        val picked = selectStreams(onlyAv1, emptyList(), listOf(VideoCodec.VP9, VideoCodec.AVC, VideoCodec.AV1), hardware = { it != VideoCodec.AV1 }).video
+        assertEquals(listOf(401, 394), picked.map { it.itag })
+    }
+
     // Big Buck Bunny 60 fps: AV1 only from 720p60, so a 480p cap on mobile data would get 720p60.
     @Test
     fun skipsACodecWithoutLowQualities() {

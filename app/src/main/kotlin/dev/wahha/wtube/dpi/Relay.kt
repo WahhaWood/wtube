@@ -3,15 +3,20 @@ package dev.wahha.wtube.dpi
 import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
+import java.net.Authenticator
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.PasswordAuthentication
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -29,6 +34,9 @@ data class Backend(val port: Int, val label: String)
  *    next to the first (at once if the first failed), and the first one that gets a byte back wins;
  *  - the pairs that won before are tried first.
  * After the first byte it only copies bytes, so TLS stays between the client and the server.
+ *
+ * Other apps on the phone can reach the port, so a client logs in with a password made up for this relay
+ * ([RelayLogins] gives it to java.net's SOCKS client, which OkHttp connects through).
  */
 class Relay(
     private val resolver: Resolver,
@@ -47,11 +55,17 @@ class Relay(
     private val noted = ConcurrentHashMap.newKeySet<String>()
     private val counters = ConcurrentHashMap<String, IntArray>()
     private val firstByteMs = ArrayList<Long>()
+    private val slots = Semaphore(MAX_CLIENTS)
+    private val password = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+
+    /** Lets clients in without the password: Chromium cannot log in to a SOCKS proxy, and the sign-in WebView goes through it. */
+    @Volatile var anonymous = false
 
     val port: Int get() = server.localPort
     val proxy get() = localSocks(port)
 
     init {
+        RelayLogins.add(port, password)
         pool.execute {
             while (!closed.get()) {
                 val client = try {
@@ -59,13 +73,24 @@ class Relay(
                 } catch (_: IOException) {
                     break
                 }
-                pool.execute { handle(client) }
+                if (!slots.tryAcquire()) {
+                    runCatching { client.close() }
+                    continue
+                }
+                pool.execute {
+                    try {
+                        handle(client)
+                    } finally {
+                        slots.release()
+                    }
+                }
             }
         }
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        RelayLogins.remove(port)
         runCatching { server.close() }
         open.forEach { runCatching { it.close() } }
         pool.shutdownNow()
@@ -103,8 +128,7 @@ class Relay(
             val input = client.getInputStream()
             val output = client.getOutputStream()
             if (input.read() != 5) return
-            repeat(input.read()) { input.read() }
-            output.write(byteArrayOf(5, 0))
+            if (!logIn(input, output)) return
             val head = ByteArray(4)
             readFully(input, head)
             if (head[1].toInt() != 1) {
@@ -117,8 +141,7 @@ class Relay(
                 1 -> address = ByteArray(4).also { readFully(input, it) }
                 4 -> address = ByteArray(16).also { readFully(input, it) }
                 3 -> {
-                    val name = ByteArray(input.read())
-                    readFully(input, name)
+                    val name = readBlock(input)
                     host = String(name, Charsets.US_ASCII)
                     address = name
                 }
@@ -153,6 +176,24 @@ class Relay(
             runCatching { client.close() }
             open -= client
         }
+    }
+
+    /** The rest of the SOCKS5 greeting and, unless [anonymous] lets the client skip it, the RFC 1929 login. */
+    private fun logIn(input: InputStream, output: java.io.OutputStream): Boolean {
+        val methods = readBlock(input)
+        val byPassword = METHOD_PASSWORD in methods
+        if (!byPassword && !(anonymous && METHOD_NONE in methods)) {
+            output.write(byteArrayOf(5, METHOD_REFUSED))
+            return false
+        }
+        output.write(byteArrayOf(5, if (byPassword) METHOD_PASSWORD else METHOD_NONE))
+        if (!byPassword) return true
+        if (input.read() != 1) return false
+        val user = readBlock(input)
+        val given = readBlock(input)
+        val ok = MessageDigest.isEqual(user, USER.toByteArray()) && MessageDigest.isEqual(given, password.toByteArray())
+        output.write(byteArrayOf(1, if (ok) 0 else 1))
+        return ok
     }
 
     /** What the client sends first (a TLS ClientHello), as it comes; empty if it waits for the server to speak. */
@@ -375,6 +416,19 @@ class Relay(
         private const val COPY_BUFFER = 32 * 1024
         private const val QUALITY_WINDOW = 40
         private const val MAX_NOTES = 60
+        /** Clients at a time: the player and image loading stay far below it, a flood of connections does not. */
+        private const val MAX_CLIENTS = 128
+        internal const val USER = "wtube"
+        private const val METHOD_NONE: Byte = 0
+        private const val METHOD_PASSWORD: Byte = 2
+        private const val METHOD_REFUSED: Byte = -1
+
+        /** A length byte and that many bytes, as SOCKS sends its strings. */
+        private fun readBlock(input: InputStream): ByteArray {
+            val size = input.read()
+            if (size < 0) throw IOException("eof")
+            return ByteArray(size).also { readFully(input, it) }
+        }
 
         private fun readFully(input: InputStream, into: ByteArray) {
             var done = 0
@@ -385,4 +439,24 @@ class Relay(
             }
         }
     }
+}
+
+/** The logins of the [Relay]s in this process, for java.net's SOCKS client; nothing for any other server. */
+private object RelayLogins : Authenticator() {
+    private val logins = ConcurrentHashMap<Int, PasswordAuthentication>()
+
+    init {
+        setDefault(this)
+    }
+
+    fun add(port: Int, password: String) {
+        logins[port] = PasswordAuthentication(Relay.USER, password.toCharArray())
+    }
+
+    fun remove(port: Int) {
+        logins.remove(port)
+    }
+
+    override fun getPasswordAuthentication(): PasswordAuthentication? =
+        if (requestingProtocol == "SOCKS5" && requestingSite?.isLoopbackAddress == true) logins[requestingPort] else null
 }

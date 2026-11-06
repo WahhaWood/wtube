@@ -1,5 +1,6 @@
 package dev.wahha.wtube.data
 
+import dev.wahha.wtube.data.innertube.AccountHeaders
 import dev.wahha.wtube.dpi.BypassSelector
 import dev.wahha.wtube.dpi.Dpi
 import dev.wahha.wtube.dpi.isBypassHost
@@ -27,6 +28,7 @@ object Http {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .eventListener(BypassWatch)
+            .addNetworkInterceptor(AccountHeaders())
             .build()
     }
 

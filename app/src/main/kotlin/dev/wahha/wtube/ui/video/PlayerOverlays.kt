@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
@@ -205,7 +206,15 @@ internal fun UpNextOverlay(upcoming: Upcoming, onPlay: () -> Unit, onCancel: () 
                 modifier = Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)),
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.player_up_next_in, seconds), style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                if (seconds > 0) {
+                    Text(stringResource(R.string.player_up_next_in, seconds), style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                } else {
+                    // The countdown is over and the video's streams have not come yet.
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(12.dp), color = colors.primary, strokeWidth = 2.dp)
+                        Text(stringResource(R.string.player_state_buffering), style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                    }
+                }
                 Text(
                     upcoming.video.title,
                     style = MaterialTheme.typography.titleSmall,

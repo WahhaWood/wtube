@@ -47,6 +47,7 @@ import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.account.Account
+import dev.wahha.wtube.player.PlayQueue
 import dev.wahha.wtube.data.account.Identity
 import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.account.SignInException
@@ -180,6 +181,7 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
                 if (clearLocal) {
                     History.clear()
                     SearchHistory.clear()
+                    PlayQueue.clear()
                     Hidden.clear()
                     WatchStats.clear()
                 }

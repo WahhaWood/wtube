@@ -14,6 +14,7 @@ import org.junit.Test
 import java.io.Closeable
 import java.io.InputStream
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.CopyOnWriteArrayList
@@ -87,19 +88,79 @@ class RelayTest {
         return Relay(resolver, { backends }, hedgeMs = hedgeMs, attemptMs = 600, deadlineMs = 3_000).also { closeables += it }
     }
 
-    /** SOCKS5 CONNECT to [host]:443 through [relay] by name, then the hello; returns the socket. */
+    /** To [host]:443 through [relay] by name as OkHttp connects: java.net's SOCKS client, which logs in itself. Then the hello. */
     private fun connect(relay: Relay, host: String = "rr1---sn-test.googlevideo.com"): Socket {
-        val socket = Socket("127.0.0.1", relay.port)
+        val socket = Socket(relay.proxy)
         socket.soTimeout = 5_000
-        val output = socket.getOutputStream()
-        val input = socket.getInputStream()
-        output.write(byteArrayOf(5, 1, 0))
-        input.readNBytes(2)
-        val name = host.toByteArray()
-        output.write(byteArrayOf(5, 1, 0, 3, name.size.toByte()) + name + byteArrayOf(1, 0xBB.toByte()))
-        input.readNBytes(10)
-        output.write("HELLO".toByteArray())
+        socket.connect(InetSocketAddress.createUnresolved(host, 443), 5_000)
+        socket.getOutputStream().write("HELLO".toByteArray())
         return socket
+    }
+
+    /** A raw SOCKS5 greeting offering [methods]; the socket and the server's choice of method. */
+    private fun greet(relay: Relay, vararg methods: Int): Pair<Socket, ByteArray> {
+        val socket = Socket("127.0.0.1", relay.port)
+        socket.soTimeout = 2_000
+        socket.getOutputStream().write(byteArrayOf(5, methods.size.toByte()) + methods.map { it.toByte() })
+        return socket to socket.getInputStream().readNBytes(2)
+    }
+
+    @Test
+    fun aClientWithoutThePasswordIsRefused() {
+        val backend = FakeBackend { true }
+        val (socket, answer) = greet(relay(listOf(Backend(backend.port, "a"))), 0)
+        assertEquals(listOf<Byte>(5, -1), answer.toList())
+        assertEquals(-1, socket.getInputStream().read())
+        assertTrue(backend.asked.isEmpty())
+    }
+
+    @Test
+    fun aWrongPasswordIsRefused() {
+        val backend = FakeBackend { true }
+        val (socket, answer) = greet(relay(listOf(Backend(backend.port, "a"))), 2)
+        assertEquals(listOf<Byte>(5, 2), answer.toList())
+        val login = "wtube".toByteArray()
+        val wrong = "nope".toByteArray()
+        socket.getOutputStream().write(byteArrayOf(1, login.size.toByte()) + login + wrong.size.toByte() + wrong)
+        assertEquals(listOf<Byte>(1, 1), socket.getInputStream().readNBytes(2).toList())
+        assertEquals(-1, socket.getInputStream().read())
+        assertTrue(backend.asked.isEmpty())
+    }
+
+    @Test
+    fun aClientThatLeavesMidGreetingDoesNotTakeTheRelayDown() {
+        val backend = FakeBackend { true }
+        val relay = relay(listOf(Backend(backend.port, "a")))
+        Socket("127.0.0.1", relay.port).use { it.getOutputStream().write(5) }
+        Thread.sleep(50)
+        assertEquals("SH", connect(relay).getInputStream().readText(2))
+    }
+
+    // The sign-in WebView: Chromium offers no login, and gets in only while the sign-in page is open.
+    @Test
+    fun anonymousClientsGetInOnlyWhileAllowed() {
+        val backend = FakeBackend { true }
+        val relay = relay(listOf(Backend(backend.port, "a")))
+        relay.anonymous = true
+        assertEquals(listOf<Byte>(5, 0), greet(relay, 0).second.toList())
+        // Whoever offers both still logs in.
+        assertEquals(listOf<Byte>(5, 2), greet(relay, 0, 2).second.toList())
+        relay.anonymous = false
+        assertEquals(listOf<Byte>(5, -1), greet(relay, 0).second.toList())
+    }
+
+    @Test
+    fun theFloodBeyondTheLimitIsClosedAndAFreedSlotWorksAgain() {
+        val backend = FakeBackend { true }
+        val relay = relay(listOf(Backend(backend.port, "a")))
+        val held = List(128) { Socket("127.0.0.1", relay.port) }
+        closeables += Closeable { held.forEach { it.close() } }
+        val extra = Socket("127.0.0.1", relay.port)
+        extra.soTimeout = 3_000
+        assertEquals(-1, extra.getInputStream().read())
+        held.first().close()
+        Thread.sleep(100)
+        assertEquals("SH", connect(relay).getInputStream().readText(2))
     }
 
     private fun InputStream.readText(n: Int) = String(readNBytes(n))

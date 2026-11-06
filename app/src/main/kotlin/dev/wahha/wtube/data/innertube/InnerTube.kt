@@ -13,9 +13,13 @@ import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.account.SessionExpiredException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
@@ -65,9 +69,10 @@ object InnerTube {
         execute(session, request)
     }
 
-    /** A stats ping of the web player; it answers 204 with no body. */
+    /** A stats ping of the web player; it answers 204 with no body. The URL comes from a page, so it is checked before it is signed. */
     suspend fun ping(session: Session, url: String) = withContext(Dispatchers.IO) {
-        execute(session, Request.Builder().url(url).get().signedBy(session).build())
+        val target = url.toHttpUrlOrNull()?.takeIf(::mayCarryAccount) ?: return@withContext
+        execute(session, Request.Builder().url(target).get().signedBy(session).build())
         Unit
     }
 
@@ -154,6 +159,30 @@ object InnerTube {
         // What the web client and yt-dlp send with a signed-in session.
         header("X-Youtube-Bootstrap-Logged-In", "true")
         session.pageId?.let { header("X-Goog-PageId", it) }
+    }
+}
+
+private val AccountDomains = listOf("youtube.com", "google.com")
+
+/** Whether the account's cookies may go to [url]: over TLS, to YouTube or Google themselves. */
+fun mayCarryAccount(url: HttpUrl): Boolean {
+    val host = url.host.trimEnd('.').lowercase()
+    return url.isHttps && AccountDomains.any { host == it || host.endsWith(".$it") }
+}
+
+/**
+ * Takes the account off every request to any other place. A network interceptor, so it sees each hop:
+ * OkHttp follows a redirect to another host with all headers but `Authorization`, `Cookie` too.
+ */
+class AccountHeaders(private val allowed: (HttpUrl) -> Boolean = ::mayCarryAccount) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        if (allowed(request.url) || Names.none { request.header(it) != null }) return chain.proceed(request)
+        return chain.proceed(request.newBuilder().apply { Names.forEach(::removeHeader) }.build())
+    }
+
+    private companion object {
+        val Names = listOf("Cookie", "Authorization", "X-Goog-AuthUser", "X-Goog-PageId")
     }
 }
 

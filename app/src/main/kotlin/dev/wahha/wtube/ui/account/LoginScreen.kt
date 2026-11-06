@@ -168,8 +168,8 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
                 WebStorage.getInstance().deleteAllData()
                 CookieManager.getInstance().removeAllCookies {
                     // Through the blocking bypass when it runs: the WebView does not use the app's OkHttp.
-                    val proxy = Dpi.webViewProxy()
-                    if (proxy != null && WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+                    val proxy = if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) Dpi.webViewProxy() else null
+                    if (proxy != null) {
                         val config = ProxyConfig.Builder().addProxyRule(proxy).build()
                         ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) { loadUrl(LOGIN_URL) }
                     } else {
@@ -181,6 +181,7 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
     )
     DisposableEffect(Unit) {
         onDispose {
+            Dpi.closeWebViewProxy()
             if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
                 ProxyController.getInstance().clearProxyOverride({}, {})
             }

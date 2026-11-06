@@ -220,6 +220,8 @@ class PlaybackService : MediaSessionService() {
             // Still at the end of the same video: the user may have replayed it or opened another meanwhile.
             if (next != null && player.playbackState == Player.STATE_ENDED && player.currentMediaItem?.mediaId == id) {
                 Autoplay.schedule(next, AUTOPLAY_DELAY_MS)
+                // Ready when the countdown ends, rather than a card stuck on "in 0 s".
+                if (Downloads.finished(next.id, audioOnly = false) == null) YouTube.prefetch(next.id)
             }
         }
     }
@@ -383,6 +385,8 @@ class PlaybackService : MediaSessionService() {
     // the user expects of "closed". Home or the power button keep playing in the background.
     override fun onTaskRemoved(rootIntent: Intent?) {
         session?.player?.saveProgress()
+        PlayQueue.forget()
+        SleepTimer.forget()
         pauseAllPlayersAndStopSelf()
         // The system kills the process right after the task goes, often before onDestroy: release the
         // session now, or its notification stays behind without an app.
@@ -412,7 +416,7 @@ class PlaybackService : MediaSessionService() {
     private suspend fun mediaItem(id: String): MediaItem {
         Downloads.finished(id, audioOnly = false)?.let { return item(it.video, Uri.fromFile(File(it.file))) }
         val details = try {
-            YouTube.earlyItem(id) ?: YouTube.video(id).item
+            YouTube.playableItem(id)
         } catch (e: Exception) {
             val sound = Downloads.finished(id, audioOnly = true) ?: throw e
             return item(sound.video, Uri.fromFile(File(sound.file)))

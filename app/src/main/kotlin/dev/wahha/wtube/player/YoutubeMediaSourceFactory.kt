@@ -92,7 +92,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
                 .createMediaSource(mediaItem.buildUpon().setUri(info.hlsUrl).build())
         }
 
-        val selection = selectStreams(info.videoOnlyStreams, info.audioStreams, codecs, ::deviceDecodes)
+        val selection = selectStreams(info.videoOnlyStreams, info.audioStreams, codecs, ::deviceDecodes, ::hasHardwareDecoder)
         // Into the event file: "why no 4K on my phone" is answered by the decoder's own limits, and the
         // shared logcat often keeps only the last minute.
         val picked = VideoCodec.entries.firstOrNull { it.matches(selection.video.firstOrNull()?.codec) }
@@ -230,6 +230,8 @@ private fun decodersFor(codec: VideoCodec): List<MediaCodecInfo> {
     val decoders = videoDecoders.filter { info -> info.supportedTypes.any { it.equals(codec.mimeType, ignoreCase = true) } }
     return decoders.filter { it.isHardware() }.ifEmpty { decoders }
 }
+
+private fun hasHardwareDecoder(codec: VideoCodec): Boolean = decodersFor(codec).any { it.isHardware() }
 
 private fun decoderNames(codec: VideoCodec): String = decodersFor(codec).joinToString("+") { it.name }.ifEmpty { "none" }
 

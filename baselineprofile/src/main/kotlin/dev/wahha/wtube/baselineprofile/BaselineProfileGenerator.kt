@@ -33,9 +33,9 @@ class BaselineProfileGenerator {
         device.wait(Until.hasObject(By.textContains("просмотров")), TIMEOUT_MS)
         device.pressBack() // the keyboard
 
-        val list = device.findObject(By.scrollable(true))
-        repeat(3) { list.fling(Direction.DOWN) }
-        repeat(3) { list.fling(Direction.UP) }
+        // Found anew each time: Compose replaces the node as the list scrolls.
+        repeat(3) { device.findObject(By.scrollable(true)).fling(Direction.DOWN) }
+        repeat(3) { device.findObject(By.scrollable(true)).fling(Direction.UP) }
 
         device.findObject(By.textContains("просмотров")).click()
         device.wait(Until.hasObject(By.text("Комментарии")), TIMEOUT_MS)

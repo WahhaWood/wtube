@@ -90,6 +90,7 @@ fun SettingsScreen() {
     val availableUpdate by Updates.available.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf<SettingsSheet?>(null) }
     var clearOpen by rememberSaveable { mutableStateOf(false) }
+    var exportOpen by rememberSaveable { mutableStateOf(false) }
     var licensesOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -307,7 +308,7 @@ fun SettingsScreen() {
         item { ValueRow(stringResource(R.string.settings_clear_history), null) { clearOpen = true } }
 
         item { SectionHeader(stringResource(R.string.settings_backup)) }
-        item { ValueRow(stringResource(R.string.settings_backup_export), stringResource(R.string.settings_backup_export_summary)) { exportFile.launch("wtube-backup.json") } }
+        item { ValueRow(stringResource(R.string.settings_backup_export), stringResource(R.string.settings_backup_export_summary)) { exportOpen = true } }
         item { ValueRow(stringResource(R.string.settings_backup_import), stringResource(R.string.settings_backup_import_summary)) { importFile.launch(arrayOf("application/json", "text/*", "application/octet-stream")) } }
 
         item { SectionHeader(stringResource(R.string.settings_about)) }
@@ -411,6 +412,19 @@ fun SettingsScreen() {
         null -> Unit
     }
     if (licensesOpen) LicensesSheet { licensesOpen = false }
+    if (exportOpen) {
+        AlertDialog(
+            onDismissRequest = { exportOpen = false },
+            text = { Text(stringResource(R.string.settings_backup_export_warning)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    exportOpen = false
+                    exportFile.launch("wtube-backup.json")
+                }) { Text(stringResource(R.string.settings_backup_export_confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { exportOpen = false }) { Text(stringResource(R.string.settings_cancel)) } },
+        )
+    }
     if (clearOpen) {
         AlertDialog(
             onDismissRequest = { clearOpen = false },

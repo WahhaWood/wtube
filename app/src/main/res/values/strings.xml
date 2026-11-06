@@ -329,6 +329,8 @@
     <string name="settings_backup_export_summary">Настройки, история просмотра и поиска</string>
     <string name="settings_backup_import">Восстановить из файла</string>
     <string name="settings_backup_import_summary">Заменит текущие настройки и историю</string>
+    <string name="settings_backup_export_warning">В файле будут настройки, история просмотра и поиска, статистика и скрытое. Он не зашифрован: прочитать его сможет любой, у кого он окажется. Вход в аккаунт в файл не попадает.</string>
+    <string name="settings_backup_export_confirm">Сохранить</string>
     <string name="settings_backup_saved">Резервная копия сохранена</string>
     <string name="settings_backup_restored">Восстановлено из файла</string>
     <string name="settings_backup_failed">Не получилось: файл не тот или недоступен</string>
@@ -348,7 +350,7 @@
     <string name="settings_dearrow">DeArrow</string>
     <string name="settings_dearrow_summary">Заголовок видео от сообщества вместо кликбейта (только на странице видео)</string>
     <string name="settings_dislikes">Дизлайки</string>
-    <string name="settings_dislikes_summary">Число дизлайков рядом с лайками (оценка Return YouTube Dislike)</string>
+    <string name="settings_dislikes_summary">Число дизлайков рядом с лайками. Оценка от Return YouTube Dislike: этот сервис видит, какие видео вы открываете</string>
     <string name="downloads_title">Загрузки</string>
     <string name="downloads_action">Скачать</string>
     <string name="downloads_saved">Скачано</string>

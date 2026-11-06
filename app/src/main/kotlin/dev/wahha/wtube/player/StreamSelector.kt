@@ -21,14 +21,16 @@ data class StreamSelection(val video: List<VideoStream>, val audio: List<List<Au
 
 /**
  * Picks streams for the merged manifest. A single codec per adaptation set keeps adaptive switching
- * seamless; [codecPreference] lists codecs the device decodes well, best first, and [decodes] says whether
- * the device plays a codec at a width, height and frame rate.
+ * seamless; [codecPreference] lists codecs the device decodes well, best first, [decodes] says whether
+ * the device plays a codec at a width, height and frame rate, and [hardware] whether it has a hardware
+ * decoder for the codec.
  */
 fun selectStreams(
     videoOnly: List<VideoStream>,
     audio: List<AudioStream>,
     codecPreference: List<VideoCodec>,
     decodes: (VideoCodec, Int, Int, Int) -> Boolean = { _, _, _, _ -> true },
+    hardware: (VideoCodec) -> Boolean = { true },
 ): StreamSelection {
     val usableVideo = videoOnly.filter { it.isPlayableDash() }
     // A codec that reaches down to the lowest quality cap, or the cap has nothing to pick and the player
@@ -40,7 +42,9 @@ fun selectStreams(
     fun best(c: VideoCodec): Int = usableVideo
         .filter { c.matches(it.codec) && it.decodedBy(c, decodes) }
         .maxOfOrNull { it.rank } ?: -1
-    val codec = candidates.maxByOrNull(::best)
+    // A software decoder claims 4K on a phone that cannot keep up with it, so it competes only when no
+    // hardware decoder can play the video at all.
+    val codec = candidates.filter { hardware(it) && best(it) >= 0 }.ifEmpty { candidates }.maxByOrNull(::best)
     val video = if (codec == null) emptyList() else usableVideo
         .filter { codec.matches(it.codec) }
         .distinctBy { it.itag }

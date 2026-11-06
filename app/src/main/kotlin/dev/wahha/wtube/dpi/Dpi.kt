@@ -661,6 +661,10 @@ object Dpi {
         return result
     }
 
+    fun closeWebViewProxy() {
+        relay?.anonymous = false
+    }
+
     /** One line for the shared log. */
     fun describe(): String {
         if (!::app.isInitialized) return "off"
@@ -668,10 +672,11 @@ object Dpi {
         return "${mutableState.value}, presets v${presets.version} (${presets.strategies.size}), route ${Http.route ?: "direct"}"
     }
 
-    /** The proxy for the sign-in WebView, as a Chromium proxy rule; null = direct. */
+    /** The proxy for the sign-in WebView, as a Chromium proxy rule; null = direct. The relay stays open to it until [closeWebViewProxy]. */
     fun webViewProxy(): String? {
         val proxy = Http.route ?: return null
         val address = proxy.address() as? java.net.InetSocketAddress ?: return null
+        relay?.takeIf { it.proxy == proxy }?.anonymous = true
         val scheme = if (proxy.type() == Proxy.Type.HTTP) "http" else "socks5"
         return "$scheme://${address.hostString}:${address.port}"
     }

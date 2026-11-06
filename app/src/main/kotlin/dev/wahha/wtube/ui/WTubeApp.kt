@@ -200,7 +200,10 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
     val player = connection.player
     val playerState = player?.let { rememberPlayerState(it) }
     val settings by Settings.current.collectAsStateWithLifecycle()
-    val glass = GlassSupported && settings.liquidGlass
+    val loginHidden by animateFloatAsState(if (destination.isOn(Login::class)) 1f else 0f, tween(SLIDE_MS))
+    // Glass over a WebView crashes it (native, in its Vulkan draw): the mini player stays flat on the sign-in
+    // page, from the moment it opens until it has slid away.
+    val glass = GlassSupported && settings.liquidGlass && !destination.isOn(Login::class) && loginHidden == 0f
     // Only the capsule records into [glassLayer]; the search button and the mini player read the same sample.
     val glassLayer = rememberGraphicsLayer()
     val luminance = rememberGlassLuminance(glassLayer, enabled = glass)
@@ -313,7 +316,6 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
     }
 
     val sheetOpen = video.id != null
-    val loginHidden by animateFloatAsState(if (destination.isOn(Login::class)) 1f else 0f, tween(SLIDE_MS))
     // The bar steps aside while a list scrolls down and comes back on the way up or on a new page.
     val haptic = LocalHapticFeedback.current
     var barScrolledAway by remember { mutableStateOf(false) }

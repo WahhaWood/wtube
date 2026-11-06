@@ -17,6 +17,10 @@ import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.dpi.Dpi
+import dev.wahha.wtube.player.PlayQueue
+import dev.wahha.wtube.player.SleepTimer
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.os.Build
 import java.io.File
 import java.util.Locale
@@ -33,9 +37,24 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
         SearchHistory.init(this)
         WatchStats.init(this)
         Hidden.init(this)
+        val restore = !closedByHand()
+        PlayQueue.init(this, restore)
+        SleepTimer.init(this, restore)
         Downloads.init(this)
         Account.init(this)
         Dpi.init(this)
+    }
+
+    /**
+     * Whether the user closed the app last time: swiped it from recents or force-stopped it, not the system
+     * killing it. PlaybackService.onTaskRemoved hears of a swipe only while it runs as a started service.
+     */
+    private fun closedByHand(): Boolean {
+        if (Build.VERSION.SDK_INT < 30) return false
+        val last = runCatching { getSystemService(ActivityManager::class.java).getHistoricalProcessExitReasons(null, 0, 0) }
+            .getOrNull()?.firstOrNull { it.processName == packageName } ?: return false
+        // Up to some Android 14 a swipe comes as REASON_OTHER, known only by this description.
+        return last.reason == ApplicationExitInfo.REASON_USER_REQUESTED || last.description?.contains("remove task") == true
     }
 
     private fun processName(): String =
