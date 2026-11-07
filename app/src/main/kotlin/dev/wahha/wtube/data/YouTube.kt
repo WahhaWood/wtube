@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.schabi.newpipe.extractor.Image
+import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
@@ -71,9 +72,14 @@ object YouTube {
     suspend fun recommendations(seeds: List<String>, watched: Set<String>, page: Page? = null): ItemsPage {
         val offset = page?.id?.toIntOrNull() ?: 0
         val batch = seeds.drop(offset).take(SEEDS_PER_PAGE)
-        val related = coroutineScope {
-            batch.map { id -> async { runCatching { video(id).related }.getOrDefault(emptyList()) } }.awaitAll()
+        val results = coroutineScope {
+            batch.map { id -> async { runCatching { video(id).related } } }.awaitAll()
         }
+        // Deleted videos are skipped, but when nothing at all answered that is no network, not an empty feed.
+        if (results.all { it.isFailure }) {
+            results.firstNotNullOfOrNull { r -> r.exceptionOrNull()?.takeUnless { it is ContentNotAvailableException } }?.let { throw it }
+        }
+        val related = results.map { it.getOrDefault(emptyList()) }
         val videos = interleave(related).filterIsInstance<VideoItem>().filter { it.id !in watched }
         val next = offset + batch.size
         return ItemsPage(videos, if (next < seeds.size) Page(RECOMMENDATIONS_CURSOR, next.toString()) else null)
@@ -356,6 +362,7 @@ object YouTube {
                     uploadDate?.offsetDateTime()?.isAfter(java.time.OffsetDateTime.now()) != true,
                 uploadedAt = uploadDate?.offsetDateTime()?.toInstant()?.toEpochMilli(),
                 membersOnly = contentAvailability == ContentAvailability.MEMBERSHIP,
+                upcoming = contentAvailability == ContentAvailability.UPCOMING || uploadDate?.offsetDateTime()?.isAfter(java.time.OffsetDateTime.now()) == true,
             )
         }
         // A row YouTube sent without its title is not worth showing.

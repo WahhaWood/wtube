@@ -166,7 +166,7 @@ class ChannelViewModel(private val url: String) : ViewModel() {
     }
 
     private fun paged(key: String, load: suspend (Page?) -> ItemsPage): PagedList<Item> =
-        lists.getOrPut(key) { PagedList(viewModelScope, Item::url, load).also { it.refresh() } }
+        lists.getOrPut(key) { PagedList(viewModelScope, Item::url, load = load).also { it.refresh() } }
 
     init {
         load()

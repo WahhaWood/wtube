@@ -64,6 +64,10 @@ object WatchProgress {
             result
         }.stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
+    /** The videos that count as watched; changes only when one crosses the line, not with every saved position. */
+    val watched: StateFlow<Set<String>> =
+        fractions.map(Recommendations::watchedIds).distinctUntilChanged().stateIn(scope, SharingStarted.Eagerly, emptySet())
+
     /** Takes in the marks of a list the account loaded; [items] give the videos' lengths. */
     fun record(marks: Map<String, ResumeMark>, items: List<Item>) {
         if (marks.isEmpty()) return

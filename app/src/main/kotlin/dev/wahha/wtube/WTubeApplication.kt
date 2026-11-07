@@ -13,12 +13,14 @@ import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.SeenVideos
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.dpi.Dpi
 import dev.wahha.wtube.player.PlayQueue
 import dev.wahha.wtube.player.SleepTimer
+import dev.wahha.wtube.data.FeedCache
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.os.Build
@@ -37,11 +39,13 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
         SearchHistory.init(this)
         WatchStats.init(this)
         Hidden.init(this)
+        SeenVideos.init(this)
         val restore = !closedByHand()
         PlayQueue.init(this, restore)
         SleepTimer.init(this, restore)
         Downloads.init(this)
         Account.init(this)
+        FeedCache.init(this)
         Dpi.init(this)
     }
 

@@ -42,6 +42,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.ChannelItem
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Item
 import dev.wahha.wtube.data.ItemsPage
@@ -54,6 +55,8 @@ import dev.wahha.wtube.ui.account.ExpiredBanner
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.ErrorState
 import dev.wahha.wtube.ui.components.FeedSkeleton
+import dev.wahha.wtube.ui.components.FreshAtTopEffect
+import dev.wahha.wtube.ui.components.staleStrip
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.ListFooter
 import dev.wahha.wtube.ui.components.LoadMoreEffect
@@ -78,7 +81,7 @@ import org.schabi.newpipe.extractor.Page
 class SubscriptionsViewModel(
     private val feed: suspend (browseId: String, page: Page?) -> ItemsPage = Feeds::feed,
 ) : ViewModel() {
-    val videos = PagedList(viewModelScope, Item::url) { page -> feed(Feeds.SUBSCRIPTIONS, page) }
+    val videos = PagedList(viewModelScope, Item::url, cache = { FeedCache.account(Feeds.SUBSCRIPTIONS) }) { page -> feed(Feeds.SUBSCRIPTIONS, page) }
 
     var channels by mutableStateOf<List<ChannelItem>>(emptyList())
         private set
@@ -91,6 +94,7 @@ class SubscriptionsViewModel(
         if (key == loadedFor) return
         loadedFor = key
         channelsJob?.cancel()
+        channels = emptyList()
         if (key != null) reload()
     }
 
@@ -99,17 +103,22 @@ class SubscriptionsViewModel(
         val key = loadedFor
         channelsJob?.cancel()
         channelsJob = viewModelScope.launch {
+            val slot = FeedCache.account(Feeds.CHANNELS)
+            if (channels.isEmpty()) slot?.read()?.let { cached -> channels = cached.items.filterIsInstance<ChannelItem>() }
             // The row is extra: without it the feed still works.
             val loaded = try {
-                feed(Feeds.CHANNELS, null).items.filterIsInstance<ChannelItem>()
+                feed(Feeds.CHANNELS, null).items
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("Subscriptions", "Channel list failed (${e.javaClass.simpleName})")
-                emptyList()
+                null
             }
             // Switched or signed out while it loaded: the answer belongs to the previous account.
-            if (loadedFor == key) channels = loaded
+            if (loaded != null && loadedFor == key) {
+                channels = loaded.filterIsInstance<ChannelItem>()
+                slot?.write(loaded)
+            }
         }
     }
 }
@@ -124,6 +133,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
     val videos = vm.videos
     val listState = rememberLazyListState()
     LoadMoreEffect(listState, loaded = videos.items.size) { videos.loadMore() }
+    FreshAtTopEffect(videos, listState)
     TabResetEffect { listState.animateScrollToItem(0) }
     val active = session?.expired == false
     val settings by Settings.current.collectAsStateWithLifecycle()
@@ -168,8 +178,9 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
                             MessageState(WIcons.Subscriptions, stringResource(R.string.subscriptions_empty))
                         }
                         else -> {
+                            staleStrip(videos)
                             items(videos.items.filter { (it !is VideoItem || it.id !in finished) && MembersOnly.inFeeds(it, settings.membersOnly) }, key = { it.url }) { ItemView(it) }
-                            item(key = "footer") { ListFooter(videos.loading, videos.error, videos::retry) }
+                            item(key = "footer") { ListFooter(videos.loading, videos.pageError, videos::retry) }
                         }
                     }
                 }

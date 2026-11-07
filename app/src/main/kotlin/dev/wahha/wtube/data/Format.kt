@@ -1,5 +1,8 @@
 package dev.wahha.wtube.data
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -84,4 +87,11 @@ fun formatWatchTime(seconds: Long): String {
         minutes < 60 -> "$minutes мин"
         else -> "%d ч %02d мин".format(minutes / 60, minutes % 60)
     }
+}
+
+/** When a list on the screen was loaded: "14:20" today, "6 нояб., 14:20" on another day. */
+fun formatLoadedAt(millis: Long, nowMillis: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+    val at = Instant.ofEpochMilli(millis).atZone(zone)
+    val today = at.toLocalDate() == Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+    return DateTimeFormatter.ofPattern(if (today) "HH:mm" else "d MMM, HH:mm", AppLocale).format(at)
 }

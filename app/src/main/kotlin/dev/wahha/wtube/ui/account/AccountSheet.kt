@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.data.SeenVideos
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.SearchHistory
 import dev.wahha.wtube.data.WatchStats
@@ -183,6 +184,7 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
                     SearchHistory.clear()
                     PlayQueue.clear()
                     Hidden.clear()
+                    SeenVideos.clear()
                     WatchStats.clear()
                 }
                 onDismiss()

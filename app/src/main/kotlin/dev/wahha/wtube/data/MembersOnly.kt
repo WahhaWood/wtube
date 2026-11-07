@@ -11,7 +11,7 @@ object MembersOnly {
     /** Marked in every list. */
     const val SHOW = 0
 
-    /** Left out of Home, search and related videos. */
+    /** Left out of Home, search and related videos: the default, recommending what cannot play here helps nobody. */
     const val HIDE_RECOMMENDED = 1
 
     /** Also left out of subscriptions and channel lists; the channel's own members tab still shows them. */

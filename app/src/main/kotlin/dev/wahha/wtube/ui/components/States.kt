@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,6 +50,7 @@ import com.grack.nanojson.JsonParserException
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.account.SessionExpiredException
 import dev.wahha.wtube.data.errorTag
+import dev.wahha.wtube.data.formatLoadedAt
 import dev.wahha.wtube.data.innertube.ActionRejectedException
 import dev.wahha.wtube.data.innertube.InnerTubeFormatException
 import dev.wahha.wtube.data.innertube.InnerTubeHttpException
@@ -91,6 +94,9 @@ fun errorMessage(error: Throwable): Int {
     }
 }
 
+/** The connection failed; an answer of YouTube's, even an HTTP error, is not that. */
+fun isNetworkError(error: Throwable): Boolean = errorMessage(error) == R.string.error_network
+
 /**
  * The technical reason behind [error] for a bug report: class and message of each wrapped cause. Our
  * exceptions never carry cookies, and OkHttp leaves the values of Cookie and Authorization out of its own.
@@ -105,6 +111,32 @@ fun ErrorState(error: Throwable, onRetry: () -> Unit, modifier: Modifier = Modif
     LaunchedEffect(error) { ErrorLog.note("[screen] ${errorDetail(error)}") }
     MessageState(WIcons.Error, stringResource(errorMessage(error)), modifier, detail = errorDetail(error)) {
         FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+    }
+}
+
+/** A video that needs the network, with the way to what plays without it. */
+@Composable
+fun OfflineState(error: Throwable, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val nav = LocalNavigator.current
+    LaunchedEffect(error) { ErrorLog.note("[screen] ${errorDetail(error)}") }
+    MessageState(WIcons.Error, stringResource(R.string.offline_video_body), modifier, title = stringResource(R.string.offline_title)) {
+        FilledTonalButton(onClick = nav.openDownloads) { Text(stringResource(R.string.downloads_title), color = LocalContentColor.current) }
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry), color = LocalContentColor.current) }
+    }
+}
+
+/** Above a list that could not be refreshed: what is shown is older, and from when. */
+@Composable
+fun StaleStrip(error: Throwable, loadedAt: Long?, onRetry: () -> Unit) {
+    val nav = LocalNavigator.current
+    val offline = isNetworkError(error)
+    LaunchedEffect(error) { ErrorLog.note("[feed] showing the older list: ${errorDetail(error)}") }
+    val status = stringResource(if (offline) R.string.offline_title else R.string.feed_not_updated)
+    val text = loadedAt?.let { stringResource(R.string.feed_stale, status, formatLoadedAt(it)) } ?: status
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        if (offline) TextButton(onClick = nav.openDownloads) { Text(stringResource(R.string.downloads_title), color = LocalContentColor.current) }
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry), color = LocalContentColor.current) }
     }
 }
 

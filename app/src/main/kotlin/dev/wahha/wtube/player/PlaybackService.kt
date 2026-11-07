@@ -244,7 +244,7 @@ class PlaybackService : MediaSessionService() {
         val watched = History.entries.value.mapTo(HashSet()) { it.video.id }
         val hidden = Hidden.items.value
         val related = runCatching { YouTube.video(id).related }.getOrDefault(emptyList())
-        return NextVideo.pick(NextVideo.candidates(related, id, hidden), watched, orWatched)
+        return NextVideo.pick(NextVideo.candidates(related, id, hidden, Settings.current.value.minDurationMinutes), watched, orWatched)
     }
 
     /**

@@ -2,6 +2,7 @@ package dev.wahha.wtube
 
 import com.grack.nanojson.JsonObject
 import com.grack.nanojson.JsonParser
+import dev.wahha.wtube.data.AppSettings
 import dev.wahha.wtube.data.Item
 import dev.wahha.wtube.data.MembersOnly
 import dev.wahha.wtube.data.VideoItem
@@ -45,6 +46,14 @@ class MembersOnlyTest {
         assertEquals(listOf("m", "o"), shown(MembersOnly.HIDE_RECOMMENDED, MembersOnly::inFeeds))
         assertEquals(listOf("o"), shown(MembersOnly.HIDE_FEEDS, MembersOnly::inRecommendations))
         assertEquals(listOf("o"), shown(MembersOnly.HIDE_FEEDS, MembersOnly::inFeeds))
+    }
+
+    @Test
+    fun recommendationsLeaveThemOutUnlessAsked() {
+        val filter = AppSettings().membersOnly
+        assertFalse(MembersOnly.inRecommendations(members, filter))
+        assertTrue(MembersOnly.inRecommendations(open, filter))
+        assertTrue(MembersOnly.inFeeds(members, filter))
     }
 
     @Test

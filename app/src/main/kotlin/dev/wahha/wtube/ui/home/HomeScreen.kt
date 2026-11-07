@@ -1,7 +1,10 @@
 package dev.wahha.wtube.ui.home
 
 import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Recommendations
+import dev.wahha.wtube.data.SeenVideos
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.WatchProgress
 import dev.wahha.wtube.data.ErrorLog
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -31,6 +35,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
 import dev.wahha.wtube.ui.components.Notices
 import dev.wahha.wtube.ui.components.errorDetail
+import dev.wahha.wtube.ui.components.isNetworkError
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Item
@@ -41,7 +47,12 @@ import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.ui.account.ExpiredBanner
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import dev.wahha.wtube.ui.components.ErrorState
+import dev.wahha.wtube.ui.components.FreshAtTopEffect
+import dev.wahha.wtube.ui.components.staleStrip
 import dev.wahha.wtube.ui.components.FeedSkeleton
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.ListFooter
@@ -59,6 +70,7 @@ import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
 
 private const val MAX_SEEDS = 30
+private const val SEEN_AFTER_MS = 1_000L
 
 /**
  * YouTube's own home when signed in; otherwise, or when that comes back empty (history paused) or
@@ -76,13 +88,14 @@ class HomeViewModel : ViewModel() {
     var hasSource by mutableStateOf<Boolean?>(null)
         private set
 
-    val feed = PagedList(viewModelScope, Item::url) { page ->
-        when {
+    val feed = PagedList(viewModelScope, Item::url, cache = FeedCache::home) { page ->
+        val loaded = when {
             page != null && Feeds.isCursor(page) -> Feeds.feed(Feeds.HOME, page)
             page != null -> YouTube.recommendations(seeds, watched, page)
             signedIn -> accountHome()
             else -> YouTube.recommendations(seeds, watched)
         }
+        if (Settings.current.value.demoteSeen) ItemsPage(SeenVideos.log.demote(loaded.items), loaded.next) else loaded
     }
 
     private suspend fun accountHome(): ItemsPage {
@@ -91,7 +104,8 @@ class HomeViewModel : ViewModel() {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (seeds.isEmpty()) throw e
+            // Without a network the local recommendations cannot load either: the cached feed stays instead.
+            if (seeds.isEmpty() || isNetworkError(e)) throw e
             Log.w("Home", "Account home failed, local recommendations instead: ${errorDetail(e)}")
             ErrorLog.note("[home] account home failed, local recommendations instead: ${errorDetail(e)}")
             Notices.show(R.string.home_account_failed, errorDetail(e))
@@ -118,7 +132,7 @@ class HomeViewModel : ViewModel() {
     fun reload(pullToRefresh: Boolean = false) {
         val entries = History.entries.value
         seeds = entries.take(MAX_SEEDS).map { it.video.id }
-        watched = entries.map { it.video.id }.toSet()
+        watched = if (Settings.current.value.hideWatchedRecommended) entries.map { it.video.id }.toSet() else emptySet()
         signedIn = Account.active != null
         hasSource = signedIn || seeds.isNotEmpty()
         if (hasSource == true) feed.refresh(pullToRefresh)
@@ -138,11 +152,21 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val session by Account.session.collectAsStateWithLifecycle()
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     val settings by Settings.current.collectAsStateWithLifecycle()
+    val watched by WatchProgress.watched.collectAsStateWithLifecycle()
     LaunchedEffect(historyLoaded, accountLoaded, session, entries.isEmpty()) {
         if (historyLoaded && accountLoaded) vm.sync(session, entries.isEmpty())
     }
     val listState = rememberLazyListState()
     LoadMoreEffect(listState, loaded = feed.items.size) { feed.loadMore() }
+    FreshAtTopEffect(feed, listState)
+    // A cached list is not YouTube showing the video again, and what is only flung past was not shown.
+    LaunchedEffect(listState, settings.demoteSeen, feed.stale) {
+        if (!settings.demoteSeen || feed.stale) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.map { it.key } }.distinctUntilChanged().collectLatest { keys ->
+            delay(SEEN_AFTER_MS)
+            SeenVideos.record(keys.mapNotNull { (it as? String)?.let(YouTube::videoIdOf) }, System.currentTimeMillis())
+        }
+    }
     TabResetEffect { listState.animateScrollToItem(0) }
 
     PullToRefreshBox(
@@ -173,8 +197,9 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 vm.hasSource == null || feed.initialLoading -> item(key = "skeleton") { FeedSkeleton() }
                 feed.items.isEmpty() && feed.error != null -> item(key = "error") { ErrorState(feed.error!!, feed::retry) }
                 else -> {
-                    items(feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { it.url }) { ItemView(it, recommended = true) }
-                    item(key = "footer") { ListFooter(feed.loading, feed.error, feed::retry) }
+                    staleStrip(feed)
+                    items(feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { it.url }) { ItemView(it, recommended = true) }
+                    item(key = "footer") { ListFooter(feed.loading, feed.pageError, feed::retry) }
                 }
             }
         }

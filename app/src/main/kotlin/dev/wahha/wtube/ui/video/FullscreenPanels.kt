@@ -2,7 +2,10 @@ package dev.wahha.wtube.ui.video
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Recommendations
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.data.WatchProgress
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -187,8 +190,11 @@ private fun ChatPanel(vm: VideoViewModel, onClose: () -> Unit, modifier: Modifie
 /** YouTube's "more videos" shelf: related videos in a row at the bottom; a tap or a swipe down elsewhere closes it. */
 @Composable
 private fun MoreVideosShelf(vm: VideoViewModel, onClose: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: (open: Boolean) -> Unit) {
-    val membersFilter = Settings.current.collectAsStateWithLifecycle().value.membersOnly
-    val videos = vm.details?.related.orEmpty().filterIsInstance<VideoItem>().filter { MembersOnly.inRecommendations(it, membersFilter) }
+    val settings by Settings.current.collectAsStateWithLifecycle()
+    val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val watched by WatchProgress.watched.collectAsStateWithLifecycle()
+    val videos = vm.details?.related.orEmpty().filterIsInstance<VideoItem>()
+        .filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }
     val colors = MaterialTheme.colorScheme
     val threshold = with(LocalDensity.current) { 48.dp.toPx() }
     val range = with(LocalDensity.current) { 160.dp.toPx() }

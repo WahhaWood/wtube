@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.History
+import dev.wahha.wtube.data.SeenVideos
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
@@ -70,6 +71,7 @@ fun HistoryScreen() {
             confirmButton = {
                 TextButton(onClick = {
                     History.clear()
+                    SeenVideos.clear()
                     confirmClear = false
                 }, modifier = Modifier.testTag("confirm_clear_history")) { Text(stringResource(R.string.library_history_clear)) }
             },

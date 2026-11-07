@@ -1,16 +1,20 @@
 package dev.wahha.wtube.data
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler
 import org.schabi.newpipe.extractor.stream.Frameset
 
 /** A row in any list: a video, a channel or a playlist. */
+@Serializable
 sealed interface Item {
     val url: String
 }
 
+// The name matters only where a list holds any Item (FeedCache); a list of videos stores no type.
 @Serializable
+@SerialName("video")
 data class VideoItem(
     val id: String,
     val title: String,
@@ -29,10 +33,14 @@ data class VideoItem(
     val uploadedAt: Long? = null,
     /** Only the channel's members can watch it (also while members get it first); see [MembersOnly]. */
     val membersOnly: Boolean = false,
+    /** A premiere or stream that has not started: nothing to play yet. */
+    val upcoming: Boolean = false,
 ) : Item {
     override val url: String get() = watchUrl(id)
 }
 
+@Serializable
+@SerialName("channel")
 data class ChannelItem(
     override val url: String,
     val name: String,
@@ -41,6 +49,8 @@ data class ChannelItem(
     val verified: Boolean,
 ) : Item
 
+@Serializable
+@SerialName("playlist")
 data class PlaylistItem(
     override val url: String,
     val name: String,

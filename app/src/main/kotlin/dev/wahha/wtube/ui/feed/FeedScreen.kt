@@ -20,11 +20,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.Item
 import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.ui.account.ExpiredBanner
 import dev.wahha.wtube.ui.components.ErrorState
 import dev.wahha.wtube.ui.components.FeedSkeleton
+import dev.wahha.wtube.ui.components.FreshAtTopEffect
+import dev.wahha.wtube.ui.components.staleStrip
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.ListFooter
 import dev.wahha.wtube.ui.components.LoadMoreEffect
@@ -39,7 +42,7 @@ import dev.wahha.wtube.ui.icon.History
 import dev.wahha.wtube.ui.icon.WIcons
 
 class FeedViewModel(browseId: String) : ViewModel() {
-    val list = PagedList(viewModelScope, Item::url) { page ->
+    val list = PagedList(viewModelScope, Item::url, cache = { FeedCache.account(browseId) }) { page ->
         if (browseId == Feeds.PLAYLISTS) Feeds.playlists(page) else Feeds.feed(browseId, page)
     }
 
@@ -56,6 +59,7 @@ fun FeedScreen(browseId: String) {
     val nav = LocalNavigator.current
     val listState = rememberLazyListState()
     LoadMoreEffect(listState) { list.loadMore() }
+    FreshAtTopEffect(list, listState)
     val title = when (browseId) {
         Feeds.HISTORY -> R.string.library_youtube_history
         Feeds.CHANNELS -> R.string.subscriptions_channels_all
@@ -83,8 +87,9 @@ fun FeedScreen(browseId: String) {
             list.items.isEmpty() && list.error != null -> item(key = "error") { ErrorState(list.error!!, list::retry) }
             list.items.isEmpty() && list.endReached -> item(key = "empty") { MessageState(WIcons.History, stringResource(R.string.feed_empty)) }
             else -> {
+                staleStrip(list)
                 items(list.items, key = { it.url }) { ItemView(it, compact = true) }
-                item(key = "footer") { ListFooter(list.loading, list.error, list::retry) }
+                item(key = "footer") { ListFooter(list.loading, list.pageError, list::retry) }
             }
         }
     }

@@ -1,6 +1,8 @@
 package dev.wahha.wtube.ui.video
 
 import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Recommendations
+import dev.wahha.wtube.data.SeenVideos
 import dev.wahha.wtube.data.innertube.WatchVideo
 import dev.wahha.wtube.data.ErrorKind
 import dev.wahha.wtube.data.ErrorLog
@@ -19,6 +21,7 @@ import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.data.Settings
+import dev.wahha.wtube.data.WatchProgress
 import dev.wahha.wtube.data.DeArrow
 import dev.wahha.wtube.data.Dislikes
 import androidx.compose.runtime.mutableLongStateOf
@@ -88,6 +91,8 @@ import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.formatCompact
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.ErrorState
+import dev.wahha.wtube.ui.components.OfflineState
+import dev.wahha.wtube.ui.components.isNetworkError
 import dev.wahha.wtube.ui.components.FeedSkeleton
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.LocalNavigator
@@ -263,6 +268,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
 
     fun load() {
         val id = id ?: return
+        SeenVideos.forget(id)
         error = null
         membersOnly = null
         streamsReady = null
@@ -436,7 +442,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
     val hasNext: Boolean
         get() = PlayQueue.items.value.isNotEmpty() || nextCandidates().isNotEmpty()
 
-    private fun nextCandidates(): List<VideoItem> = NextVideo.candidates(details?.related.orEmpty(), id.orEmpty(), Hidden.items.value)
+    private fun nextCandidates(): List<VideoItem> = NextVideo.candidates(details?.related.orEmpty(), id.orEmpty(), Hidden.items.value, Settings.current.value.minDurationMinutes)
 
     /** The video "next" plays: the queue's first, else the first related one not watched yet, as autoplay picks. */
     fun playNext() {
@@ -488,6 +494,7 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
             }
             details != null && comments != null -> Details(vm, details, comments, onSeek)
             error != null && MembersOnly.refused(error) -> MembersOnlyPage(vm.id.orEmpty(), vm.membersOnly)
+            error != null && isNetworkError(error) -> OfflineState(error, vm::load)
             error != null -> ErrorState(error, vm::load)
             else -> FeedSkeleton(Modifier.padding(top = 16.dp), compact = true)
         }
@@ -547,6 +554,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
     val queue by PlayQueue.items.collectAsStateWithLifecycle()
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     val settings by Settings.current.collectAsStateWithLifecycle()
+    val watched by WatchProgress.watched.collectAsStateWithLifecycle()
     if (commentsOpen) CommentsSheet(vm, comments, onLink, onDismiss = { commentsOpen = false })
     if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     if (queueOpen) QueueSheet(onDismiss = { queueOpen = false })
@@ -636,7 +644,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
         }
         item(key = "comments") { CommentsPreview(comments, onOpen = { commentsOpen = true }) }
         item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
-        items(details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
+        items(details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
     }
 }
 

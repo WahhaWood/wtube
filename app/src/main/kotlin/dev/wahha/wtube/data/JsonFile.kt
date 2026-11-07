@@ -49,20 +49,21 @@ internal class JsonFile<T>(private val tag: String, private val serializer: KSer
         }
     }
 
-    private fun writeAtomically(file: File, text: String) {
-        val tmp = File.createTempFile(file.name + ".", ".tmp", file.parentFile)
-        try {
-            FileOutputStream(tmp).use { out ->
-                out.write(text.toByteArray())
-                out.fd.sync()
-            }
-            if (!tmp.renameTo(file)) throw IOException("Could not move ${tmp.name} over ${file.name}")
-        } finally {
-            tmp.delete()
-        }
-    }
-
     private companion object {
         const val RETRIES = 3
+    }
+}
+
+/** Replaces [file] whole: a crash halfway leaves the old contents and at most a stray `.tmp`. */
+internal fun writeAtomically(file: File, text: String) {
+    val tmp = File.createTempFile(file.name + ".", ".tmp", file.parentFile)
+    try {
+        FileOutputStream(tmp).use { out ->
+            out.write(text.toByteArray())
+            out.fd.sync()
+        }
+        if (!tmp.renameTo(file)) throw IOException("Could not move ${tmp.name} over ${file.name}")
+    } finally {
+        tmp.delete()
     }
 }

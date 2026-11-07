@@ -1,6 +1,8 @@
 package dev.wahha.wtube.ui.settings
 
 import dev.wahha.wtube.data.MembersOnly
+import dev.wahha.wtube.data.Recommendations
+import dev.wahha.wtube.data.SeenVideos
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +37,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,8 +57,10 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
+import android.text.format.Formatter
 import dev.wahha.wtube.data.Backup
 import dev.wahha.wtube.data.ErrorLog
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.HiddenItems
 import dev.wahha.wtube.data.History
@@ -284,7 +289,19 @@ fun SettingsScreen() {
 
         item { SectionHeader(stringResource(R.string.settings_recommendations)) }
         item {
+            SwitchRow(stringResource(R.string.settings_hide_watched_recommended), stringResource(R.string.settings_hide_watched_recommended_summary), settings.hideWatchedRecommended, Settings.HideWatchedRecommended)
+        }
+        item {
             SwitchRow(stringResource(R.string.settings_hide_watched), stringResource(R.string.settings_hide_watched_summary), settings.hideWatched, Settings.HideWatched)
+        }
+        item {
+            ValueRow(stringResource(R.string.settings_min_duration), stringResource(MinDurationNames.getValue(settings.minDurationMinutes))) { sheet = SettingsSheet.MinDuration }
+        }
+        item {
+            SwitchRow(stringResource(R.string.settings_hide_streams), stringResource(R.string.settings_hide_streams_summary), settings.hideStreams, Settings.HideStreams)
+        }
+        item {
+            SwitchRow(stringResource(R.string.settings_demote_seen), stringResource(R.string.settings_demote_seen_summary), settings.demoteSeen, Settings.DemoteSeen)
         }
         item {
             ValueRow(stringResource(R.string.settings_members_only), stringResource(MembersOnlyNames.getValue(settings.membersOnly))) { sheet = SettingsSheet.MembersOnly }
@@ -306,6 +323,16 @@ fun SettingsScreen() {
             SwitchRow(stringResource(R.string.settings_report_watching), stringResource(R.string.settings_report_watching_summary), settings.reportWatching, Settings.ReportWatching)
         }
         item { ValueRow(stringResource(R.string.settings_clear_history), null) { clearOpen = true } }
+        item {
+            var cacheSize by remember { mutableStateOf<Long?>(null) }
+            LaunchedEffect(Unit) { cacheSize = FeedCache.size() }
+            ValueRow(stringResource(R.string.settings_clear_feed_cache), cacheSize?.let { Formatter.formatShortFileSize(context, it) }) {
+                scope.launch {
+                    FeedCache.clear()
+                    cacheSize = FeedCache.size()
+                }
+            }
+        }
 
         item { SectionHeader(stringResource(R.string.settings_backup)) }
         item { ValueRow(stringResource(R.string.settings_backup_export), stringResource(R.string.settings_backup_export_summary)) { exportOpen = true } }
@@ -396,6 +423,14 @@ fun SettingsScreen() {
             dismiss,
         )
         SettingsSheet.SponsorCategories -> SponsorCategoriesSheet(settings.sponsorCategories, dismiss)
+        SettingsSheet.MinDuration -> ChoiceSheet(
+            stringResource(R.string.settings_min_duration),
+            Recommendations.MinDurations,
+            settings.minDurationMinutes,
+            { stringResource(MinDurationNames.getValue(it)) },
+            Settings.MinDurationMinutes,
+            dismiss,
+        )
         SettingsSheet.MembersOnly -> ChoiceSheet(
             stringResource(R.string.settings_members_only),
             MembersOnly.Choices,
@@ -433,6 +468,7 @@ fun SettingsScreen() {
                 TextButton(onClick = {
                     History.clear()
                     SearchHistory.clear()
+                    SeenVideos.clear()
                     WatchStats.clear()
                     clearOpen = false
                 }) { Text(stringResource(R.string.settings_clear)) }
@@ -460,7 +496,7 @@ private fun qualityLabel(maxQuality: Int): String =
     if (maxQuality == 0) stringResource(R.string.settings_quality_auto) else stringResource(R.string.settings_quality_max, maxQuality)
 
 private enum class SettingsSheet {
-    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, MembersOnly, Font, TextSize, Hidden,
+    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, MinDuration, MembersOnly, Font, TextSize, Hidden,
 }
 
 // In the order of the theme's font families and text scales.
@@ -473,6 +509,14 @@ private val GestureSensitivityNames = listOf(
     R.string.settings_gesture_sensitivity_low,
     R.string.settings_gesture_sensitivity_normal,
     R.string.settings_gesture_sensitivity_high,
+)
+
+private val MinDurationNames = mapOf(
+    0 to R.string.settings_min_duration_off,
+    1 to R.string.settings_min_duration_1,
+    3 to R.string.settings_min_duration_3,
+    5 to R.string.settings_min_duration_5,
+    10 to R.string.settings_min_duration_10,
 )
 
 private val MembersOnlyNames = mapOf(

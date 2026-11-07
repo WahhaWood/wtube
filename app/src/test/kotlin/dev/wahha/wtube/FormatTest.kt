@@ -5,11 +5,14 @@ import dev.wahha.wtube.data.interleave
 import dev.wahha.wtube.data.formatClock
 import dev.wahha.wtube.data.formatCompact
 import dev.wahha.wtube.data.formatDuration
+import dev.wahha.wtube.data.formatLoadedAt
 import dev.wahha.wtube.data.parseYoutubeTime
 import dev.wahha.wtube.data.ruPlural
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneOffset
 
 class FormatTest {
     @Test
@@ -87,5 +90,13 @@ class FormatTest {
     fun interleaveTakesRoundRobin() {
         assertEquals(listOf(1, 10, 100, 2, 20, 3), interleave(listOf(listOf(1, 2, 3), listOf(10, 20), listOf(100))))
         assertEquals(emptyList<Int>(), interleave(emptyList<List<Int>>()))
+    }
+
+    @Test
+    fun loadedAtShowsTheDayOnlyWhenItIsAnother() {
+        val at = 1_762_438_800_000L // 2025-11-06 14:20 UTC
+        assertEquals("14:20", formatLoadedAt(at, nowMillis = at + 3_600_000, zone = ZoneOffset.UTC))
+        val nextDay = formatLoadedAt(at, nowMillis = at + 86_400_000, zone = ZoneOffset.UTC)
+        assertTrue(nextDay, nextDay.startsWith("6 ") && nextDay.endsWith(", 14:20"))
     }
 }

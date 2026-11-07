@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.HistoryEntry
 import dev.wahha.wtube.data.PlaylistItem
@@ -75,7 +76,7 @@ private val CardWidth = 160.dp
 private val CardCorner = 12.dp
 private val CardShape = RoundedCornerShape(CardCorner)
 
-/** The account's playlists for the Library row; loaded once per account, when the tab is opened. */
+/** The account's playlists for the Library row; loaded once per account, when the tab is opened, and shown from the last time until then. */
 class LibraryViewModel(
     private val loadPlaylists: suspend () -> List<PlaylistItem> = { Feeds.playlists().items.filterIsInstance<PlaylistItem>() },
 ) : ViewModel() {
@@ -92,9 +93,14 @@ class LibraryViewModel(
         playlists = emptyList()
         if (key == null) return
         job = viewModelScope.launch {
-            val loaded = runCatching { loadPlaylists() }.getOrDefault(emptyList())
+            val slot = FeedCache.account(Feeds.PLAYLISTS)
+            slot?.read()?.let { cached -> playlists = cached.items.filterIsInstance<PlaylistItem>() }
+            val loaded = runCatching { loadPlaylists() }.getOrNull()
             // Switched or signed out while it loaded: the answer belongs to the previous account.
-            if (loadedFor == key) playlists = loaded
+            if (loaded != null && loadedFor == key) {
+                playlists = loaded
+                slot?.write(loaded)
+            }
         }
     }
 }

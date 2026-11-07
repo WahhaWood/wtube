@@ -47,7 +47,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.FeedCache
 import dev.wahha.wtube.data.Item
+import dev.wahha.wtube.data.ItemsPage
+import dev.wahha.wtube.data.PlaylistHead
 import dev.wahha.wtube.data.PlaylistDetails
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
@@ -55,6 +58,8 @@ import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.ui.components.BackButton
 import dev.wahha.wtube.ui.components.ErrorState
 import dev.wahha.wtube.ui.components.FeedSkeleton
+import dev.wahha.wtube.ui.components.FreshAtTopEffect
+import dev.wahha.wtube.ui.components.staleStrip
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.ListFooter
 import dev.wahha.wtube.ui.components.LoadMoreEffect
@@ -70,7 +75,14 @@ class PlaylistViewModel(private val url: String) : ViewModel() {
         private set
 
     // The first page comes with the playlist header; later pages are fetched by cursor.
-    val list = PagedList(viewModelScope, Item::url) { page ->
+    val list = PagedList(
+        viewModelScope,
+        Item::url,
+        cache = { FeedCache.playlist(url) { details?.run { PlaylistHead(name, thumbnail, uploader, count) } } },
+        onCached = { cached ->
+            cached.playlist?.let { details = PlaylistDetails(url, it.name, it.thumbnail, it.uploader, it.count, ItemsPage(cached.items, null)) }
+        },
+    ) { page ->
         when {
             page == null -> load().also { details = it }.firstPage
             Feeds.isCursor(page) -> Feeds.more(page)
@@ -163,6 +175,7 @@ fun PlaylistScreen(url: String) {
     var downloading by remember { mutableStateOf(false) }
     if (downloading) PlaylistDownloadSheet(onPick = vm::download, onDismiss = { downloading = false })
     LoadMoreEffect(listState) { list.loadMore() }
+    FreshAtTopEffect(list, listState)
 
     Box(Modifier.fillMaxSize()) {
         when {
@@ -179,8 +192,9 @@ fun PlaylistScreen(url: String) {
                 item(key = "header") {
                     Header(details, canPlay = list.items.any { it is VideoItem }, onPlay = ::playAll, onDownload = { downloading = true })
                 }
+                staleStrip(list)
                 items(list.items, key = { it.url }) { ItemView(it, compact = true) }
-                item(key = "footer") { ListFooter(list.loading, list.error, list::retry) }
+                item(key = "footer") { ListFooter(list.loading, list.pageError, list::retry) }
             }
         }
         BackButton(Modifier.statusBarsPadding().padding(8.dp))

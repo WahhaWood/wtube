@@ -58,8 +58,16 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     /** Leave videos played to their end out of the subscriptions feed. */
     val hideWatched: Boolean = false,
+    /** Leave videos watched to [Recommendations.WATCHED_SHARE], here or on the account's other devices, out of Home and related videos. */
+    val hideWatchedRecommended: Boolean = true,
+    /** One of [Recommendations.MinDurations]: recommended videos shorter than this many minutes are left out. */
+    val minDurationMinutes: Int = 0,
+    /** Leave live streams and what has not started yet out of Home and related videos. */
+    val hideStreams: Boolean = false,
+    /** Home moves videos it kept showing without them being opened down the page; see [SeenLog]. */
+    val demoteSeen: Boolean = true,
     /** One of [MembersOnly.Choices]: how far members-only videos are left out of lists. */
-    val membersOnly: Int = MembersOnly.SHOW,
+    val membersOnly: Int = MembersOnly.HIDE_RECOMMENDED,
     /** Tint the player page and mini player with the current video's cover. */
     val coverAccent: Boolean = true,
     /** Community titles from DeArrow instead of clickbait on the video page. */
@@ -111,6 +119,10 @@ object Settings {
     val TextSize = intPreferencesKey("text_size")
     val PureBlack = booleanPreferencesKey("pure_black")
     val HideWatched = booleanPreferencesKey("hide_watched")
+    val HideWatchedRecommended = booleanPreferencesKey("hide_watched_recommended")
+    val MinDurationMinutes = intPreferencesKey("min_duration_minutes")
+    val HideStreams = booleanPreferencesKey("hide_streams")
+    val DemoteSeen = booleanPreferencesKey("demote_seen")
     val MembersOnlyFilter = intPreferencesKey("members_only")
     val CoverAccent = booleanPreferencesKey("cover_accent")
     val UpdateCheck = booleanPreferencesKey("update_check")
@@ -197,6 +209,10 @@ object Settings {
         this[TextSize] = settings.textSize
         this[PureBlack] = settings.pureBlack
         this[HideWatched] = settings.hideWatched
+        this[HideWatchedRecommended] = settings.hideWatchedRecommended
+        this[MinDurationMinutes] = settings.minDurationMinutes
+        this[HideStreams] = settings.hideStreams
+        this[DemoteSeen] = settings.demoteSeen
         this[MembersOnlyFilter] = settings.membersOnly
         this[CoverAccent] = settings.coverAccent
         this[UpdateCheck] = settings.updateCheck
@@ -238,6 +254,10 @@ object Settings {
             textSize = this[TextSize] ?: defaults.textSize,
             pureBlack = this[PureBlack] ?: defaults.pureBlack,
             hideWatched = this[HideWatched] ?: defaults.hideWatched,
+            hideWatchedRecommended = this[HideWatchedRecommended] ?: defaults.hideWatchedRecommended,
+            minDurationMinutes = (this[MinDurationMinutes] ?: defaults.minDurationMinutes).takeIf { it in Recommendations.MinDurations } ?: defaults.minDurationMinutes,
+            hideStreams = this[HideStreams] ?: defaults.hideStreams,
+            demoteSeen = this[DemoteSeen] ?: defaults.demoteSeen,
             membersOnly = (this[MembersOnlyFilter] ?: defaults.membersOnly).coerceIn(MembersOnly.Choices.first(), MembersOnly.Choices.last()),
             coverAccent = this[CoverAccent] ?: defaults.coverAccent,
             updateCheck = this[UpdateCheck] ?: defaults.updateCheck,
