@@ -20,7 +20,16 @@ import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamInf
  * What one browse response holds: its items in page order, the token of the next page, and where the
  * account stopped in the videos it started, by video id.
  */
-class FeedPage(val items: List<InfoItem>, val continuation: String?, val resume: Map<String, ResumeMark> = emptyMap())
+class FeedPage(
+    val items: List<InfoItem>,
+    val continuation: String?,
+    val resume: Map<String, ResumeMark> = emptyMap(),
+    /** In a playlist the account may change: each video's place in it (`setVideoId`), by video id, the first place of a video that is in twice. */
+    val setVideoIds: Map<String, String> = emptyMap(),
+)
+
+/** A playlist the account may change; [params] goes along with every edit, as the web app sends it. */
+class PlaylistEditing(val playlistId: String, val params: String?, val canReorder: Boolean)
 
 /** The account's place in a video as a list shows it: the second it resumes at and the red bar's percent (either may be missing). */
 data class ResumeMark(val startSeconds: Int, val percent: Int)
@@ -51,18 +60,21 @@ object FeedParser {
         val collector = MultiInfoItemsCollector(ServiceList.YouTube.serviceId)
         var continuation: String? = null
         val resume = HashMap<String, ResumeMark>()
+        val setVideoIds = HashMap<String, String>()
 
         fun mark(id: String?, mark: ResumeMark) {
             if (id != null && (mark.startSeconds > 0 || mark.percent > 0)) resume[id] = mark
         }
 
-        // One item the extractor cannot read must not cost the whole page.
-        fun commit(key: String, extract: () -> InfoItemExtractor) {
+        // One item the extractor cannot read must not cost the whole page. True when the item made it in.
+        fun commit(key: String, extract: () -> InfoItemExtractor): Boolean {
+            val before = collector.items.size
             try {
                 collector.commit(extract())
             } catch (e: RuntimeException) {
                 Log.w("FeedParser", "Skipped $key: $e")
             }
+            return collector.items.size > before
         }
 
         fun walk(node: Any?) {
@@ -74,8 +86,11 @@ object FeedParser {
                     when {
                         obj == null -> walk(value)
                         key in StreamRenderers -> {
-                            commit(key) { YoutubeStreamInfoItemExtractor(obj, timeAgoParser) }
-                            mark(obj.getString("videoId"), rendererMark(obj))
+                            val added = commit(key) { YoutubeStreamInfoItemExtractor(obj, timeAgoParser) }
+                            val id = obj.getString("videoId")
+                            mark(id, rendererMark(obj))
+                            val setVideoId = obj.getString("setVideoId")
+                            if (added && id != null && setVideoId != null) setVideoIds.putIfAbsent(id, setVideoId)
                         }
                         key == "lockupViewModel" -> when (obj.getString("contentType")) {
                             "LOCKUP_CONTENT_TYPE_VIDEO" -> {
@@ -96,7 +111,22 @@ object FeedParser {
         }
 
         ContentRoots.forEach { walk(response[it]) }
-        return FeedPage(collector.items, continuation, resume)
+        return FeedPage(collector.items, continuation, resume, setVideoIds)
+    }
+
+    /**
+     * What the account may do to the playlist of a `VL…` browse response, or null when it is not the
+     * account's to change: someone else's playlist and Liked come without the editable list renderer.
+     */
+    fun playlistEditing(response: JsonObject): PlaylistEditing? {
+        val list = findFirst(response["contents"], "playlistVideoListRenderer") ?: return null
+        val id = list.getString("playlistId")
+        if (!list.getBoolean("isEditable", false) || id == null) return null
+        return PlaylistEditing(
+            playlistId = id,
+            params = list.getObject("onReorderEndpoint").getObject("playlistEditEndpoint").getString("params"),
+            canReorder = list.getBoolean("canReorder", false),
+        )
     }
 
     // Older renderers: the tap resumes through the watch endpoint, the thumbnail has a resume overlay.
@@ -152,6 +182,10 @@ object FeedParser {
     }
 
     private val AuthUserParam = Regex("[?&]authuser=(\\d+)")
+
+    /** The cursor of [list] itself, from the continuation item at its end; null when it has no more. */
+    fun continuationIn(list: JsonObject): String? =
+        ContinuationRenderers.firstNotNullOfOrNull { findFirst(list, it) }?.let(::continuationToken)
 
     // continuationItemViewModel nests one continuationCommand in another; only the inner one has the token.
     private fun continuationToken(renderer: JsonObject): String? =

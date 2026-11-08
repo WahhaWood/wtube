@@ -88,6 +88,13 @@ class PagedList<T>(
         if (items.isEmpty() || stale) restart(pullToRefresh = false, replaceNow = true) else loadMore()
     }
 
+    /** Changes the items in place, for an edit the user made to the list itself; the copy on disk follows. */
+    fun change(transform: (List<T>) -> List<T>) {
+        items = transform(items)
+        held = held?.let { PageOf(transform(it.items), it.next) }
+        slot?.write(items)
+    }
+
     /** Whether the user is near the top of the list; there a waiting fresh page can replace it unnoticed. */
     fun onNearTop(near: Boolean) {
         nearTop = near

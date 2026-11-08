@@ -61,7 +61,7 @@ fun HistoryScreen() {
         items(entries, key = { it.video.id }) { entry ->
             val duration = entry.video.duration * 1000
             val progress = if (duration > 0) (entry.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
-            Box(Modifier.animateItem()) { VideoRow(entry.video, progress) { nav.openVideo(entry.video.id, it) } }
+            Box(Modifier.animateItem()) { VideoRow(entry.video, progress = progress) { nav.openVideo(entry.video.id, it) } }
         }
     }
     if (confirmClear) {

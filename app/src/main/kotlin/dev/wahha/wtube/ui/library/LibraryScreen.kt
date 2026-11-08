@@ -71,6 +71,8 @@ import dev.wahha.wtube.ui.icon.WIcons
 import dev.wahha.wtube.ui.icon.WatchLater
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
+import dev.wahha.wtube.data.innertube.Actions
 
 private val CardWidth = 160.dp
 private val CardCorner = 12.dp
@@ -84,21 +86,36 @@ class LibraryViewModel(
         private set
     private var loadedFor: Any? = null
     private var job: Job? = null
+    private var session: Session? = null
 
-    fun sync(session: Session?) {
+    init {
+        viewModelScope.launch { Actions.renamedPlaylists.drop(1).collect { playlists = playlists.map(Actions::withNewName) } }
+        // A playlist made or deleted here: the row is read again, the old one stays until then.
+        viewModelScope.launch {
+            Actions.playlistsChanged.drop(1).collect {
+                if (loadedFor != null) {
+                    loadedFor = null
+                    sync(session, keepShown = true)
+                }
+            }
+        }
+    }
+
+    fun sync(session: Session?, keepShown: Boolean = false) {
+        this.session = session
         val key = session?.takeUnless { it.expired }?.let { listOf(it.cookie, it.authUser, it.pageId) }
         if (key == loadedFor) return
         loadedFor = key
         job?.cancel()
-        playlists = emptyList()
+        if (!keepShown) playlists = emptyList()
         if (key == null) return
         job = viewModelScope.launch {
             val slot = FeedCache.account(Feeds.PLAYLISTS)
-            slot?.read()?.let { cached -> playlists = cached.items.filterIsInstance<PlaylistItem>() }
+            if (!keepShown) slot?.read()?.let { cached -> playlists = cached.items.filterIsInstance<PlaylistItem>() }
             val loaded = runCatching { loadPlaylists() }.getOrNull()
             // Switched or signed out while it loaded: the answer belongs to the previous account.
             if (loaded != null && loadedFor == key) {
-                playlists = loaded
+                playlists = loaded.map(Actions::withNewName)
                 slot?.write(loaded)
             }
         }

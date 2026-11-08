@@ -2,6 +2,7 @@ package dev.wahha.wtube
 
 import dev.wahha.wtube.download.ExpiredException
 import dev.wahha.wtube.download.downloadRange
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -81,6 +82,27 @@ class DownloadRangeTest {
         run()
         assertArrayEquals(data, target.readBytes())
         assertEquals(0, asked.first().first)
+    }
+
+    // A pause mid-request: no failure to retry, what came stays, and continuing asks only for the rest.
+    @Test fun stopInTheMiddleOfARequestKeepsWhatCameAndContinuesFromIt() {
+        serve { from, to, _ -> slice(from, to).throttleBody(1_000, 5, java.util.concurrent.TimeUnit.MILLISECONDS) }
+        var checks = 0
+        try {
+            runBlocking {
+                downloadRange(client, server.url("/v").toString(), data.size.toLong(), target, data.size.toLong(), ::request, ensureAlive = {
+                    if (++checks == 4) throw CancellationException("paused")
+                })
+            }
+            fail("Should have stopped")
+        } catch (_: CancellationException) {
+        }
+        val kept = target.length()
+        assertTrue("kept $kept", kept in 1 until data.size)
+        asked.clear()
+        run(chunk = data.size.toLong())
+        assertEquals(listOf(kept.toInt() until data.size), asked)
+        assertArrayEquals(data, target.readBytes())
     }
 
     @Test fun expiredLinkIsTold() {

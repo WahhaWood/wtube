@@ -388,6 +388,10 @@
     <string name="downloads_playlist_nothing">Всё из списка уже скачано</string>
     <string name="downloads_paused">Система остановила загрузку. Продолжить?</string>
     <string name="downloads_continue">Продолжить</string>
+    <string name="downloads_pause">Приостановить</string>
+    <string name="downloads_on_pause">На паузе</string>
+    <string name="downloads_pause_all">Приостановить всё</string>
+    <string name="downloads_continue_all">Продолжить всё</string>
     <string name="downloads_muxing">Склеиваем видео и звук…</string>
     <string name="queue_title">Очередь</string>
     <string name="queue_count">Очередь · %1$d</string>
@@ -439,6 +443,16 @@
     <string name="playlist_public">Открытый доступ</string>
     <string name="playlist_create">Создать</string>
     <string name="playlist_created">Плейлист «%1$s» создан</string>
+    <string name="playlist_remove">Убрать из плейлиста</string>
+    <string name="playlist_remove_liked">Убрать из понравившихся</string>
+    <string name="playlist_removed">Видео убрано</string>
+    <string name="playlist_rename">Переименовать</string>
+    <string name="playlist_renamed">Плейлист переименован</string>
+    <string name="playlist_save">Сохранить</string>
+    <string name="playlist_delete">Удалить плейлист</string>
+    <string name="playlist_delete_confirm">Удалить плейлист «%1$s»? Это нельзя отменить.</string>
+    <string name="playlist_delete_action">Удалить</string>
+    <string name="playlist_deleted">Плейлист «%1$s» удалён</string>
     <string name="comment_placeholder">Оставьте комментарий</string>
     <string name="comment_reply">Ответить</string>
     <string name="comment_reply_to">Ответ для %1$s</string>

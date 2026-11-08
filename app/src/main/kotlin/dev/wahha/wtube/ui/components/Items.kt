@@ -7,6 +7,7 @@ import dev.wahha.wtube.MainActivity
 import dev.wahha.wtube.ui.icon.Star
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -86,6 +87,8 @@ import dev.wahha.wtube.ui.icon.Share
 import dev.wahha.wtube.ui.icon.Verified
 import dev.wahha.wtube.ui.icon.VisibilityOff
 import dev.wahha.wtube.ui.icon.WIcons
+import dev.wahha.wtube.ui.icon.DragHandle
+import dev.wahha.wtube.ui.icon.Delete
 import dev.wahha.wtube.ui.icon.WatchLater
 
 /** Where list items lead; provided once by the app shell so screens need not thread lambdas. */
@@ -150,7 +153,7 @@ private val ThumbnailShape = RoundedCornerShape(ThumbnailCorner)
 fun ItemView(item: Item, compact: Boolean = false, progress: Float = 0f, recommended: Boolean = false) {
     val nav = LocalNavigator.current
     when (item) {
-        is VideoItem -> if (compact) VideoRow(item, progress, recommended) { nav.openVideo(item.id, it) } else VideoCard(item, recommended) { nav.openVideo(item.id, it) }
+        is VideoItem -> if (compact) VideoRow(item, progress = progress, recommended = recommended) { nav.openVideo(item.id, it) } else VideoCard(item, recommended) { nav.openVideo(item.id, it) }
         is ChannelItem -> ChannelRow(item) { nav.openChannel(item.url) }
         is PlaylistItem -> PlaylistRow(item) { nav.openPlaylist(item.url) }
     }
@@ -197,7 +200,13 @@ fun VideoCard(video: VideoItem, recommended: Boolean = false, onClick: (VideoOri
  * and, where the list is a recommendation (the only place the filter applies), keeping it or its channel out of it.
  */
 @Composable
-fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modifier) {
+fun VideoMenu(
+    video: VideoItem,
+    recommended: Boolean,
+    modifier: Modifier = Modifier,
+    @StringRes removeLabel: Int = 0,
+    onRemove: (() -> Unit)? = null,
+) {
     val nav = LocalNavigator.current
     val context = LocalContext.current
     // With nothing playing there is nothing to queue after: the video just starts.
@@ -278,6 +287,16 @@ fun VideoMenu(video: VideoItem, recommended: Boolean, modifier: Modifier = Modif
                     },
                 )
             }
+            onRemove?.let { remove ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(removeLabel)) },
+                    leadingIcon = { Icon(WIcons.Delete, contentDescription = null) },
+                    onClick = {
+                        open = false
+                        remove()
+                    },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.video_share)) },
                 leadingIcon = { Icon(WIcons.Share, contentDescription = null) },
@@ -352,18 +371,41 @@ private fun BoxScope.WatchedBar(fraction: Float) {
 
 /** Dense row for related videos, playlists, channels and history. */
 @Composable
-fun VideoRow(video: VideoItem, progress: Float = 0f, recommended: Boolean = false, onClick: (VideoOrigin?) -> Unit) {
+fun VideoRow(
+    video: VideoItem,
+    modifier: Modifier = Modifier,
+    progress: Float = 0f,
+    recommended: Boolean = false,
+    // A row of a list the user orders by hand: the part to drag it by, and whether it is being dragged.
+    handle: Modifier? = null,
+    dragging: Boolean = false,
+    // A row of a list the user may take it out of: the menu item's text and what it does.
+    @StringRes removeLabel: Int = 0,
+    onRemove: (() -> Unit)? = null,
+    onClick: (VideoOrigin?) -> Unit,
+) {
     val anchor = remember { ThumbnailAnchor(ThumbnailCorner) }
     Row(
-        Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier.fillMaxWidth()
+            .then(if (dragging) Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier)
+            .clickable { onClick(anchor.origin(video.thumbnail)) }
+            .padding(start = if (handle != null) 0.dp else 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (handle != null) 4.dp else 12.dp),
     ) {
+        if (handle != null) {
+            Icon(
+                WIcons.DragHandle,
+                contentDescription = stringResource(R.string.queue_drag),
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = handle.align(Alignment.CenterVertically).padding(12.dp),
+            )
+        }
         val watched = watchedFraction(video.id)
-        Thumbnail(video.thumbnail, Modifier.width(168.dp).clip(ThumbnailShape).then(anchor.modifier)) {
+        Thumbnail(video.thumbnail, Modifier.width(if (handle != null) 144.dp else 168.dp).clip(ThumbnailShape).then(anchor.modifier)) {
             VideoBadge(video)
             WatchedBar(if (progress > 0f) progress else watched)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f).padding(start = if (handle != null) 8.dp else 0.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             video.channelName?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -375,7 +417,7 @@ fun VideoRow(video: VideoItem, progress: Float = 0f, recommended: Boolean = fals
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        VideoMenu(video, recommended, Modifier.offset(x = 8.dp, y = (-6).dp))
+        VideoMenu(video, recommended, Modifier.offset(x = 8.dp, y = (-6).dp), removeLabel, onRemove)
     }
 }
 

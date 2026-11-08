@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import android.content.Intent
 import dev.wahha.wtube.data.JsonFile
 import dev.wahha.wtube.data.VideoItem
+import dev.wahha.wtube.ui.components.movedBefore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +20,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 
-enum class DownloadState { QUEUED, RUNNING, DONE, FAILED }
+enum class DownloadState { QUEUED, RUNNING, PAUSED, DONE, FAILED }
 
 /** The audio track picked in the player when the download was started: its language and kind (an `AudioTrackType` name). */
 @Serializable
@@ -27,7 +28,8 @@ data class AudioChoice(val language: String, val kind: String?)
 
 /**
  * One saved video or its sound. [quality] is the video height picked (0 for audio); [file] is where the
- * finished file lives; [bytes] of [total] counts every part being fetched, for the progress bar.
+ * finished file lives; [bytes] of [total] counts every part being fetched, for the progress bar. The queue
+ * goes by [order] (the user's, or the turn it joined in; 0 in files from before there was one), then [addedAt].
  */
 @Serializable
 data class Download(
@@ -41,13 +43,47 @@ data class Download(
     val error: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
     val audio: AudioChoice? = null,
+    val order: Long = 0,
 ) {
     val key: String get() = key(video.id, audioOnly)
+
+    /** Has not started its turn yet or was stopped mid-way: the rows the user can put in order. */
+    val waiting: Boolean get() = state == DownloadState.QUEUED || state == DownloadState.PAUSED
 
     companion object {
         fun key(videoId: String, audioOnly: Boolean) = if (audioOnly) "$videoId/audio" else videoId
     }
 }
+
+private val QueueOrder = compareBy<Download>({ it.order }, { it.addedAt })
+
+/** The waiting downloads in the order they would be fetched. */
+internal fun List<Download>.waitingInOrder(): List<Download> = filter { it.waiting }.sortedWith(QueueOrder)
+
+/** What is on its way, in the order it is fetched, above everything else as it was. */
+internal fun List<Download>.arranged(): List<Download> =
+    filter { it.state == DownloadState.RUNNING } + waitingInOrder() + filter { it.state == DownloadState.DONE || it.state == DownloadState.FAILED }
+
+/** The one to fetch next; a paused one sits out. */
+internal fun List<Download>.nextInQueue(): Download? = filter { it.state == DownloadState.QUEUED }.minWithOrNull(QueueOrder)
+
+/** Past every order in use, so a new download joins the end of a queue the user has arranged. */
+internal fun List<Download>.queueEnd(): Long = (maxOfOrNull { it.order } ?: 0) + 1
+
+/** [key] placed right above [before] (at the end when null) among the waiting ones; their order is written out anew. */
+internal fun List<Download>.withMoved(key: String, before: String?): List<Download> {
+    val orders = waitingInOrder().movedBefore(Download::key, key, before).withIndex().associate { (index, download) -> download.key to index + 1L }
+    return map { download -> orders[download.key]?.let { download.copy(order = it) } ?: download }
+}
+
+internal fun List<Download>.pausing(selected: (Download) -> Boolean): List<Download> =
+    map { if (selected(it) && (it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING)) it.copy(state = DownloadState.PAUSED) else it }
+
+internal fun List<Download>.unpausing(selected: (Download) -> Boolean): List<Download> =
+    map { if (selected(it) && it.state == DownloadState.PAUSED) it.copy(state = DownloadState.QUEUED) else it }
+
+/** The list as a new process takes it over: a download running when the old one died goes back to the queue, a paused one stays paused. */
+internal fun List<Download>.afterRestart(): List<Download> = map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it }
 
 /**
  * Downloads, newest first, in one JSON file like [dev.wahha.wtube.data.History]. Files go to the app's
@@ -67,15 +103,14 @@ object Downloads {
     fun init(context: Context) {
         app = context.applicationContext
         disk.load(File(context.filesDir, "downloads.json")) { fromFile ->
-            // A download that was running when the process died goes back to the queue and resumes.
-            state.update { current -> (current + fromFile.orEmpty().map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it }).distinctBy { it.key } }
+            state.update { current -> (current + fromFile.orEmpty().afterRestart()).distinctBy { it.key } }
             resume()
         }
     }
 
-    /** Starts the service if anything waits in the queue. */
+    /** Starts the service if anything waits in the queue; a paused download waits for the user, not for this. */
     fun resume() {
-        if (state.value.any { it.state == DownloadState.QUEUED }) startService()
+        if (hasQueued()) startService()
     }
 
     /**
@@ -87,7 +122,7 @@ object Downloads {
         change { list -> list.filterNot { it.key == download.key } }
         scope.launch {
             partsOf(download).forEach { it.delete() }
-            change { list -> listOf(download) + list.filterNot { it.key == download.key } }
+            change { list -> listOf(download.copy(order = list.queueEnd())) + list.filterNot { it.key == download.key } }
             startService()
         }
     }
@@ -104,7 +139,7 @@ object Downloads {
             .mapIndexedNotNull { index, video -> newDownload(video, audioOnly, quality, now + index) }
         if (fresh.isEmpty()) return 0
         val keys = fresh.mapTo(HashSet()) { it.key }
-        change { list -> fresh + list.filterNot { it.key in keys } }
+        change { list -> list.queueEnd().let { end -> fresh.map { it.copy(order = end) } } + list.filterNot { it.key in keys } }
         startService()
         return fresh.size
     }
@@ -128,20 +163,51 @@ object Downloads {
         startService()
     }
 
+    /** Stops [key] with its parts kept (the service notices); it continues only when asked to. */
+    fun pause(key: String) = change { list -> list.pausing { it.key == key } }
+
+    fun unpause(key: String) {
+        change { list -> list.unpausing { it.key == key } }
+        startService()
+    }
+
+    fun pauseAll() = change { list -> list.pausing { true } }
+
+    fun unpauseAll() {
+        change { list -> list.unpausing { true } }
+        startService()
+    }
+
+    /** Puts waiting [key] right above [before], or last when null. */
+    fun move(key: String, before: String?) = change { list -> list.withMoved(key, before) }
+
     /** The finished download of [videoId] (its picture with sound, or the sound alone), if its file is there. */
     fun finished(videoId: String, audioOnly: Boolean): Download? =
         find(Download.key(videoId, audioOnly))?.takeIf { it.state == DownloadState.DONE && File(it.file).exists() }
 
     /** Puts the running download back in the queue, parts kept: the service was stopped by the system. */
-    internal fun pauseRunning() = change { list -> list.map { if (it.state == DownloadState.RUNNING) it.copy(state = DownloadState.QUEUED) else it } }
+    internal fun requeueRunning() = change { list -> list.afterRestart() }
 
-    /** The queued download added first. */
-    internal fun next(): Download? = state.value.filter { it.state == DownloadState.QUEUED }.minByOrNull { it.addedAt }
+    /** Pauses what is being fetched now, from the notification. */
+    internal fun pauseRunning() = change { list -> list.pausing { it.state == DownloadState.RUNNING } }
+
+    /** Marks the next in the queue as running and returns it. One step, so a pause tapped just now is not overwritten. */
+    internal fun claim(): Download? {
+        var claimed: Download? = null
+        change { list ->
+            claimed = list.nextInQueue()?.copy(state = DownloadState.RUNNING, error = null)
+            claimed?.let { taken -> list.map { if (it.key == taken.key) taken else it } } ?: list
+        }
+        return claimed
+    }
+
+    internal fun hasQueued(): Boolean = state.value.any { it.state == DownloadState.QUEUED }
 
     internal fun find(key: String): Download? = state.value.firstOrNull { it.key == key }
 
-    /** Whether [download] is still listed, and not replaced by a newer copy of the same video. */
-    internal fun isCurrent(download: Download): Boolean = find(download.key)?.addedAt == download.addedAt
+    /** Whether [download] should go on: still listed, not replaced by a newer copy of the same video, not paused. */
+    internal fun wanted(download: Download): Boolean =
+        find(download.key)?.let { it.addedAt == download.addedAt && it.state == DownloadState.RUNNING } == true
 
     /** Changes [download] if it is still the listed one: a replaced download's late news is dropped. */
     internal fun update(download: Download, transform: (Download) -> Download) =

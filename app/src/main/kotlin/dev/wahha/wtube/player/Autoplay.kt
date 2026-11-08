@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import dev.wahha.wtube.data.JsonFile
 import dev.wahha.wtube.data.VideoItem
+import dev.wahha.wtube.ui.components.movedBefore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,9 +70,8 @@ object PlayQueue {
 
     fun remove(id: String) = change { it.without(id) }
 
-    fun move(from: Int, to: Int) = change { list ->
-        if (from !in list.indices || to !in list.indices) list else list.toMutableList().apply { add(to, removeAt(from)) }
-    }
+    /** Puts [id] right above [before], or last when null. */
+    fun move(id: String, before: String?) = change { it.movedBefore(VideoItem::id, id, before) }
 
     fun clear() = change { emptyList() }
 

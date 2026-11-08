@@ -72,6 +72,7 @@ class ParserRobustnessTest {
     @Test fun home() = check("home.json") { FeedParser.page(it, timeAgo).items.toItems() }
     @Test fun homeMore() = check("home_more.json") { FeedParser.page(it, timeAgo).items.toItems() }
     @Test fun playlist() = check("playlist.json") { FeedParser.page(it, timeAgo).items.toItems(); FeedParser.playlistTitle(it) }
+    @Test fun ownPlaylist() = check("own_playlist.json") { FeedParser.page(it, timeAgo).items.toItems(); FeedParser.playlistEditing(it) }
     @Test fun channels() = check("channels.json") { FeedParser.page(it, timeAgo).items.toItems() }
     @Test fun channelVideos() = check("channel_videos.json") { Channels.extras(it); FeedParser.page(it, timeAgo).items.toItems() }
     @Test fun channelSearch() = check("channel_search.json") { FeedParser.page(it, timeAgo).items.toItems() }

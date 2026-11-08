@@ -28,6 +28,7 @@ import dev.wahha.wtube.player.YoutubeRequests
 import dev.wahha.wtube.ui.components.errorDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -35,6 +36,7 @@ import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.MediaFormat as StreamFormat
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
@@ -106,6 +108,7 @@ class DownloadService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startInForeground(notification(null, 0, 0))
+        if (intent?.action == ACTION_PAUSE) Downloads.pauseRunning()
         if (!running) {
             running = true
             scope.launch { work() }
@@ -120,7 +123,7 @@ class DownloadService : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) {
         scope.coroutineContext.cancelChildren()
         running = false
-        Downloads.pauseRunning()
+        Downloads.requeueRunning()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         val resume = PendingIntent.getForegroundService(
             this, 1, Intent(this, DownloadService::class.java), PendingIntent.FLAG_IMMUTABLE,
@@ -141,23 +144,37 @@ class DownloadService : Service() {
 
     private suspend fun work() {
         while (true) {
-            val download = Downloads.next() ?: break
+            val download = Downloads.claim() ?: if (finished()) return else continue
             try {
-                Downloads.update(download) { it.copy(state = DownloadState.RUNNING, error = null) }
                 fetchWithRetry(download)
+                // A pause during the muxing comes too late: it is done now.
                 Downloads.update(download) { it.copy(state = DownloadState.DONE, bytes = it.total) }
             } catch (e: CancellationException) {
-                // Removed or queued again meanwhile: nothing to report, the queue goes on.
-                if (Downloads.isCurrent(download)) throw e
+                // The service itself is stopping: this one stays for the next start.
+                currentCoroutineContext().ensureActive()
+                // Removed, paused or queued again meanwhile: nothing to report, the queue goes on.
+                if (Downloads.wanted(download)) throw e
             } catch (e: Exception) {
-                Log.w(TAG, "Download failed: ${errorDetail(e)}")
-                ErrorLog.note("[download] failed: ${errorDetail(e)}")
-                Downloads.update(download) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
+                // A paused download that also lost its connection is still just paused.
+                if (Downloads.wanted(download)) {
+                    Log.w(TAG, "Download failed: ${errorDetail(e)}")
+                    ErrorLog.note("[download] failed: ${errorDetail(e)}")
+                    Downloads.update(download) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
+                }
             }
         }
+    }
+
+    /**
+     * Stops the service unless something was queued since the last look. On the main thread, in turn with
+     * [onStartCommand]: a "continue" tapped right now either finds work still going or a stopped service.
+     */
+    private suspend fun finished(): Boolean = withContext(Dispatchers.Main.immediate) {
+        if (Downloads.hasQueued()) return@withContext false
         running = false
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        ServiceCompat.stopForeground(this@DownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
+        true
     }
 
     /**
@@ -174,8 +191,15 @@ class DownloadService : Service() {
                 Log.w(TAG, "Download interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
                 ErrorLog.note("[download] interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
                 delay(RETRY_PAUSES_MS[attempt++])
+                ensureWanted(download)
             }
         }
+    }
+
+    /** Stops the work on [download] by way of cancellation: being paused or removed is not a failure to retry. */
+    private suspend fun ensureWanted(download: Download) {
+        currentCoroutineContext().ensureActive()
+        if (!Downloads.wanted(download)) throw CancellationException("Download paused or removed")
     }
 
     private suspend fun fetch(download: Download) {
@@ -215,10 +239,7 @@ class DownloadService : Service() {
     private suspend fun part(download: Download, url: String, length: Long, target: File, offset: Long, total: Long) {
         downloadRange(Http.calls, url, length, target, CHUNK_BYTES, { link, from, to ->
             YoutubeRequests.rangeRequest(StreamServers.pick(link, Http.route), from, to)
-        }, ensureAlive = {
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            if (!Downloads.isCurrent(download)) throw CancellationException("Download removed")
-        }) { position ->
+        }, ensureAlive = { ensureWanted(download) }) { position ->
             Downloads.progress(download, offset + position)
             notify(download, total, offset + position, muxing = false)
         }
@@ -237,7 +258,15 @@ class DownloadService : Service() {
         val openApp = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE,
         )
-        return NotificationCompat.Builder(this, CHANNEL)
+        val builder = NotificationCompat.Builder(this, CHANNEL)
+        // Not while muxing: that step is not interrupted.
+        if (download != null && total > 0) {
+            val pause = PendingIntent.getForegroundService(
+                this, 2, Intent(this, DownloadService::class.java).setAction(ACTION_PAUSE), PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(0, getString(R.string.downloads_pause), pause)
+        }
+        return builder
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle(download?.video?.title ?: getString(R.string.downloads_title))
             .setContentText(getString(if (download != null && total == 0L) R.string.downloads_muxing else R.string.downloads_running))
@@ -261,6 +290,7 @@ class DownloadService : Service() {
     private companion object {
         const val TAG = "Downloads"
         const val CHANNEL = "downloads"
+        const val ACTION_PAUSE = "dev.wahha.wtube.download.PAUSE"
         const val NOTIFICATION_ID = 2
         // Up to 4 MB per request: like the player's segment requests, which googlevideo serves at full speed.
         const val CHUNK_BYTES = 4L * 1024 * 1024
@@ -315,7 +345,7 @@ internal class ExpiredException : IOException("Stream URL expired")
 /**
  * Appends bytes of [url] to [target] until it holds [length] of them, in requests of up to [chunk] bytes,
  * continuing from what [target] already holds. [onProgress] gets the size after each request; [ensureAlive]
- * throws to stop. A longer [target] is a stale leftover and is started over. An answer that does not
+ * throws to stop, also in the middle of a request, and what came until then stays in [target]. A longer [target] is a stale leftover and is started over. An answer that does not
  * start at the asked position (a server ignoring the range) is skipped into place or refused, never appended.
  */
 internal suspend fun downloadRange(
@@ -343,6 +373,7 @@ internal suspend fun downloadRange(
                 val body = source.inputStream()
                 val buffer = ByteArray(64 * 1024)
                 while (got < end - position) {
+                    ensureAlive()
                     val read = body.read(buffer, 0, minOf(buffer.size.toLong(), end - position - got).toInt())
                     if (read < 0) break
                     output.write(buffer, 0, read)

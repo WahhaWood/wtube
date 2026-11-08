@@ -1,5 +1,6 @@
 package dev.wahha.wtube.data
 
+import dev.wahha.wtube.data.innertube.PlaylistEditing
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.schabi.newpipe.extractor.Page
@@ -135,6 +136,10 @@ class PlaylistDetails(
     val uploader: String?,
     val count: Long,
     val firstPage: ItemsPage,
+    /** Null unless the signed-in account may change this playlist. */
+    val editing: PlaylistEditing? = null,
+    /** Where each video of [firstPage] stands in the playlist, by video id; only with [editing]. */
+    val setVideoIds: Map<String, String> = emptyMap(),
 )
 
 sealed interface LinkTarget {

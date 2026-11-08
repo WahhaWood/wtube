@@ -1,6 +1,10 @@
 package dev.wahha.wtube.data.innertube
 
+import com.grack.nanojson.JsonBuilder
+import com.grack.nanojson.JsonObject
 import dev.wahha.wtube.data.PlaylistItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Session
@@ -18,6 +22,15 @@ object Actions {
     const val WATCH_LATER = Feeds.WATCH_LATER
 
     private fun session() = Account.active ?: throw SessionExpiredException()
+
+    /** Goes up each time a playlist is made or deleted here; the lists of the account's playlists reload. */
+    val playlistsChanged = MutableStateFlow(0)
+
+    /** Names given here, by playlist id. YouTube's list of playlists shows a new name only after a while, so the lists put these over it. */
+    val renamedPlaylists = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    fun withNewName(playlist: PlaylistItem): PlaylistItem =
+        renamedPlaylists.value[YouTube.playlistIdOf(playlist.url)]?.let { playlist.copy(name = it) } ?: playlist
 
     /** The account's view of [videoId]: its rating, subscription and comments token; signed out, only the token. */
     suspend fun watch(videoId: String, session: Session? = Account.active): Watch {
@@ -57,12 +70,41 @@ object Actions {
             }
     }
 
-    suspend fun setInPlaylist(playlistId: String, videoId: String, add: Boolean) {
+    suspend fun setInPlaylist(playlistId: String, videoId: String, add: Boolean) = editPlaylist(playlistId) {
+        if (add) value("action", "ACTION_ADD_VIDEO").value("addedVideoId", videoId)
+        else value("action", "ACTION_REMOVE_VIDEO_BY_VIDEO_ID").value("removedVideoId", videoId)
+    }
+
+    /** Takes out the one place [setVideoId] of a video, not every copy of it. */
+    suspend fun removeFromPlaylist(playlist: PlaylistEditing, setVideoId: String) = editPlaylist(playlist.playlistId, playlist.params) {
+        value("action", "ACTION_REMOVE_VIDEO").value("setVideoId", setVideoId)
+    }
+
+    /** Puts [setVideoId] right above the place [before], or, without it, right below [after]. */
+    suspend fun moveInPlaylist(playlist: PlaylistEditing, setVideoId: String, before: String?, after: String?) =
+        editPlaylist(playlist.playlistId, playlist.params) {
+            value("setVideoId", setVideoId)
+            if (before != null) value("action", "ACTION_MOVE_VIDEO_BEFORE").value("movedSetVideoIdSuccessor", before)
+            else value("action", "ACTION_MOVE_VIDEO_AFTER").value("movedSetVideoIdPredecessor", after)
+        }
+
+    suspend fun renamePlaylist(playlist: PlaylistEditing, name: String) {
+        editPlaylist(playlist.playlistId, playlist.params) { value("action", "ACTION_SET_PLAYLIST_NAME").value("playlistName", name) }
+        renamedPlaylists.update { it + (playlist.playlistId to name) }
+    }
+
+    suspend fun deletePlaylist(playlistId: String) {
+        InnerTube.post(session(), "playlist/delete") { value("playlistId", playlistId) }
+        playlistsChanged.update { it + 1 }
+    }
+
+    // One action of the web app's playlist editor; YouTube answers a refused one with a status, not an HTTP error.
+    private suspend fun editPlaylist(playlistId: String, params: String? = null, action: JsonBuilder<JsonObject>.() -> Unit) {
         val response = InnerTube.post(session(), "browse/edit_playlist") {
             value("playlistId", playlistId)
+            params?.let { value("params", it) }
             array("actions").`object`()
-            if (add) value("action", "ACTION_ADD_VIDEO").value("addedVideoId", videoId)
-            else value("action", "ACTION_REMOVE_VIDEO_BY_VIDEO_ID").value("removedVideoId", videoId)
+            action()
             end().end()
         }
         val status = response.getString("status")
@@ -77,6 +119,7 @@ object Actions {
             array("videoIds").value(videoId).end()
         }
         if (response.getString("playlistId") == null) throw ActionRejectedException("playlist/create: no playlist")
+        playlistsChanged.update { it + 1 }
     }
 
     /**

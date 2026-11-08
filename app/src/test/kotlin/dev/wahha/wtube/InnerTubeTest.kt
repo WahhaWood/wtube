@@ -104,6 +104,32 @@ class InnerTubeTest {
     }
 
     @Test
+    fun ownPlaylistIsEditableWithPlacesAndNoSuggestionsCursor() {
+        // The account's own five-video playlist, as YouTube gives it signed in (2026-11-08, WEB 2.20261105).
+        val response = fixture("own_playlist.json")
+        val page = FeedParser.page(response, timeAgo)
+        val videos = page.items.toItems().filterIsInstance<VideoItem>()
+        assertEquals(listOf("aqz-KE-bpKQ", "jNQXAC9IVRw", "9bZkp7q19f0", "kJQP7kiw5Fk", "dQw4w9WgXcQ"), videos.map { it.id })
+        assertEquals(videos.map { it.id }.toSet(), page.setVideoIds.keys)
+        assertEquals("56B44F6D10557CC6", page.setVideoIds["aqz-KE-bpKQ"])
+        val editing = FeedParser.playlistEditing(response)!!
+        assertEquals("PLK_TmugJLamM", editing.playlistId)
+        assertEquals("CAFAAQ%3D%3D", editing.params)
+        assertTrue(editing.canReorder)
+        // The only cursor loads suggested videos below the list, not more of it.
+        assertTrue(page.continuation != null)
+        val list = FeedParser.findFirst(response["contents"], "playlistVideoListRenderer")!!
+        assertEquals(null, FeedParser.continuationIn(list))
+    }
+
+    @Test
+    fun someoneElsesPlaylistIsNotEditable() {
+        val response = fixture("playlist.json")
+        assertEquals(null, FeedParser.playlistEditing(response))
+        assertTrue(FeedParser.page(response, timeAgo).setVideoIds.isEmpty())
+    }
+
+    @Test
     fun channelListParses() {
         val channels = FeedParser.page(fixture("channels.json"), timeAgo).items.toItems()
         val channel = channels.single() as ChannelItem

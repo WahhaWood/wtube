@@ -40,14 +40,25 @@ import dev.wahha.wtube.ui.components.systemTop
 import dev.wahha.wtube.ui.icon.ArrowBack
 import dev.wahha.wtube.ui.icon.History
 import dev.wahha.wtube.ui.icon.WIcons
+import dev.wahha.wtube.data.innertube.Actions
+import dev.wahha.wtube.data.PlaylistItem
+import dev.wahha.wtube.data.ItemsPage
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 class FeedViewModel(browseId: String) : ViewModel() {
     val list = PagedList(viewModelScope, Item::url, cache = { FeedCache.account(browseId) }) { page ->
-        if (browseId == Feeds.PLAYLISTS) Feeds.playlists(page) else Feeds.feed(browseId, page)
+        if (browseId == Feeds.PLAYLISTS) Feeds.playlists(page).let { ItemsPage(it.items.map(::withNewName), it.next) } else Feeds.feed(browseId, page)
     }
+
+    private fun withNewName(item: Item) = if (item is PlaylistItem) Actions.withNewName(item) else item
 
     init {
         list.refresh()
+        if (browseId == Feeds.PLAYLISTS) {
+            viewModelScope.launch { Actions.playlistsChanged.drop(1).collect { list.refresh() } }
+            viewModelScope.launch { Actions.renamedPlaylists.drop(1).collect { list.change { items -> items.map(::withNewName) } } }
+        }
     }
 }
 

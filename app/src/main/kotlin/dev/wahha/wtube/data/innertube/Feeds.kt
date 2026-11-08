@@ -45,14 +45,19 @@ object Feeds {
         return itemsPage(response)
     }
 
-    /** The page a cursor of any of these lists points to; the channel lists of [Channels] need no account. */
-    suspend fun more(page: Page): ItemsPage = itemsPage(InnerTube.browse(Account.active, continuation = page.id))
+    /**
+     * The page a cursor of any of these lists points to; the channel lists of [Channels] need no account.
+     * In a playlist the account may change, the places of its videos go to [setVideoIds].
+     */
+    suspend fun more(page: Page, setVideoIds: MutableMap<String, String>? = null): ItemsPage =
+        itemsPage(InnerTube.browse(Account.active, continuation = page.id), setVideoIds)
 
     /** The items of a browse response and the cursor of its next page. */
-    internal fun itemsPage(response: JsonObject): ItemsPage {
+    internal fun itemsPage(response: JsonObject, setVideoIds: MutableMap<String, String>? = null): ItemsPage {
         val parsed = FeedParser.page(response, timeAgoParser())
         val items = parsed.items.toItems()
         WatchProgress.record(parsed.resume, items)
+        setVideoIds?.let { known -> parsed.setVideoIds.forEach { (id, place) -> known.putIfAbsent(id, place) } }
         return ItemsPage(items, parsed.continuation?.let { Page(CURSOR, it) })
     }
 
@@ -69,13 +74,19 @@ object Feeds {
         val parsed = FeedParser.page(response, timeAgoParser())
         val items = parsed.items.toItems()
         WatchProgress.record(parsed.resume, items)
+        // Below a short playlist of its own the account gets a section of suggested videos with a cursor of its
+        // own: that is not the next page. The list's cursor, if it has more, is inside the list.
+        val list = FeedParser.findFirst(response["contents"], "playlistVideoListRenderer")
+        val next = if (list != null) FeedParser.continuationIn(list) else parsed.continuation
         return PlaylistDetails(
             url = url,
             name = FeedParser.playlistTitle(response).orEmpty(),
             thumbnail = items.firstNotNullOfOrNull { (it as? VideoItem)?.thumbnail },
             uploader = null,
             count = -1,
-            firstPage = ItemsPage(items, parsed.continuation?.let { Page(CURSOR, it) }),
+            firstPage = ItemsPage(items, next?.let { Page(CURSOR, it) }),
+            editing = FeedParser.playlistEditing(response),
+            setVideoIds = parsed.setVideoIds,
         )
     }
 
