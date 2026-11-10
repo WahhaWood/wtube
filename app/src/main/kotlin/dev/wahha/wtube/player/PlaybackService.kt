@@ -3,6 +3,8 @@ package dev.wahha.wtube.player
 import dev.wahha.wtube.ui.components.errorDetail
 import android.app.PendingIntent
 import android.content.Context
+import dev.wahha.wtube.data.AppLocale
+import android.content.res.Configuration
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
@@ -77,6 +79,11 @@ import kotlinx.coroutines.launch
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private val scope = MainScope()
+
+    // Media3's own notification texts in the interface language, not the phone's.
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base.createConfigurationContext(Configuration(base.resources.configuration).apply { setLocale(AppLocale) }))
+    }
     private var session: MediaSession? = null
     private lateinit var exo: ExoPlayer
     private var videoDecoder: String? = null
@@ -176,7 +183,7 @@ class PlaybackService : MediaSessionService() {
         val longSide = cap?.let(::capLongSide) ?: Int.MAX_VALUE
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setMaxVideoSize(longSide, longSide)
-            .setPreferredTextLanguage(settings.subtitleLanguage)
+            .setPreferredTextLanguage(settings.captionLanguage)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !settings.subtitles)
             .build()
     }

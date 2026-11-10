@@ -1,5 +1,6 @@
 package dev.wahha.wtube.download
 
+import dev.wahha.wtube.data.AppLanguage
 import dev.wahha.wtube.data.ErrorLog
 import android.app.Notification
 import android.app.NotificationChannel
@@ -100,6 +101,9 @@ private fun length(stream: org.schabi.newpipe.extractor.stream.Stream): Long = s
  * together into one MP4.
  */
 class DownloadService : Service() {
+    /** Notification texts in the interface language, which a service does not get by itself. */
+    private val strings get() = AppLanguage.strings(this)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var running = false
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
@@ -132,11 +136,11 @@ class DownloadService : Service() {
             NOTIFICATION_ID + 1,
             NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
-                .setContentTitle(getString(R.string.downloads_title))
-                .setContentText(getString(R.string.downloads_paused))
+                .setContentTitle(strings.getString(R.string.downloads_title))
+                .setContentText(strings.getString(R.string.downloads_paused))
                 .setAutoCancel(true)
                 .setContentIntent(resume)
-                .addAction(0, getString(R.string.downloads_continue), resume)
+                .addAction(0, strings.getString(R.string.downloads_continue), resume)
                 .build(),
         )
         stopSelf()
@@ -252,7 +256,7 @@ class DownloadService : Service() {
     private fun notification(download: Download?, total: Long, bytes: Long): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             notifications.createNotificationChannel(
-                NotificationChannel(CHANNEL, getString(R.string.downloads_title), NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL, strings.getString(R.string.downloads_title), NotificationManager.IMPORTANCE_LOW),
             )
         }
         val openApp = PendingIntent.getActivity(
@@ -264,12 +268,12 @@ class DownloadService : Service() {
             val pause = PendingIntent.getForegroundService(
                 this, 2, Intent(this, DownloadService::class.java).setAction(ACTION_PAUSE), PendingIntent.FLAG_IMMUTABLE,
             )
-            builder.addAction(0, getString(R.string.downloads_pause), pause)
+            builder.addAction(0, strings.getString(R.string.downloads_pause), pause)
         }
         return builder
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
-            .setContentTitle(download?.video?.title ?: getString(R.string.downloads_title))
-            .setContentText(getString(if (download != null && total == 0L) R.string.downloads_muxing else R.string.downloads_running))
+            .setContentTitle(download?.video?.title ?: strings.getString(R.string.downloads_title))
+            .setContentText(strings.getString(if (download != null && total == 0L) R.string.downloads_muxing else R.string.downloads_running))
             .setProgress(total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), bytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), total == 0L)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

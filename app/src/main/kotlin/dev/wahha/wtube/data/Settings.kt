@@ -19,7 +19,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -31,8 +33,8 @@ data class AppSettings(
     /** The last speed picked in the player; new videos start at it. */
     val speed: Float = 1f,
     val subtitles: Boolean = false,
-    /** Language of the last caption track picked, preferred when a new video starts with captions on. */
-    val subtitleLanguage: String = "ru",
+    /** Language of the last caption track picked, preferred when a new video starts with captions on; "" = the interface's. */
+    val subtitleLanguage: String = "",
     /** Index into [Settings.SubtitleScales]. */
     val subtitleSize: Int = 1,
     val subtitleBackground: Boolean = true,
@@ -92,7 +94,12 @@ data class AppSettings(
     val gestureBrightnessLevel: Float = -1f,
     /** A tick under the finger at 0 and 100%. */
     val gestureHaptics: Boolean = true,
-)
+    /** One of [AppLanguage.Choices]: the interface language, "" = the phone's. */
+    val appLanguage: String = AppLanguage.SYSTEM,
+) {
+    /** [subtitleLanguage], or the interface's while none was picked. */
+    val captionLanguage: String get() = subtitleLanguage.ifEmpty { AppLocale.language }
+}
 
 /** User settings in DataStore, mirrored into [current] so the player and UI read them synchronously. */
 object Settings {
@@ -136,6 +143,7 @@ object Settings {
     val GestureRememberBrightness = booleanPreferencesKey("gesture_remember_brightness")
     val GestureBrightnessLevel = floatPreferencesKey("gesture_brightness_level")
     val GestureHaptics = booleanPreferencesKey("gesture_haptics")
+    val AppLanguageChoice = stringPreferencesKey("app_language")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -169,6 +177,11 @@ object Settings {
 
     fun init(context: Context) {
         val store = context.applicationContext.dataStore.also { store = it }
+        // The first activity takes its language from here as it attaches, before any coroutine would have run.
+        runCatching { runBlocking { store.data.first() } }.onSuccess {
+            state.value = it.toSettings()
+            mutableLoaded.value = true
+        }
         scope.launch {
             store.data.collect {
                 state.value = it.toSettings()
@@ -229,6 +242,7 @@ object Settings {
         this[GestureRememberBrightness] = settings.gestureRememberBrightness
         this[GestureBrightnessLevel] = settings.gestureBrightnessLevel
         this[GestureHaptics] = settings.gestureHaptics
+        this[AppLanguageChoice] = settings.appLanguage
     }
 
     internal fun Preferences.toSettings(): AppSettings {
@@ -274,6 +288,7 @@ object Settings {
             gestureRememberBrightness = this[GestureRememberBrightness] ?: defaults.gestureRememberBrightness,
             gestureBrightnessLevel = this[GestureBrightnessLevel] ?: defaults.gestureBrightnessLevel,
             gestureHaptics = this[GestureHaptics] ?: defaults.gestureHaptics,
+            appLanguage = this[AppLanguageChoice]?.takeIf { it in AppLanguage.Choices } ?: defaults.appLanguage,
         )
     }
 }

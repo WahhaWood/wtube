@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.settings
 
+import dev.wahha.wtube.data.AppLanguage
 import dev.wahha.wtube.data.MembersOnly
 import dev.wahha.wtube.data.Recommendations
 import dev.wahha.wtube.data.SeenVideos
@@ -81,8 +82,9 @@ import dev.wahha.wtube.ui.glass.GlassSupported
 import dev.wahha.wtube.ui.icon.ArrowBack
 import dev.wahha.wtube.ui.icon.Check
 import dev.wahha.wtube.ui.icon.WIcons
+import dev.wahha.wtube.ui.video.QuickSpeeds
+import dev.wahha.wtube.ui.video.languageName
 import dev.wahha.wtube.ui.video.speedLabel
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -221,7 +223,7 @@ fun SettingsScreen() {
             SwitchRow(stringResource(R.string.settings_subtitles_on), stringResource(R.string.settings_subtitles_on_summary), settings.subtitles, Settings.Subtitles)
         }
         item {
-            ValueRow(stringResource(R.string.settings_subtitle_language), languageName(settings.subtitleLanguage)) { sheet = SettingsSheet.SubtitleLanguage }
+            ValueRow(stringResource(R.string.settings_subtitle_language), languageName(settings.captionLanguage).orEmpty()) { sheet = SettingsSheet.SubtitleLanguage }
         }
         item {
             ValueRow(stringResource(R.string.settings_subtitle_size), stringResource(SubtitleSizeNames[settings.subtitleSize])) { sheet = SettingsSheet.SubtitleSize }
@@ -236,6 +238,7 @@ fun SettingsScreen() {
         }
 
         item { SectionHeader(stringResource(R.string.settings_appearance)) }
+        item { ValueRow(stringResource(R.string.settings_language), languageChoiceName(settings.appLanguage)) { sheet = SettingsSheet.Language } }
         item { ValueRow(stringResource(R.string.settings_font), stringResource(FontNames[settings.font.coerceIn(FontNames.indices)])) { sheet = SettingsSheet.Font } }
         item {
             ValueRow(stringResource(R.string.settings_text_size), stringResource(TextSizeNames[settings.textSize.coerceIn(TextSizeNames.indices)])) {
@@ -375,7 +378,7 @@ fun SettingsScreen() {
             ChoiceSheet(stringResource(R.string.settings_quality), Settings.QualityChoices, settings.maxQuality, { qualityLabel(it) }, Settings.MaxQuality, dismiss)
         SettingsSheet.QualityMobile ->
             ChoiceSheet(stringResource(R.string.settings_quality_mobile), Settings.QualityChoices, settings.maxQualityMobile, { qualityLabel(it) }, Settings.MaxQualityMobile, dismiss)
-        SettingsSheet.Speed -> ChoiceSheet(stringResource(R.string.settings_speed), SpeedChoices, settings.speed, { speedLabel(it) }, Settings.Speed, dismiss)
+        SettingsSheet.Speed -> ChoiceSheet(stringResource(R.string.settings_speed), QuickSpeeds, settings.speed, { speedLabel(it) }, Settings.Speed, dismiss)
         SettingsSheet.DoubleTap -> ChoiceSheet(
             stringResource(R.string.settings_double_tap),
             Settings.DoubleTapChoices,
@@ -386,9 +389,9 @@ fun SettingsScreen() {
         )
         SettingsSheet.SubtitleLanguage -> ChoiceSheet(
             stringResource(R.string.settings_subtitle_language),
-            (SubtitleLanguages + settings.subtitleLanguage).distinct(),
-            settings.subtitleLanguage,
-            { languageName(it) },
+            (SubtitleLanguages + settings.captionLanguage).distinct(),
+            settings.captionLanguage,
+            { languageName(it) ?: it },
             Settings.SubtitleLanguage,
             dismiss,
         )
@@ -442,6 +445,8 @@ fun SettingsScreen() {
             dismiss,
         )
         SettingsSheet.Hidden -> HiddenSheet(hidden, dismiss)
+        SettingsSheet.Language ->
+            ChoiceSheet(stringResource(R.string.settings_language), AppLanguage.Choices, settings.appLanguage, { languageChoiceName(it) }, Settings.AppLanguageChoice, dismiss)
         SettingsSheet.Font ->
             ChoiceSheet(stringResource(R.string.settings_font), FontNames.indices.toList(), settings.font, { stringResource(FontNames[it]) }, Settings.Font, dismiss)
         SettingsSheet.TextSize ->
@@ -498,8 +503,18 @@ private fun qualityLabel(maxQuality: Int): String =
     if (maxQuality == 0) stringResource(R.string.settings_quality_auto) else stringResource(R.string.settings_quality_max, maxQuality)
 
 private enum class SettingsSheet {
-    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, MinDuration, MembersOnly, Font, TextSize, Hidden,
+    Quality, QualityMobile, Speed, DoubleTap, GestureSides, GestureZone, GestureSensitivity, SubtitleLanguage, SubtitleSize, SponsorCategories, MinDuration, MembersOnly, Language, Font, TextSize, Hidden,
 }
+
+/** Each language by its own name, so it can be found whatever the interface speaks now. */
+@Composable
+private fun languageChoiceName(choice: String) = stringResource(
+    when (choice) {
+        "ru" -> R.string.language_ru
+        "en" -> R.string.language_en
+        else -> R.string.settings_language_system
+    },
+)
 
 // In the order of the theme's font families and text scales.
 private val FontNames = listOf(R.string.settings_font_inter, R.string.settings_font_system, R.string.settings_font_montserrat)
@@ -530,7 +545,6 @@ private val MembersOnlyNames = mapOf(
 private fun gestureSidesName(swapped: Boolean) =
     if (swapped) R.string.settings_gesture_sides_swapped else R.string.settings_gesture_sides_default
 
-private val SpeedChoices = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 private val SubtitleLanguages = listOf("ru", "en", "uk", "be", "kk", "de", "fr", "es", "it", "pt", "pl", "tr", "ja", "ko", "zh")
 private val SubtitleSizeNames = listOf(
     R.string.settings_subtitle_size_small,
@@ -538,12 +552,6 @@ private val SubtitleSizeNames = listOf(
     R.string.settings_subtitle_size_large,
     R.string.settings_subtitle_size_huge,
 )
-
-/** "Английский" for "en", in Russian whatever the phone's language. */
-private fun languageName(tag: String): String {
-    val russian = Locale.forLanguageTag("ru")
-    return Locale.forLanguageTag(tag).getDisplayName(russian).replaceFirstChar { it.titlecase(russian) }
-}
 
 /** Which SponsorBlock categories to skip: a checklist that saves on every tap. */
 @OptIn(ExperimentalMaterial3Api::class)

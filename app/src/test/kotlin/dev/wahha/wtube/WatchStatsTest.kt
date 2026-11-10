@@ -5,6 +5,7 @@ import dev.wahha.wtube.data.StatsEntry
 import dev.wahha.wtube.data.StatsRange
 import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.formatWatchTime
+import java.util.Locale
 import dev.wahha.wtube.data.summarize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -80,9 +81,11 @@ class WatchStatsTest {
 
     @Test
     fun watchTimeReadsInHoursAndMinutes() {
-        assertEquals("< 1 мин", formatWatchTime(59))
-        assertEquals("5 мин", formatWatchTime(300))
-        assertEquals("2 ч 05 мин", formatWatchTime(7_500))
+        assertEquals("< 1 мин", formatWatchTime(59, Russian))
+        assertEquals("5 мин", formatWatchTime(300, Russian))
+        assertEquals("2 ч 05 мин", formatWatchTime(7_500, Russian))
+        assertEquals("< 1 min", formatWatchTime(59, Locale.ENGLISH))
+        assertEquals("2 h 05 min", formatWatchTime(7_500, Locale.ENGLISH))
     }
 
     @Test
@@ -92,3 +95,5 @@ class WatchStatsTest {
         assertTrue(Backup.parse(Backup.current()).stats.isEmpty())
     }
 }
+
+private val Russian = Locale.forLanguageTag("ru-RU")

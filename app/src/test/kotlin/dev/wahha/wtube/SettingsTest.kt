@@ -47,7 +47,7 @@ class SettingsTest {
         sponsorCategories = setOf("intro"), showDislikes = false, font = 2, textSize = 0, pureBlack = true,
         hideWatched = true, hideWatchedRecommended = false, minDurationMinutes = 5, hideStreams = true, demoteSeen = false, membersOnly = 2, coverAccent = false, deArrow = true, updateCheck = false, dpiBypass = true,
         gestureBrightness = false, gestureVolume = false, gestureSwapSides = true, gestureZone = 2, gestureSensitivity = 0,
-        gestureRememberBrightness = true, gestureBrightnessLevel = 0.4f, gestureHaptics = false,
+        gestureRememberBrightness = true, gestureBrightnessLevel = 0.4f, gestureHaptics = false, appLanguage = "en",
     )
 
     @Test

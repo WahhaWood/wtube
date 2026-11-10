@@ -5,14 +5,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/**
- * The app speaks Russian only, so plural rules, dates and YouTube's own texts follow Russian whatever
- * the device language is; the region stays the device's, it picks the trending lists.
- */
-val AppLocale: Locale by lazy {
-    Locale.Builder().setLanguage("ru").setRegion(Locale.getDefault().country.takeIf { it.length == 2 }.orEmpty()).build()
-}
-
 /** "3:07", "1:02:03"; live and unknown durations (<= 0) give an empty string. */
 fun formatDuration(seconds: Long): String {
     if (seconds <= 0) return ""
@@ -26,28 +18,41 @@ fun formatDuration(seconds: Long): String {
 fun formatClock(millis: Long): String = formatDuration(millis.coerceAtLeast(0) / 1000).ifEmpty { "0:00" }
 
 /**
- * YouTube-style short Russian counts: "999", "1,2 тыс.", "12 тыс.", "3,4 млн", "1,1 млрд".
- * Truncates rather than rounds, as YouTube does, so 1 999 is "1,9 тыс." and never "2 тыс.".
+ * YouTube-style short counts: "999", "1,2 тыс.", "12 тыс.", "3,4 млн", "1,1 млрд" in Russian, "1.2K", "12K",
+ * "3.4M", "1.1B" in English. Truncates rather than rounds, as YouTube does, so 1 999 is "1,9 тыс." and never "2 тыс.".
  */
-fun formatCompact(count: Long): String {
+fun formatCompact(count: Long, locale: Locale = AppLocale): String {
     if (count < 1000) return count.coerceAtLeast(0).toString()
+    val russian = locale.isRussian
     val (unit, suffix) = when {
-        count < 1_000_000 -> 1_000L to "тыс."
-        count < 1_000_000_000 -> 1_000_000L to "млн"
-        else -> 1_000_000_000L to "млрд"
+        count < 1_000_000 -> 1_000L to if (russian) " тыс." else "K"
+        count < 1_000_000_000 -> 1_000_000L to if (russian) " млн" else "M"
+        else -> 1_000_000_000L to if (russian) " млрд" else "B"
     }
     val whole = count / unit
-    if (whole >= 10) return "$whole $suffix"
+    if (whole >= 10) return "$whole$suffix"
     val tenth = count % unit * 10 / unit
-    return if (tenth == 0L) "$whole $suffix" else "$whole,$tenth $suffix"
+    return if (tenth == 0L) "$whole$suffix" else "$whole${if (russian) ',' else '.'}$tenth$suffix"
 }
 
-/** "только что", "5 минут назад", "1 неделю назад", "3 месяца назад", "2 года назад". */
-fun formatAgo(thenMillis: Long, nowMillis: Long): String {
+/** "только что", "5 минут назад", "1 неделю назад"; "just now", "5 minutes ago", "1 week ago". */
+fun formatAgo(thenMillis: Long, nowMillis: Long, locale: Locale = AppLocale): String {
     val seconds = ((nowMillis - thenMillis) / 1000).coerceAtLeast(0)
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
+    if (!locale.isRussian) {
+        val amount = when {
+            minutes < 1 -> return "just now"
+            hours < 1 -> enPlural(minutes, "minute")
+            days < 1 -> enPlural(hours, "hour")
+            days < 7 -> enPlural(days, "day")
+            days < 30 -> enPlural(days / 7, "week")
+            days < 365 -> enPlural(days / 30, "month")
+            else -> enPlural(days / 365, "year")
+        }
+        return "$amount ago"
+    }
     val amount = when {
         minutes < 1 -> return "только что"
         hours < 1 -> ruPlural(minutes, "минуту", "минуты", "минут")
@@ -59,6 +64,11 @@ fun formatAgo(thenMillis: Long, nowMillis: Long): String {
     }
     return "$amount назад"
 }
+
+private val Locale.isRussian get() = language == "ru"
+
+/** "1 week", "3 weeks". */
+private fun enPlural(n: Long, one: String): String = if (n == 1L) "1 $one" else "$n ${one}s"
 
 /** "1 год", "3 года", "11 лет", "21 год": Russian count agreement. */
 fun ruPlural(n: Long, one: String, few: String, many: String): String {
@@ -79,19 +89,32 @@ fun parseYoutubeTime(t: String): Long? {
     return (h.toLongOrNull() ?: 0) * 3600 + (m.toLongOrNull() ?: 0) * 60 + (s.toLongOrNull() ?: 0)
 }
 
-/** "5 мин", "2 ч 05 мин"; under a minute reads "< 1 мин". */
-fun formatWatchTime(seconds: Long): String {
+/** "5 мин", "2 ч 05 мин" ("5 min", "2 h 05 min"); under a minute reads "< 1 мин". */
+fun formatWatchTime(seconds: Long, locale: Locale = AppLocale): String {
     val minutes = seconds.coerceAtLeast(0) / 60
+    val (min, h) = if (locale.isRussian) "мин" to "ч" else "min" to "h"
     return when {
-        minutes < 1 -> "< 1 мин"
-        minutes < 60 -> "$minutes мин"
-        else -> "%d ч %02d мин".format(minutes / 60, minutes % 60)
+        minutes < 1 -> "< 1 $min"
+        minutes < 60 -> "$minutes $min"
+        else -> "%d $h %02d $min".format(minutes / 60, minutes % 60)
     }
 }
 
-/** When a list on the screen was loaded: "14:20" today, "6 нояб., 14:20" on another day. */
-fun formatLoadedAt(millis: Long, nowMillis: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+/** When a list on the screen was loaded: "14:20" today, "6 нояб., 14:20" ("Nov 6, 14:20") on another day. */
+fun formatLoadedAt(
+    millis: Long,
+    nowMillis: Long = System.currentTimeMillis(),
+    zone: ZoneId = ZoneId.systemDefault(),
+    locale: Locale = AppLocale,
+): String {
     val at = Instant.ofEpochMilli(millis).atZone(zone)
     val today = at.toLocalDate() == Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
-    return DateTimeFormatter.ofPattern(if (today) "HH:mm" else "d MMM, HH:mm", AppLocale).format(at)
+    return DateTimeFormatter.ofPattern(
+        when {
+            today -> "HH:mm"
+            locale.isRussian -> "d MMM, HH:mm"
+            else -> "MMM d, HH:mm"
+        },
+        locale,
+    ).format(at)
 }

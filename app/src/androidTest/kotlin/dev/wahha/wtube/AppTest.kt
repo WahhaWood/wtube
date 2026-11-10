@@ -32,12 +32,17 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.wahha.wtube.data.History
+import dev.wahha.wtube.data.AppLanguage
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.VideoItem
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +62,14 @@ class AppTest {
     private fun launch(intent: Intent? = null) {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         scenario = ActivityScenario.launch(intent ?: Intent(context, MainActivity::class.java))
+    }
+
+    /** The tests look for Russian texts: the phone's own language must not switch the interface. */
+    @Before
+    fun russian() {
+        AppLanguage.toSystemSettings(ApplicationProvider.getApplicationContext(), "ru")
+        Settings.set(Settings.AppLanguageChoice, "ru")
+        runBlocking { withTimeout(5_000) { Settings.current.first { it.appLanguage == "ru" } } }
     }
 
     @After

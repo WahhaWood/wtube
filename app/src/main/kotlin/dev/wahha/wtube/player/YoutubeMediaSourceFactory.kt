@@ -2,6 +2,7 @@
 
 package dev.wahha.wtube.player
 
+import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.ErrorLog
 import androidx.media3.datasource.FileDataSource
 import android.media.MediaCodecInfo
@@ -124,8 +125,8 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
      * player prefers over auto-generated ones of the same language; the format id tells the UI the kind.
      */
     private fun withSubtitles(main: MediaSource, info: StreamInfo): MediaSource {
-        // The app is Russian only, so machine translation always targets Russian.
-        val tracks = subtitleTracks(info.subtitles, translateTo = "ru")
+        // Machine translation targets the interface language.
+        val tracks = subtitleTracks(info.subtitles, translateTo = AppLocale.language)
         if (tracks.isEmpty()) return main
         val factory = SingleSampleMediaSource.Factory(subtitleDataSource).also { f -> errorPolicy?.let { f.setLoadErrorHandlingPolicy(it) } }
         val subtitles = tracks.map { track ->

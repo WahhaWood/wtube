@@ -12,7 +12,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import dev.wahha.wtube.data.AppLanguage
 import java.time.ZoneOffset
+import java.util.Locale
+
+private val Russian = Locale.forLanguageTag("ru-RU")
+private val English = Locale.forLanguageTag("en-US")
 
 class FormatTest {
     @Test
@@ -34,16 +39,16 @@ class FormatTest {
 
     @Test
     fun compactCountsTruncateLikeYoutube() {
-        assertEquals("0", formatCompact(0))
-        assertEquals("999", formatCompact(999))
-        assertEquals("1 тыс.", formatCompact(1_000))
-        assertEquals("1,2 тыс.", formatCompact(1_234))
-        assertEquals("1,9 тыс.", formatCompact(1_999))
-        assertEquals("12 тыс.", formatCompact(12_345))
-        assertEquals("999 тыс.", formatCompact(999_999))
-        assertEquals("1 млн", formatCompact(1_000_000))
-        assertEquals("3,4 млн", formatCompact(3_456_789))
-        assertEquals("1,1 млрд", formatCompact(1_100_000_000))
+        assertEquals("0", formatCompact(0, Russian))
+        assertEquals("999", formatCompact(999, Russian))
+        assertEquals("1 тыс.", formatCompact(1_000, Russian))
+        assertEquals("1,2 тыс.", formatCompact(1_234, Russian))
+        assertEquals("1,9 тыс.", formatCompact(1_999, Russian))
+        assertEquals("12 тыс.", formatCompact(12_345, Russian))
+        assertEquals("999 тыс.", formatCompact(999_999, Russian))
+        assertEquals("1 млн", formatCompact(1_000_000, Russian))
+        assertEquals("3,4 млн", formatCompact(3_456_789, Russian))
+        assertEquals("1,1 млрд", formatCompact(1_100_000_000, Russian))
     }
 
     @Test
@@ -63,16 +68,16 @@ class FormatTest {
         val now = 1_800_000_000_000L
         val minute = 60_000L
         val day = 24 * 60 * minute
-        assertEquals("только что", formatAgo(now - 30_000, now))
-        assertEquals("только что", formatAgo(now + day, now))
-        assertEquals("1 минуту назад", formatAgo(now - minute, now))
-        assertEquals("5 минут назад", formatAgo(now - 5 * minute, now))
-        assertEquals("2 часа назад", formatAgo(now - 120 * minute, now))
-        assertEquals("1 день назад", formatAgo(now - day, now))
-        assertEquals("1 неделю назад", formatAgo(now - 8 * day, now))
-        assertEquals("3 недели назад", formatAgo(now - 22 * day, now))
-        assertEquals("3 месяца назад", formatAgo(now - 95 * day, now))
-        assertEquals("21 год назад", formatAgo(now - 21 * 366 * day, now))
+        assertEquals("только что", formatAgo(now - 30_000, now, Russian))
+        assertEquals("только что", formatAgo(now + day, now, Russian))
+        assertEquals("1 минуту назад", formatAgo(now - minute, now, Russian))
+        assertEquals("5 минут назад", formatAgo(now - 5 * minute, now, Russian))
+        assertEquals("2 часа назад", formatAgo(now - 120 * minute, now, Russian))
+        assertEquals("1 день назад", formatAgo(now - day, now, Russian))
+        assertEquals("1 неделю назад", formatAgo(now - 8 * day, now, Russian))
+        assertEquals("3 недели назад", formatAgo(now - 22 * day, now, Russian))
+        assertEquals("3 месяца назад", formatAgo(now - 95 * day, now, Russian))
+        assertEquals("21 год назад", formatAgo(now - 21 * 366 * day, now, Russian))
     }
 
     @Test
@@ -95,8 +100,51 @@ class FormatTest {
     @Test
     fun loadedAtShowsTheDayOnlyWhenItIsAnother() {
         val at = 1_762_438_800_000L // 2025-11-06 14:20 UTC
-        assertEquals("14:20", formatLoadedAt(at, nowMillis = at + 3_600_000, zone = ZoneOffset.UTC))
-        val nextDay = formatLoadedAt(at, nowMillis = at + 86_400_000, zone = ZoneOffset.UTC)
+        assertEquals("14:20", formatLoadedAt(at, nowMillis = at + 3_600_000, zone = ZoneOffset.UTC, locale = Russian))
+        val nextDay = formatLoadedAt(at, nowMillis = at + 86_400_000, zone = ZoneOffset.UTC, locale = Russian)
         assertTrue(nextDay, nextDay.startsWith("6 ") && nextDay.endsWith(", 14:20"))
+    }
+
+    @Test
+    fun englishCompactCounts() {
+        assertEquals("999", formatCompact(999, English))
+        assertEquals("1K", formatCompact(1_000, English))
+        assertEquals("1.2K", formatCompact(1_234, English))
+        assertEquals("12K", formatCompact(12_345, English))
+        assertEquals("3.4M", formatCompact(3_456_789, English))
+        assertEquals("1.1B", formatCompact(1_100_000_000, English))
+    }
+
+    @Test
+    fun englishAgo() {
+        val now = 2_000_000_000_000L
+        val minute = 60_000L
+        val day = 24 * 60 * minute
+        assertEquals("just now", formatAgo(now - 30_000, now, English))
+        assertEquals("1 minute ago", formatAgo(now - minute, now, English))
+        assertEquals("5 minutes ago", formatAgo(now - 5 * minute, now, English))
+        assertEquals("1 week ago", formatAgo(now - 8 * day, now, English))
+        assertEquals("21 years ago", formatAgo(now - 21 * 366 * day, now, English))
+    }
+
+    @Test
+    fun englishLoadedAtPutsTheMonthFirst() {
+        val at = 1_762_438_800_000L // 2025-11-06 14:20 UTC
+        assertEquals("Nov 6, 14:20", formatLoadedAt(at, nowMillis = at + 86_400_000, zone = ZoneOffset.UTC, locale = English))
+    }
+
+    @Test
+    fun systemLanguageGivesRussianOnlyToRussianPhones() {
+        assertEquals("ru", AppLanguage.resolve(AppLanguage.SYSTEM, Russian))
+        assertEquals("en", AppLanguage.resolve(AppLanguage.SYSTEM, English))
+        assertEquals("en", AppLanguage.resolve(AppLanguage.SYSTEM, Locale.forLanguageTag("de-DE")))
+        assertEquals("ru", AppLanguage.resolve("ru", English))
+        assertEquals("en", AppLanguage.resolve("en", Russian))
+    }
+
+    @Test
+    fun appLocaleKeepsThePhonesRegion() {
+        assertEquals(Locale.forLanguageTag("en-RU"), AppLanguage.locale("en", Russian))
+        assertEquals(Locale.forLanguageTag("ru-US"), AppLanguage.locale("ru", English))
     }
 }

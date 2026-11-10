@@ -1,5 +1,6 @@
 package dev.wahha.wtube.player
 
+import dev.wahha.wtube.data.AppLanguage
 import android.content.Context
 import android.util.Log
 import androidx.media3.common.MediaItem
@@ -74,7 +75,7 @@ class SegmentSkipper(private val context: Context, private val scope: CoroutineS
         val skip = segmentToSkip(current.segments, position, previous)
         if (skip != null) {
             player.seekTo(skip.endMs)
-            Notices.show(R.string.sb_skipped, context.getString(sponsorCategoryLabel(skip.category)))
+            Notices.show(R.string.sb_skipped, AppLanguage.strings(context).getString(sponsorCategoryLabel(skip.category)))
             // A segment right after this one starts where it ends, and must be skipped too.
             previous = -1
             return

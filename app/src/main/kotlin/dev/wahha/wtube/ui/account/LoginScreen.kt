@@ -1,5 +1,6 @@
 package dev.wahha.wtube.ui.account
 
+import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.ErrorLog
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -69,8 +70,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 // As SimpMusic signs in: Google's own sign-in page, continuing to YouTube once done.
-private const val LOGIN_URL = "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&hl=ru" +
-    "&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3Dru%26next%3Dhttps%253A%252F%252Fwww.youtube.com%252F"
+// Google's pages speak the interface language.
+private fun loginUrl(language: String = AppLocale.language): String =
+    "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&hl=$language" +
+        "&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3D$language" +
+        "%26next%3Dhttps%253A%252F%252Fwww.youtube.com%252F"
 
 /**
  * Google's sign-in page in a WebView. Once it lands back on YouTube the WebView holds the session's
@@ -194,9 +198,9 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -
                     val proxy = if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) Dpi.webViewProxy() else null
                     if (proxy != null) {
                         val config = ProxyConfig.Builder().addProxyRule(proxy).build()
-                        ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) { loadUrl(LOGIN_URL) }
+                        ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) { loadUrl(loginUrl()) }
                     } else {
-                        loadUrl(LOGIN_URL)
+                        loadUrl(loginUrl())
                     }
                 }
             }

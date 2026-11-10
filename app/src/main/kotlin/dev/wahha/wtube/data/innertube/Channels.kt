@@ -2,6 +2,7 @@ package dev.wahha.wtube.data.innertube
 
 import java.net.URLDecoder
 import java.util.Base64
+import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.MembersOnly
 import com.grack.nanojson.JsonObject
 import dev.wahha.wtube.data.ItemsPage
@@ -137,6 +138,6 @@ object Channels {
 
     private fun countryName(english: String): String {
         val code = Locale.getISOCountries().firstOrNull { Locale("", it).getDisplayCountry(Locale.ENGLISH).equals(english, ignoreCase = true) }
-        return code?.let { Locale("", it).getDisplayCountry(Locale.forLanguageTag("ru")) } ?: english
+        return code?.let { Locale("", it).getDisplayCountry(AppLocale) } ?: english
     }
 }

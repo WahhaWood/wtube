@@ -14,6 +14,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import dev.wahha.wtube.data.AppLanguage
 import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.LinkTarget
 import dev.wahha.wtube.data.Settings
@@ -23,11 +25,19 @@ import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.PlayerConnection
 import dev.wahha.wtube.ui.WTubeApp
 import dev.wahha.wtube.ui.theme.WTubeTheme
+import java.util.Locale
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var connection: PlayerConnection
     private lateinit var pictureInPicture: PictureInPicture
     private var deepLink by mutableStateOf<LinkTarget?>(null)
+
+    /** The locale this activity's resources were made in; another one in the settings recreates it. */
+    private lateinit var builtIn: Locale
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Dark-only app: light system bar icons whatever the system theme is.
@@ -46,6 +56,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (savedInstanceState == null) deepLink = linkOf(intent)
+        followLanguage()
         setContent {
             WTubeTheme {
                 CompositionLocalProvider(
@@ -60,8 +71,26 @@ class MainActivity : ComponentActivity() {
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase)
-        // Survives configuration changes, unlike a wrapped context: plurals keep Russian rules after rotation.
-        applyOverrideConfiguration(Configuration().apply { setLocale(AppLocale) })
+        // Survives configuration changes, unlike a wrapped context: plurals keep the strings' rules after rotation.
+        AppLanguage.forgetSystem()
+        builtIn = AppLocale
+        applyOverrideConfiguration(Configuration().apply { setLocale(builtIn) })
+    }
+
+    /**
+     * Keeps the interface language and the phone's per-app language (Android 13+) the same: one picked in the
+     * phone's settings is taken over, one picked in the app is shown there; a change recreates the activity
+     * (the player lives in its service and goes on).
+     */
+    private fun followLanguage() {
+        val stored = Settings.current.value.appLanguage
+        AppLanguage.fromSystemSettings(this)?.takeIf { it != stored }?.let { Settings.set(Settings.AppLanguageChoice, it) }
+        lifecycleScope.launch {
+            Settings.current.map { it.appLanguage }.distinctUntilChanged().drop(1).collect { choice ->
+                AppLanguage.toSystemSettings(this@MainActivity, choice)
+                if (AppLocale != builtIn) recreate()
+            }
+        }
     }
 
     override fun onUserLeaveHint() {

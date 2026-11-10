@@ -68,7 +68,7 @@ import kotlin.coroutines.cancellation.CancellationException
 @Composable
 fun TranscriptSheet(videoId: String, tracks: List<CaptionTrack>, onSeek: (Long) -> Unit, onDismiss: () -> Unit) {
     val ordered = remember(tracks) { tracks.sortedBy { it.auto } }
-    var track by remember(tracks) { mutableStateOf(Transcript.preferred(tracks, Settings.current.value.subtitleLanguage)) }
+    var track by remember(tracks) { mutableStateOf(Transcript.preferred(tracks, Settings.current.value.captionLanguage)) }
     var attempt by remember { mutableIntStateOf(0) }
     val result by produceState<Result<List<TranscriptLine>>?>(null, track, attempt) {
         value = null

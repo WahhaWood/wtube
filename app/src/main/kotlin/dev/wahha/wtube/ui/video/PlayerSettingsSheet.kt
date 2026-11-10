@@ -40,6 +40,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import dev.wahha.wtube.R
+import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.PlayerState
 import dev.wahha.wtube.player.SUBTITLE_AUTO
@@ -66,7 +67,7 @@ import kotlin.math.roundToInt
 
 private enum class SettingsPage { Main, Quality, Speed, Subtitles, Audio, Sleep }
 
-private val QuickSpeeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+internal val QuickSpeeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 private val MIN_SPEED = Settings.SpeedRange.start
 private val MAX_SPEED = Settings.SpeedRange.endInclusive
 private const val SPEED_STEP = 0.05f
@@ -252,16 +253,18 @@ private fun roundSpeed(speed: Float): Float = (speed / SPEED_STEP).roundToInt() 
 
 @Composable
 internal fun speedLabel(speed: Float): String =
-    if (speed == 1f) stringResource(R.string.player_speed_normal) else speed.toString().removeSuffix(".0").replace('.', ',') + "x"
+    if (speed == 1f) stringResource(R.string.player_speed_normal)
+    else speed.toString().removeSuffix(".0").let { if (AppLocale.language == "ru") it.replace('.', ',') else it } + "x"
 
 private fun qualityLabel(format: Format): String {
     val fps = if (format.frameRate > 48f) format.frameRate.toInt().toString() else ""
     return "${format.height}p$fps"
 }
 
-/** "Английский", from a language tag, in Russian whatever the phone's language. */
+/** "Английский" / "English", from a language tag, in the interface language whatever the phone's. */
 internal fun languageName(tag: String?): String? = tag?.takeIf { it.isNotEmpty() }?.let {
-    Locale.forLanguageTag(it).getDisplayName(Locale.forLanguageTag("ru")).replaceFirstChar { c -> c.titlecase(Locale.forLanguageTag("ru")) }
+    val locale = AppLocale
+    Locale.forLanguageTag(it).getDisplayName(locale).replaceFirstChar { c -> c.titlecase(locale) }
 }
 
 @Composable

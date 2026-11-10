@@ -1,5 +1,6 @@
 package dev.wahha.wtube.dpi
 
+import dev.wahha.wtube.data.AppLanguage
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
@@ -622,7 +623,7 @@ object Dpi {
         ) return
         val manager = NotificationManagerCompat.from(app)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, app.getString(R.string.dpi_channel), NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL, AppLanguage.strings(app).getString(R.string.dpi_channel), NotificationManager.IMPORTANCE_DEFAULT),
         )
         val open = PendingIntent.getActivity(
             app, 0,
@@ -631,8 +632,8 @@ object Dpi {
         )
         val notification = NotificationCompat.Builder(app, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
-            .setContentTitle(app.getString(R.string.dpi_broken_title))
-            .setContentText(app.getString(R.string.dpi_broken_text))
+            .setContentTitle(AppLanguage.strings(app).getString(R.string.dpi_broken_title))
+            .setContentText(AppLanguage.strings(app).getString(R.string.dpi_broken_text))
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

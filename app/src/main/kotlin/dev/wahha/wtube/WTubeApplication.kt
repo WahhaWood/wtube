@@ -6,6 +6,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
+import dev.wahha.wtube.data.AppLanguage
 import dev.wahha.wtube.data.Hidden
 import dev.wahha.wtube.data.ErrorLog
 import dev.wahha.wtube.data.History
@@ -23,9 +24,9 @@ import dev.wahha.wtube.player.SleepTimer
 import dev.wahha.wtube.data.FeedCache
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
+import android.content.res.Configuration
 import android.os.Build
 import java.io.File
-import java.util.Locale
 
 class WTubeApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
@@ -33,7 +34,8 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
         // The byedpi processes (dpi/DpiService) run the native proxy and nothing of the app.
         if (processName().contains(":dpi")) return
         ErrorLog.init(this)
-        YouTube.init(Locale.getDefault().country)
+        AppLanguage.init(this)
+        YouTube.init(AppLanguage.systemLocale.country)
         Settings.init(this)
         History.init(this)
         SearchHistory.init(this)
@@ -64,6 +66,11 @@ class WTubeApplication : Application(), SingletonImageLoader.Factory {
     private fun processName(): String =
         if (Build.VERSION.SDK_INT >= 28) getProcessName()
         else runCatching { File("/proc/self/cmdline").readText().substringBefore('\u0000') }.getOrDefault("")
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        AppLanguage.forgetSystem()
+    }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
