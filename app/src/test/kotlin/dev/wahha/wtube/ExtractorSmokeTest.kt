@@ -95,8 +95,10 @@ class ExtractorSmokeTest {
         val ua = if (YoutubeParsingHelper.isVisionOsStreamingUrl(url)) YoutubeParsingHelper.getVisionOsUserAgent(null) else Http.USER_AGENT
         val request = Request.Builder().url(url).header("User-Agent", ua).post(byteArrayOf(0x78, 0).toRequestBody()).build()
         Http.client.newCall(request).execute().use { response ->
-            assertEquals(200, response.code)
-            assertEquals(1024, response.body.bytes().size)
+            val bytes = response.body.bytes()
+            val head = String(bytes, 0, minOf(bytes.size, 200), Charsets.ISO_8859_1)
+            assertEquals("code=${response.code} ua=$ua size=${bytes.size} head=$head", 200, response.code)
+            assertEquals("size=${bytes.size} head=$head", 1024, bytes.size)
         }
     }
 
