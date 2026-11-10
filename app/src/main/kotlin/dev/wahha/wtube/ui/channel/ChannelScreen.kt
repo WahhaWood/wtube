@@ -37,6 +37,7 @@ import dev.wahha.wtube.data.innertube.ChannelExtras
 import dev.wahha.wtube.data.innertube.ChannelAbout
 import dev.wahha.wtube.data.ItemsPage
 import dev.wahha.wtube.data.AppLocale
+import dev.wahha.wtube.data.innertube.countryName
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
@@ -461,7 +462,7 @@ private fun About(about: ChannelAbout, details: ChannelDetails) {
             about.joined?.let {
                 stringResource(R.string.channel_joined, DateFormat.getDateInstance(DateFormat.MEDIUM, AppLocale).format(Date.from(it.atStartOfDay(ZoneId.systemDefault()).toInstant())))
             },
-            about.country,
+            about.country?.let { countryName(it) },
         )
         facts.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
         if (about.links.isNotEmpty()) {

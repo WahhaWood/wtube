@@ -7,6 +7,8 @@ import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube.toItems
 import dev.wahha.wtube.data.account.Cookies
 import dev.wahha.wtube.data.innertube.Channels
+import dev.wahha.wtube.data.innertube.countryName
+import java.util.Locale
 import dev.wahha.wtube.data.innertube.ChatAction
 import dev.wahha.wtube.data.innertube.ChatRole
 import dev.wahha.wtube.data.innertube.ChatRun
@@ -248,7 +250,10 @@ class InnerTubeTest {
         assertEquals(2_713_179_977, about.views)
         assertEquals(472, about.videos)
         assertEquals(LocalDate.of(2015, 3, 18), about.joined)
-        assertEquals("Франция", about.country)
+        assertEquals("France", about.country)
+        assertEquals("Франция", countryName("France", Locale.forLanguageTag("ru-RU")))
+        assertEquals("France", countryName("France", Locale.forLanguageTag("en-US")))
+        assertEquals("Atlantis", countryName("Atlantis", Locale.forLanguageTag("ru-RU")))
         assertEquals(ChannelLinkView("Discord", "https://discord.com/invite/hUKvJnw"), about.links.first().let { ChannelLinkView(it.title, it.url) })
     }
 

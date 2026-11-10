@@ -19,7 +19,7 @@ class ChannelAbout(
     /** -1 when unknown. */
     val videos: Long,
     val joined: LocalDate?,
-    /** In Russian when the English name is a known country. */
+    /** As YouTube gives it, in English; [countryName] puts it into the interface language. */
     val country: String?,
     val links: List<ChannelLink>,
 )
@@ -122,7 +122,7 @@ object Channels {
             videos = number(about.getString("videoCountText")),
             joined = about.getObject("joinedDateText").getString("content")?.removePrefix("Joined ")
                 ?.let { runCatching { LocalDate.parse(it, JoinedFormat) }.getOrNull() },
-            country = about.getString("country")?.let(::countryName),
+            country = about.getString("country"),
             links = about.getArray("links").filterIsInstance<JsonObject>().mapNotNull { link ->
                 val model = link.getObject("channelExternalLinkViewModel")
                 val title = model.getObject("title").getString("content") ?: return@mapNotNull null
@@ -135,9 +135,10 @@ object Channels {
 
     // "2,713,179,977 views" → 2713179977; -1 without digits.
     private fun number(text: String?): Long = text?.filter(Char::isDigit)?.toLongOrNull() ?: -1
+}
 
-    private fun countryName(english: String): String {
-        val code = Locale.getISOCountries().firstOrNull { Locale("", it).getDisplayCountry(Locale.ENGLISH).equals(english, ignoreCase = true) }
-        return code?.let { Locale("", it).getDisplayCountry(AppLocale) } ?: english
-    }
+/** A country's English name, as YouTube gives it, in [locale]; unknown names stay as they are. */
+fun countryName(english: String, locale: Locale = AppLocale): String {
+    val code = Locale.getISOCountries().firstOrNull { Locale("", it).getDisplayCountry(Locale.ENGLISH).equals(english, ignoreCase = true) }
+    return code?.let { Locale("", it).getDisplayCountry(locale) } ?: english
 }
