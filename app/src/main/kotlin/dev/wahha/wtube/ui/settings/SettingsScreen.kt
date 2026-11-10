@@ -53,7 +53,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.Preferences
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
@@ -70,6 +69,7 @@ import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.SponsorBlock
 import dev.wahha.wtube.data.Updates
 import dev.wahha.wtube.player.sponsorCategoryLabel
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
@@ -125,6 +125,8 @@ fun SettingsScreen() {
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             top = systemTop(),
+            start = readableSide(),
+            end = readableSide(),
             bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
@@ -347,7 +349,7 @@ fun SettingsScreen() {
         availableUpdate?.let { found ->
             item {
                 ValueRow(stringResource(R.string.update_title, found.version), stringResource(R.string.settings_update_available_summary)) {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, found.url.toUri()))
+                    Updates.open(context, found)
                 }
             }
         }

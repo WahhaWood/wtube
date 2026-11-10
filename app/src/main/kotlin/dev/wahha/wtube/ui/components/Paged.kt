@@ -4,6 +4,8 @@ import dev.wahha.wtube.data.ErrorLog
 import android.util.Log
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -199,11 +201,25 @@ fun LazyListScope.staleStrip(list: PagedList<*>) {
     if (list.stale && error != null) item(key = "stale") { StaleStrip(error, list.loadedAt, list::retry) }
 }
 
+/** [staleStrip] for a [FeedGrid], across every column. */
+fun LazyGridScope.staleStrip(list: PagedList<*>) {
+    val error = list.error
+    if (list.stale && error != null) fullRow(key = "stale") { StaleStrip(error, list.loadedAt, list::retry) }
+}
+
 /** Keeps [list] told whether [state] is near its top: further down, a fresh page waits instead of replacing the list. */
 @Composable
 fun FreshAtTopEffect(list: PagedList<*>, state: LazyListState) {
     LaunchedEffect(list, state) {
         snapshotFlow { state.firstVisibleItemIndex < NEAR_TOP_ROWS }.collect(list::onNearTop)
+    }
+}
+
+@Composable
+fun FreshAtTopEffect(list: PagedList<*>, state: LazyGridState) {
+    LaunchedEffect(list, state) {
+        // In rows, not cells: a three-column grid is not "far down" after one line of cards.
+        snapshotFlow { state.firstVisibleItemIndex < NEAR_TOP_ROWS * maxOf(1, state.layoutInfo.maxSpan) }.collect(list::onNearTop)
     }
 }
 
@@ -218,19 +234,37 @@ fun LoadMoreEffect(
     // Items loaded so far, for a screen that filters them: a page it hides whole leaves the list the same size.
     loaded: Int = 0,
     onLoadMore: () -> Unit,
-) {
-    val nearEnd by remember(listState) {
+) = PagingEffect(listState, loaded, onLoadMore) {
+    val info = listState.layoutInfo
+    Triple(info.visibleItemsInfo.lastOrNull()?.index ?: 0, info.totalItemsCount, threshold)
+}
+
+/** [LoadMoreEffect] for a [FeedGrid]; [threshold] is in rows of cards. */
+@Composable
+fun LoadMoreEffect(
+    gridState: LazyGridState,
+    threshold: Int = 6,
+    loaded: Int = 0,
+    onLoadMore: () -> Unit,
+) = PagingEffect(gridState, loaded, onLoadMore) {
+    val info = gridState.layoutInfo
+    Triple(info.visibleItemsInfo.lastOrNull()?.index ?: 0, info.totalItemsCount, threshold * maxOf(1, info.maxSpan))
+}
+
+/** [position] gives the last visible index, the total count and the threshold in items, read inside a snapshot. */
+@Composable
+private fun PagingEffect(state: Any, loaded: Int, onLoadMore: () -> Unit, position: () -> Triple<Int, Int, Int>) {
+    val nearEnd by remember(state) {
         derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount > 0 && last >= info.totalItemsCount - threshold
+            val (last, total, threshold) = position()
+            total > 0 && last >= total - threshold
         }
     }
-    val total by remember(listState) { derivedStateOf { listState.layoutInfo.totalItemsCount } }
+    val total by remember(state) { derivedStateOf { position().second } }
     // The list behind the same state can change (a channel tab or sort): always page the current one.
     val loadMore by rememberUpdatedState(onLoadMore)
     val loadedNow by rememberUpdatedState(loaded)
-    LaunchedEffect(listState) {
+    LaunchedEffect(state) {
         // Keyed on the size too: a page that leaves the list still near its end must load the next one.
         snapshotFlow { Triple(nearEnd, total, loadedNow) }.filter { it.first }.collect { loadMore() }
     }

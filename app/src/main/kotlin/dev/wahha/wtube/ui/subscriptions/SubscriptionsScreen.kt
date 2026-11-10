@@ -1,5 +1,9 @@
 package dev.wahha.wtube.ui.subscriptions
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import dev.wahha.wtube.ui.components.FeedGrid
+import dev.wahha.wtube.ui.components.fullRow
 import dev.wahha.wtube.data.MembersOnly
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -11,10 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -131,7 +133,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
     val loaded by Account.loaded.collectAsStateWithLifecycle()
     LaunchedEffect(session) { vm.sync(session) }
     val videos = vm.videos
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LoadMoreEffect(listState, loaded = videos.items.size) { videos.loadMore() }
     FreshAtTopEffect(videos, listState)
     TabResetEffect { listState.animateScrollToItem(0) }
@@ -147,7 +149,7 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
         onRefresh = { if (active) vm.reload(pullToRefresh = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(
+        FeedGrid(
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("subscriptions_feed"),
             contentPadding = PaddingValues(
@@ -155,11 +157,11 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
                 bottom = systemBottom() + LocalBottomInset.current,
             ),
         ) {
-            item(key = "header") { ScreenHeader(stringResource(R.string.tab_subscriptions)) }
-            item(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            fullRow(key = "header") { ScreenHeader(stringResource(R.string.tab_subscriptions)) }
+            fullRow(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             when {
                 !loaded -> Unit
-                session == null -> item(key = "signed_out") {
+                session == null -> fullRow(key = "signed_out") {
                     MessageState(
                         WIcons.AccountCircle,
                         stringResource(R.string.subscriptions_body),
@@ -170,17 +172,17 @@ fun SubscriptionsScreen(vm: SubscriptionsViewModel = viewModel()) {
                 }
                 !active -> Unit
                 else -> {
-                    if (vm.channels.isNotEmpty()) item(key = "channels") { ChannelStrip(vm.channels) { nav.openFeed(Feeds.CHANNELS) } }
+                    if (vm.channels.isNotEmpty()) fullRow(key = "channels") { ChannelStrip(vm.channels) { nav.openFeed(Feeds.CHANNELS) } }
                     when {
-                        videos.initialLoading -> item(key = "skeleton") { FeedSkeleton() }
-                        videos.items.isEmpty() && videos.error != null -> item(key = "error") { ErrorState(videos.error!!, videos::retry) }
-                        videos.items.isEmpty() && videos.endReached -> item(key = "empty") {
+                        videos.initialLoading -> fullRow(key = "skeleton") { FeedSkeleton() }
+                        videos.items.isEmpty() && videos.error != null -> fullRow(key = "error") { ErrorState(videos.error!!, videos::retry) }
+                        videos.items.isEmpty() && videos.endReached -> fullRow(key = "empty") {
                             MessageState(WIcons.Subscriptions, stringResource(R.string.subscriptions_empty))
                         }
                         else -> {
                             staleStrip(videos)
                             items(videos.items.filter { (it !is VideoItem || it.id !in finished) && MembersOnly.inFeeds(it, settings.membersOnly) }, key = { it.url }) { ItemView(it) }
-                            item(key = "footer") { ListFooter(videos.loading, videos.pageError, videos::retry) }
+                            fullRow(key = "footer") { ListFooter(videos.loading, videos.pageError, videos::retry) }
                         }
                     }
                 }

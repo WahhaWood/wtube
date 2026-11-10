@@ -84,12 +84,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
-import android.content.Intent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import dev.wahha.wtube.BuildConfig
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.LinkTarget
@@ -102,11 +100,14 @@ import dev.wahha.wtube.ui.account.LoginScreen
 import dev.wahha.wtube.ui.channel.ChannelScreen
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
+import dev.wahha.wtube.ui.components.LocalWindowLayout
+import dev.wahha.wtube.ui.components.WindowLayout
 import dev.wahha.wtube.ui.components.LocalTabState
 import dev.wahha.wtube.ui.components.Navigator
 import dev.wahha.wtube.ui.components.Notices
 import dev.wahha.wtube.ui.components.TAB_RESET
 import dev.wahha.wtube.ui.components.systemBottom
+import dev.wahha.wtube.ui.components.systemEnd
 import dev.wahha.wtube.ui.downloads.DownloadsScreen
 import dev.wahha.wtube.ui.feed.FeedScreen
 import dev.wahha.wtube.ui.glass.BarHeight
@@ -338,86 +339,91 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
         LocalBottomInset provides bottomInset,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize().background(background)) {
-            val capsuleBudget = maxWidth - BarEdgePadding * 2 - SearchGap - SearchSize
-            val rowWidth = liquidTabBarWidth(TabRoutes.size, capsuleBudget) + SearchGap + SearchSize
-            val barSpace = systemBottom() + BarBottomPadding + BarHeight
+            val windowLayout = remember(maxWidth, maxHeight) { WindowLayout(maxWidth, maxHeight) }
+            CompositionLocalProvider(LocalWindowLayout provides windowLayout) {
+                val capsuleBudget = maxWidth - BarEdgePadding * 2 - SearchGap - SearchSize
+                val rowWidth = liquidTabBarWidth(TabRoutes.size, capsuleBudget) + SearchGap + SearchSize
+                val barSpace = systemBottom() + BarBottomPadding + BarHeight
 
-            val axisShift = with(LocalDensity.current) { AxisShift.roundToPx() }
-            // The backdrop source; the bar and the sheet below are its siblings, never its children.
-            Box(Modifier.fillMaxSize().layerBackdrop(backdrop).nestedScroll(barScroll)) {
-                NavHost(
-                    navController = navController,
-                    startDestination = Home,
-                    // Landscape: a side navigation bar or the camera cutout must not cover the pages.
-                    modifier = Modifier.windowInsetsPadding(
-                        WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
-                    ),
-                    enterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageSlideIn() },
-                    exitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageSlideOut() },
-                    popEnterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageBackIn(axisShift) },
-                    popExitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageBackOut(axisShift) },
-                ) {
-                    composable<Home> { entry -> TabPage(entry) { HomeScreen() } }
-                    composable<Subscriptions> { entry -> TabPage(entry) { SubscriptionsScreen() } }
-                    composable<Search> { entry -> TabPage(entry) { SearchScreen() } }
-                    composable<Library> { entry -> TabPage(entry) { LibraryScreen() } }
-                    composable<Channel> { entry -> Page { ChannelScreen(entry.toRoute<Channel>().url) } }
-                    composable<Playlist> { entry -> Page { PlaylistScreen(entry.toRoute<Playlist>().url) } }
-                    composable<SettingsRoute> { Page { SettingsScreen() } }
-                    composable<Login> { Page { LoginScreen() } }
-                    composable<Feed> { entry -> Page { FeedScreen(entry.toRoute<Feed>().browseId) } }
-                    composable<DownloadsRoute> { Page { DownloadsScreen() } }
-                    composable<HistoryRoute> { Page { HistoryScreen() } }
-                    composable<StatsRoute> { Page { StatsScreen() } }
-                    composable<BypassRoute> { Page { BypassScreen() } }
-                }
-                // Keeps the clock and icons readable over text scrolling beneath the transparent status bar.
-                Box(
-                    Modifier.align(Alignment.TopCenter).fillMaxWidth()
-                        .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout))
-                        .background(Brush.verticalGradient(listOf(background.copy(alpha = 0.7f), background.copy(alpha = 0f)))),
-                )
-                // Registered after NavHost's own predictive handler, so it wins: pages go back on release, while
-                // the expanded video sheet keeps following the gesture with its own handler.
-                BackHandler(enabled = canGoBack && !sheet.expanded) {
-                    navController.popBackStack()
-                }
-            }
-            GlassBottomBar(
-                backdrop = backdrop,
-                layer = glassLayer,
-                luminance = luminance,
-                capsuleBudget = capsuleBudget,
-                selectedTab = TabRoutes.indexOfFirst { destination.isOn(it::class) },
-                searchSelected = destination.isOn(Search::class),
-                onTabSelected = {
-                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                    navController.selectTab(TabRoutes[it])
-                },
-                onSearch = { navController.selectTab(Search) },
-                gapAbove = if (sheetOpen) MiniPlayerGap else 0.dp,
-                modifier = Modifier.align(Alignment.BottomCenter).offset {
-                    // Slides away under the video as the sheet opens, on the sheet's own progress, and
-                    // off Google's sign-in page, whose buttons sit at the bottom.
-                    val hidden = maxOf(if (video.id != null) sheet.coverage else 0f, loginHidden, barAway)
-                    IntOffset(0, (hidden * (barSpace + 16.dp).toPx()).roundToInt())
-                },
-            )
-            if (sheetOpen) {
-                CoverAccent(video.details?.item?.thumbnail) {
-                    PlayerSheet(
-                        vm = video,
-                        sheet = sheet,
-                        miniWidth = rowWidth,
-                        // With the bar away the mini player takes its place at the bottom.
-                        miniBottom = lerp(barSpace, systemBottom() + BarBottomPadding, barAway) + MiniPlayerGap,
-                        backdrop = backdrop,
-                        luminance = { luminance.value },
-                        onClose = {
-                            connection.stop()
-                            video.close()
-                        },
+                val axisShift = with(LocalDensity.current) { AxisShift.roundToPx() }
+                // The backdrop source; the bar and the sheet below are its siblings, never its children.
+                Box(Modifier.fillMaxSize().layerBackdrop(backdrop).nestedScroll(barScroll)) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Home,
+                        // Landscape: a side navigation bar or the camera cutout must not cover the pages.
+                        modifier = Modifier.windowInsetsPadding(
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
+                        ),
+                        enterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageSlideIn() },
+                        exitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageSlideOut() },
+                        popEnterTransition = { if (betweenTopLevel()) fadeThroughIn() else pageBackIn(axisShift) },
+                        popExitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageBackOut(axisShift) },
+                    ) {
+                        composable<Home> { entry -> TabPage(entry) { HomeScreen() } }
+                        composable<Subscriptions> { entry -> TabPage(entry) { SubscriptionsScreen() } }
+                        composable<Search> { entry -> TabPage(entry) { SearchScreen() } }
+                        composable<Library> { entry -> TabPage(entry) { LibraryScreen() } }
+                        composable<Channel> { entry -> Page { ChannelScreen(entry.toRoute<Channel>().url) } }
+                        composable<Playlist> { entry -> Page { PlaylistScreen(entry.toRoute<Playlist>().url) } }
+                        composable<SettingsRoute> { Page { SettingsScreen() } }
+                        composable<Login> { Page { LoginScreen() } }
+                        composable<Feed> { entry -> Page { FeedScreen(entry.toRoute<Feed>().browseId) } }
+                        composable<DownloadsRoute> { Page { DownloadsScreen() } }
+                        composable<HistoryRoute> { Page { HistoryScreen() } }
+                        composable<StatsRoute> { Page { StatsScreen() } }
+                        composable<BypassRoute> { Page { BypassScreen() } }
+                    }
+                    // Keeps the clock and icons readable over text scrolling beneath the transparent status bar.
+                    Box(
+                        Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                            .windowInsetsTopHeight(WindowInsets.statusBars.union(WindowInsets.displayCutout))
+                            .background(Brush.verticalGradient(listOf(background.copy(alpha = 0.7f), background.copy(alpha = 0f)))),
                     )
+                    // Registered after NavHost's own predictive handler, so it wins: pages go back on release, while
+                    // the expanded video sheet keeps following the gesture with its own handler.
+                    BackHandler(enabled = canGoBack && !sheet.expanded) {
+                        navController.popBackStack()
+                    }
+                }
+                GlassBottomBar(
+                    backdrop = backdrop,
+                    layer = glassLayer,
+                    luminance = luminance,
+                    capsuleBudget = capsuleBudget,
+                    selectedTab = TabRoutes.indexOfFirst { destination.isOn(it::class) },
+                    searchSelected = destination.isOn(Search::class),
+                    onTabSelected = {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                        navController.selectTab(TabRoutes[it])
+                    },
+                    onSearch = { navController.selectTab(Search) },
+                    gapAbove = if (sheetOpen) MiniPlayerGap else 0.dp,
+                    modifier = Modifier.align(Alignment.BottomCenter).offset {
+                        // Slides away under the video as the sheet opens, on the sheet's own progress, and
+                        // off Google's sign-in page, whose buttons sit at the bottom.
+                        val hidden = maxOf(if (video.id != null) sheet.coverage else 0f, loginHidden, barAway)
+                        IntOffset(0, (hidden * (barSpace + 16.dp).toPx()).roundToInt())
+                    },
+                )
+                if (sheetOpen) {
+                    CoverAccent(video.details?.item?.thumbnail) {
+                        PlayerSheet(
+                            vm = video,
+                            sheet = sheet,
+                            miniWidth = rowWidth,
+                            // A wide window keeps the middle for the content: the mini player waits in the corner.
+                            miniLeft = if (windowLayout.grid) maxWidth - rowWidth - BarEdgePadding - systemEnd() else (maxWidth - rowWidth) / 2,
+                            // With the bar away the mini player takes its place at the bottom.
+                            miniBottom = lerp(barSpace, systemBottom() + BarBottomPadding, barAway) + MiniPlayerGap,
+                            backdrop = backdrop,
+                            luminance = { luminance.value },
+                            onClose = {
+                                connection.stop()
+                                video.close()
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -566,7 +572,7 @@ private fun UpdateOffer() {
             text = { if (found.notes.isNotEmpty()) Text(found.notes.take(600)) },
             confirmButton = {
                 TextButton(onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, found.url.toUri()))
+                    Updates.open(context, found)
                     Updates.dismiss()
                 }) { Text(stringResource(R.string.update_download)) }
             },

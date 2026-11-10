@@ -1,12 +1,14 @@
 package dev.wahha.wtube.ui.feed
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import dev.wahha.wtube.ui.components.FeedGrid
+import dev.wahha.wtube.ui.components.fullRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +70,7 @@ fun FeedScreen(browseId: String) {
     val vm: FeedViewModel = viewModel(key = browseId) { FeedViewModel(browseId) }
     val list = vm.list
     val nav = LocalNavigator.current
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LoadMoreEffect(listState) { list.loadMore() }
     FreshAtTopEffect(list, listState)
     val title = when (browseId) {
@@ -78,7 +80,7 @@ fun FeedScreen(browseId: String) {
         else -> R.string.app_name
     }
 
-    LazyColumn(
+    FeedGrid(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -86,21 +88,21 @@ fun FeedScreen(browseId: String) {
             bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
-        item(key = "header") {
+        fullRow(key = "header") {
             Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = nav.back) { Icon(WIcons.ArrowBack, contentDescription = stringResource(R.string.back)) }
                 Text(stringResource(title), style = MaterialTheme.typography.headlineMedium)
             }
         }
-        item(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+        fullRow(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         when {
-            list.initialLoading -> item(key = "skeleton") { FeedSkeleton(compact = true) }
-            list.items.isEmpty() && list.error != null -> item(key = "error") { ErrorState(list.error!!, list::retry) }
-            list.items.isEmpty() && list.endReached -> item(key = "empty") { MessageState(WIcons.History, stringResource(R.string.feed_empty)) }
+            list.initialLoading -> fullRow(key = "skeleton") { FeedSkeleton(compact = true) }
+            list.items.isEmpty() && list.error != null -> fullRow(key = "error") { ErrorState(list.error!!, list::retry) }
+            list.items.isEmpty() && list.endReached -> fullRow(key = "empty") { MessageState(WIcons.History, stringResource(R.string.feed_empty)) }
             else -> {
                 staleStrip(list)
                 items(list.items, key = { it.url }) { ItemView(it, compact = true) }
-                item(key = "footer") { ListFooter(list.loading, list.pageError, list::retry) }
+                fullRow(key = "footer") { ListFooter(list.loading, list.pageError, list::retry) }
             }
         }
     }

@@ -85,6 +85,7 @@ import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.LocalPlayerState
+import dev.wahha.wtube.ui.components.SaveSheet
 import dev.wahha.wtube.ui.components.VideoOrigin
 import dev.wahha.wtube.ui.glass.LocalLiquidGlass
 import dev.wahha.wtube.ui.glass.drawInteractiveGlass
@@ -241,13 +242,15 @@ class PlayerSheetState(private val scope: CoroutineScope) {
 /**
  * Draws [vm]'s video between the full page and the mini player. The same [VideoPlayer] is in both states:
  * collapsing shrinks it into the mini player's slot, so the picture never restarts or blinks.
- * [miniWidth] and [miniBottom] place the mini player above the tab bar (its distance from the window's bottom).
+ * [miniWidth] and [miniBottom] place the mini player above the tab bar (its distance from the window's bottom),
+ * [miniLeft] from the window's left edge.
  */
 @Composable
 fun PlayerSheet(
     vm: VideoViewModel,
     sheet: PlayerSheetState,
     miniWidth: Dp,
+    miniLeft: Dp,
     miniBottom: Dp,
     backdrop: LayerBackdrop,
     luminance: () -> Float,
@@ -319,6 +322,9 @@ fun PlayerSheet(
     }
     var panel by remember { mutableStateOf<FullscreenPanel?>(null) }
     LaunchedEffect(fullscreen) { if (!fullscreen) panel = null }
+    // Here, not in the fullscreen controls: those leave the screen when they hide, and the sheet went with them.
+    var saving by remember { mutableStateOf<String?>(null) }
+    saving?.let { id -> CompositionLocalProvider(LocalFullscreen provides fullscreen) { SaveSheet(id, onDismiss = { saving = null }) } }
     // How far the shelf of more videos is in: follows a swipe up, then settles; the panel state says where it stays.
     val scope = rememberCoroutineScope()
     val shelf = remember { Animatable(0f) }
@@ -383,6 +389,7 @@ fun PlayerSheet(
                 height = constraints.maxHeight.toFloat(),
                 statusBar = statusBar.toFloat(),
                 miniWidth = miniWidth.toPx(),
+                miniLeft = miniLeft.toPx(),
                 miniBottom = miniBottom.toPx(),
                 miniHeight = MiniPlayerHeight.toPx(),
                 miniVideoStart = MiniVideoStart.toPx(),
@@ -482,7 +489,7 @@ fun PlayerSheet(
                                 showControls = controlsShown && !inPictureInPicture && panel != FullscreenPanel.MoreVideos && membersOnlyCover == null,
                                 membersOnly = membersOnlyCover != null,
                                 loadFailed = vm.error != null,
-                                fullscreenActions = { FullscreenActions(vm, onPanel = { panel = it }) },
+                                fullscreenActions = { FullscreenActions(vm, onPanel = { panel = it }, onSave = { saving = it }) },
                             )
                         } else {
                             Box(videoModifier.background(colors.scrim))
@@ -596,12 +603,12 @@ private class SheetGeometry(
     val height: Float,
     statusBar: Float,
     private val miniWidth: Float,
+    private val miniLeft: Float,
     miniBottom: Float,
     val miniHeight: Float,
     miniVideoStart: Float,
     miniVideoWidth: Float,
 ) {
-    private val miniLeft = (width - miniWidth) / 2f
     val miniTop = height - miniBottom - miniHeight
 
     /** The portrait player under the status bar; the page continues below it. */

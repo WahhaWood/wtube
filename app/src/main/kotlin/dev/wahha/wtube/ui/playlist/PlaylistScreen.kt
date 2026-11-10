@@ -15,6 +15,7 @@ import androidx.compose.material3.TextButton
 import dev.wahha.wtube.ui.icon.Delete
 import dev.wahha.wtube.ui.icon.MoreVert
 import kotlinx.coroutines.launch
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.Notices
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.ui.downloads.PlaylistDownloadSheet
@@ -293,6 +294,8 @@ fun PlaylistScreen(url: String) {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = systemTop() + 56.dp,
+                    start = readableSide(),
+                    end = readableSide(),
                     bottom = systemBottom() + LocalBottomInset.current,
                 ),
             ) {

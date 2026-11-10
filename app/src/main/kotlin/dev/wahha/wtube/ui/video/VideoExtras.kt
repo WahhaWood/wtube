@@ -39,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
+import dev.wahha.wtube.data.innertube.hostIn
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -86,15 +88,24 @@ fun rememberLinkHandler(videoId: String, onSeek: (Long) -> Unit): (String) -> Un
             val uri = Uri.parse(url)
             val linkedVideo = YouTube.videoIdOf(url)
             val seconds = uri.getQueryParameter("t")?.let(::parseYoutubeTime)
-            val youtubeHost = uri.host?.endsWith("youtube.com") == true
+            val youtubeHost = hostIn(uri.host, listOf("youtube.com"))
             when {
                 linkedVideo == videoId && seconds != null -> onSeek(seconds * 1000)
                 linkedVideo != null -> nav.openVideo(linkedVideo)
                 youtubeHost && ChannelPaths.any { uri.path.orEmpty().startsWith(it) } -> nav.openChannel(url)
-                else -> runCatching { uriHandler.openUri(url) }
+                else -> uriHandler.openWebLink(url)
             }
         }
     }
+}
+
+/**
+ * Opens a link someone else wrote (a description, a comment, a channel's links) in the browser, and only a web one:
+ * an `intent:` or `content:` address there could start any app's screen.
+ */
+fun UriHandler.openWebLink(url: String) {
+    if (Uri.parse(url).scheme?.lowercase() !in setOf("http", "https")) return
+    runCatching { openUri(url) }
 }
 
 @Composable

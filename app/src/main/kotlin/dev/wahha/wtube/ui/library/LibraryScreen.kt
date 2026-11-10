@@ -53,6 +53,7 @@ import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.download.DownloadState
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.ui.account.ExpiredBanner
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.ScreenHeader
@@ -142,6 +143,8 @@ fun LibraryScreen(vm: LibraryViewModel = viewModel()) {
         state = listState,
         contentPadding = PaddingValues(
             top = systemTop(),
+            start = readableSide(),
+            end = readableSide(),
             bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {

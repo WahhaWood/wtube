@@ -41,6 +41,7 @@ import dev.wahha.wtube.data.StatsRange
 import dev.wahha.wtube.data.WatchStats
 import dev.wahha.wtube.data.formatWatchTime
 import dev.wahha.wtube.data.summarize
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
@@ -62,7 +63,7 @@ fun StatsScreen() {
     }
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = systemTop(), bottom = systemBottom() + LocalBottomInset.current),
+        contentPadding = PaddingValues(start = readableSide(), top = systemTop(), end = readableSide(), bottom = systemBottom() + LocalBottomInset.current),
     ) {
         item {
             Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

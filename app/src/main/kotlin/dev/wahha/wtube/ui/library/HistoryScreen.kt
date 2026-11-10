@@ -1,11 +1,14 @@
 package dev.wahha.wtube.ui.library
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import dev.wahha.wtube.ui.components.FeedGrid
+import dev.wahha.wtube.ui.components.fullRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -43,21 +46,21 @@ fun HistoryScreen() {
     val nav = LocalNavigator.current
     val entries by History.entries.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
-    LazyColumn(
+    FeedGrid(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             top = systemTop(),
             bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {
-        item {
+        fullRow(key = "header") {
             Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = nav.back) { Icon(WIcons.ArrowBack, contentDescription = stringResource(R.string.back)) }
                 Text(stringResource(R.string.library_history), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
                 if (entries.isNotEmpty()) TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.library_history_clear)) }
             }
         }
-        if (entries.isEmpty()) item { MessageState(WIcons.History, stringResource(R.string.library_history_empty)) }
+        if (entries.isEmpty()) fullRow(key = "empty") { MessageState(WIcons.History, stringResource(R.string.library_history_empty)) }
         items(entries, key = { it.video.id }) { entry ->
             val duration = entry.video.duration * 1000
             val progress = if (duration > 0) (entry.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f

@@ -153,6 +153,9 @@ object Settings {
     /** Caption text size per [AppSettings.subtitleSize], relative to the default. */
     val SubtitleScales = listOf(0.8f, 1f, 1.3f, 1.6f)
 
+    /** The player's speed range; anything else (a 0 from a hand-edited backup) would crash ExoPlayer on every start. */
+    val SpeedRange = 0.25f..3f
+
     private val Context.dataStore by preferencesDataStore("settings", corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() })
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow(AppSettings())
@@ -233,7 +236,7 @@ object Settings {
         return AppSettings(
             maxQuality = this[MaxQuality] ?: defaults.maxQuality,
             maxQualityMobile = this[MaxQualityMobile] ?: if (this[MobileDataSaver] == false) 0 else defaults.maxQualityMobile,
-            speed = this[Speed] ?: defaults.speed,
+            speed = this[Speed]?.takeIf { it in SpeedRange } ?: defaults.speed,
             subtitles = this[Subtitles] ?: defaults.subtitles,
             subtitleLanguage = this[SubtitleLanguage] ?: defaults.subtitleLanguage,
             subtitleSize = (this[SubtitleSize] ?: defaults.subtitleSize).coerceIn(SubtitleScales.indices),

@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 /**
  * Counts how long each video really plays (wall-clock time, so speed does not stretch it) into [WatchStats].
  * The running count is handed over on pause, on a change of video and every 30 s, so a killed
- * process loses seconds, not the session.
+ * process loses seconds, not the session; the watch position is saved on the same tick.
  */
 internal class StatsRecorder(private val scope: CoroutineScope, private val player: Player) : Player.Listener {
     private var videoId: String? = null
@@ -43,6 +43,9 @@ internal class StatsRecorder(private val scope: CoroutineScope, private val play
                 delay(FLUSH_MS)
                 commit()
                 mark()
+                // The screen saves the position only while it is shown: in the background this keeps it fresh,
+                // so a process the system kills resumes near where it stopped.
+                player.saveProgress()
             }
         }
     }

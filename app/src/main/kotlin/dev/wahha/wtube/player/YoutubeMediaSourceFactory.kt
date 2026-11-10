@@ -39,6 +39,7 @@ import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.Youtub
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
 import org.schabi.newpipe.extractor.stream.Stream
 import org.schabi.newpipe.extractor.stream.StreamInfo
+import org.schabi.newpipe.extractor.stream.StreamType
 
 private const val TAG = "WTubeSource"
 
@@ -87,7 +88,11 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
             return progressive(mediaItem)
         }
 
-        if (info.streamType.isLive() && info.hlsUrl.isNotEmpty()) {
+        // A stream that has just ended has no DASH-able streams yet (the extractor marks them not isUrl):
+        // without HLS it would fall back to the muxed 360p below.
+        val postLive = info.streamType == StreamType.POST_LIVE_STREAM || info.streamType == StreamType.POST_LIVE_AUDIO_STREAM
+        if ((info.streamType.isLive() || postLive) && info.hlsUrl.isNotEmpty()) {
+            if (postLive) ErrorLog.note("[player] ${info.id}: ended stream, playing its HLS")
             return HlsMediaSource.Factory(plainDataSource).configured()
                 .createMediaSource(mediaItem.buildUpon().setUri(info.hlsUrl).build())
         }

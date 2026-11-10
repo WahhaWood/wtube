@@ -26,6 +26,9 @@ jobs:
         with:
           packages: platforms;android-37.0 build-tools;36.0.0 ndk;29.0.14206865 cmake;3.22.1
       - uses: gradle/actions/setup-gradle@07d1f8453baaff67fb503883367f8b13e6158a54 # v6
+        with:
+          # A cache written by another workflow must not feed the build that gets signed.
+          cache-disabled: true
       - name: Tag matches the version
         run: |
           TAG="${GITHUB_REF_NAME}"

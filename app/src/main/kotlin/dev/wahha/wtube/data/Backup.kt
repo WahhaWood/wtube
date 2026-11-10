@@ -27,7 +27,9 @@ class Backup(
 
         fun current(): String = json.encodeToString(serializer(), Backup(settings = Settings.current.value, history = History.entries.value, searches = SearchHistory.queries.value, hidden = Hidden.items.value, stats = WatchStats.entries.value))
 
-        fun parse(text: String): Backup = json.decodeFromString(serializer(), text)
+        fun parse(text: String): Backup = json.decodeFromString(serializer(), text).also {
+            require(it.settings.speed in Settings.SpeedRange) { "speed ${it.settings.speed}" }
+        }
 
         /** Replaces settings, history, searches and the hidden list with the backup's. */
         suspend fun restore(backup: Backup) {

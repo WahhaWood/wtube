@@ -165,9 +165,12 @@ object InnerTube {
 private val AccountDomains = listOf("youtube.com", "google.com")
 
 /** Whether the account's cookies may go to [url]: over TLS, to YouTube or Google themselves. */
-fun mayCarryAccount(url: HttpUrl): Boolean {
-    val host = url.host.trimEnd('.').lowercase()
-    return url.isHttps && AccountDomains.any { host == it || host.endsWith(".$it") }
+fun mayCarryAccount(url: HttpUrl): Boolean = url.isHttps && hostIn(url.host, AccountDomains)
+
+/** Whether [host] is one of [domains] or below one: `m.youtube.com` is YouTube, `notyoutube.com` is not. */
+fun hostIn(host: String?, domains: List<String>): Boolean {
+    val name = host?.trimEnd('.')?.lowercase() ?: return false
+    return domains.any { name == it || name.endsWith(".$it") }
 }
 
 /**

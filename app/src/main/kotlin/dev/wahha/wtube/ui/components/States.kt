@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.PlaybackException
 import com.grack.nanojson.JsonParserException
@@ -200,6 +201,7 @@ fun Modifier.shimmer(): Modifier = composed {
 /** Skeleton of the feed while the first page loads. */
 @Composable
 fun FeedSkeleton(modifier: Modifier = Modifier, compact: Boolean = false) {
+    val layout = LocalWindowLayout.current
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         repeat(4) {
             if (compact) {
@@ -210,17 +212,13 @@ fun FeedSkeleton(modifier: Modifier = Modifier, compact: Boolean = false) {
                         SkeletonLine(0.6f)
                     }
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).shimmer())
-                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(36.dp).shimmerShape(CircleShape))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SkeletonLine(0.9f)
-                            SkeletonLine(0.5f)
-                        }
-                    }
+            } else if (layout.grid) {
+                // A row of cards as the grid will lay them out; [FeedGrid] already pads the sides.
+                Row(horizontalArrangement = Arrangement.spacedBy(WindowLayout.GridGutter)) {
+                    repeat(layout.columns) { SkeletonCard(Modifier.weight(1f), RoundedCornerShape(12.dp), side = 0.dp) }
                 }
+            } else {
+                SkeletonCard(Modifier, null, side = 16.dp)
             }
         }
     }
@@ -232,3 +230,18 @@ private fun SkeletonLine(fraction: Float) {
 }
 
 private fun Modifier.shimmerShape(shape: Shape) = clip(shape).shimmer()
+
+@Composable
+private fun SkeletonCard(modifier: Modifier, thumbnailShape: Shape?, side: Dp) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val thumbnail = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+        Box(if (thumbnailShape == null) thumbnail.shimmer() else thumbnail.shimmerShape(thumbnailShape))
+        Row(Modifier.padding(horizontal = side), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(36.dp).shimmerShape(CircleShape))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SkeletonLine(0.9f)
+                SkeletonLine(0.5f)
+            }
+        }
+    }
+}

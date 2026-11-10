@@ -20,18 +20,36 @@ class UpdatesTest {
 
     @Test
     fun releaseTakesApkAssetAndStripsTagPrefix() {
-        val json = """{"tag_name":"v0.11.0","html_url":"https://github.com/x/y/releases/tag/v0.11.0","draft":false,"prerelease":false,
-            "body":" Notes \n","assets":[{"name":"mapping.txt","browser_download_url":"https://x/m"},{"name":"WTube-0.11.0.apk","browser_download_url":"https://x/a.apk"}]}"""
+        val json = """{"tag_name":"v0.11.0","html_url":"https://github.com/WahhaWood/wtube/releases/tag/v0.11.0","draft":false,"prerelease":false,
+            "body":" Notes \n","assets":[{"name":"mapping.txt","browser_download_url":"https://github.com/WahhaWood/wtube/releases/download/v0.11.0/mapping.txt"},{"name":"WTube-0.11.0.apk","browser_download_url":"https://github.com/WahhaWood/wtube/releases/download/v0.11.0/WTube-0.11.0.apk"}]}"""
         val release = Updates.parse(JsonParser.`object`().from(json))!!
         assertEquals("0.11.0", release.version)
-        assertEquals("https://x/a.apk", release.url)
+        assertEquals("https://github.com/WahhaWood/wtube/releases/download/v0.11.0/WTube-0.11.0.apk", release.url)
         assertEquals("Notes", release.notes)
     }
 
     @Test
     fun releaseWithoutApkFallsBackToPageAndDraftsAreIgnored() {
-        val page = """{"tag_name":"v0.11.0","html_url":"https://github.com/x/y/releases/tag/v0.11.0","assets":[]}"""
-        assertEquals("https://github.com/x/y/releases/tag/v0.11.0", Updates.parse(JsonParser.`object`().from(page))!!.url)
+        val page = """{"tag_name":"v0.11.0","html_url":"https://github.com/WahhaWood/wtube/releases/tag/v0.11.0","assets":[]}"""
+        assertEquals("https://github.com/WahhaWood/wtube/releases/tag/v0.11.0", Updates.parse(JsonParser.`object`().from(page))!!.url)
         assertNull(Updates.parse(JsonParser.`object`().from("""{"tag_name":"v9","draft":true}""")))
+    }
+
+    // The address comes from the network: only this repository on GitHub is ever opened.
+    @Test
+    fun linksOutsideTheRepositoryAreRefused() {
+        val foreignApk = """{"tag_name":"v0.11.0","html_url":"https://github.com/WahhaWood/wtube/releases/tag/v0.11.0",
+            "assets":[{"name":"WTube.apk","browser_download_url":"https://evil.example/WTube.apk"}]}"""
+        assertEquals("https://github.com/WahhaWood/wtube/releases/tag/v0.11.0", Updates.parse(JsonParser.`object`().from(foreignApk))!!.url)
+        val nothingOwn = """{"tag_name":"v0.11.0","html_url":"https://github.com/someone/else","assets":[]}"""
+        assertNull(Updates.parse(JsonParser.`object`().from(nothingOwn)))
+        for (url in listOf(
+            "http://github.com/WahhaWood/wtube/releases",
+            "https://github.com.evil.example/WahhaWood/wtube/",
+            "https://github.com/WahhaWood/wtube/../../evil/x",
+            "https://github.com/WahhaWood/wtube-fork/releases",
+            "intent://github.com/WahhaWood/wtube#Intent;end",
+        )) assertFalse(url, Updates.isOwnLink(url))
+        assertTrue(Updates.isOwnLink("https://github.com/WahhaWood/wtube/releases/download/v0.28.0/WTube-0.28.0.apk"))
     }
 }

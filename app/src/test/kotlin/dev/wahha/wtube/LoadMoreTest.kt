@@ -3,6 +3,9 @@ package dev.wahha.wtube
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,5 +81,22 @@ class LoadMoreTest {
         compose.runOnIdle { assertEquals(1, calls) }
         compose.runOnIdle { loaded = 20 }
         compose.runOnIdle { assertEquals(2, calls) }
+    }
+
+    // In a grid the threshold is rows of cards: three columns must start the next page three times as many cells early.
+    @Test
+    fun gridCountsTheThresholdInRows() {
+        var calls = 0
+        val state = LazyGridState()
+        compose.setContent {
+            LazyVerticalGrid(GridCells.Fixed(3), Modifier.height(200.dp).testTag("grid"), state = state) {
+                items(60) { Text("item $it", Modifier.height(40.dp)) }
+            }
+            LoadMoreEffect(state) { calls++ }
+        }
+        compose.runOnIdle { assertEquals(0, calls) }
+        // Row 11 at the top: the last visible cell is about 47, six rows (18 cells) from the end of 60.
+        compose.onNodeWithTag("grid").performScrollToIndex(33)
+        compose.runOnIdle { assertEquals(1, calls) }
     }
 }

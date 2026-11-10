@@ -159,19 +159,25 @@ fun ItemView(item: Item, compact: Boolean = false, progress: Float = 0f, recomme
     }
 }
 
-/** Full-width card for feeds: edge-to-edge thumbnail, then avatar, title and meta, like the YouTube app. */
+/**
+ * Card for feeds, like the YouTube app: on a phone an edge-to-edge thumbnail, in a grid's cell a rounded one,
+ * then avatar, title and meta.
+ */
 @Composable
 fun VideoCard(video: VideoItem, recommended: Boolean = false, onClick: (VideoOrigin?) -> Unit) {
     val nav = LocalNavigator.current
-    val anchor = remember { ThumbnailAnchor(0.dp) }
-    Column(Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(bottom = 12.dp)) {
+    val inGrid = LocalInGrid.current
+    val corner = if (inGrid) ThumbnailCorner else 0.dp
+    val anchor = remember(corner) { ThumbnailAnchor(corner) }
+    Column(Modifier.fillMaxWidth().clickable { onClick(anchor.origin(video.thumbnail)) }.padding(bottom = if (inGrid) 20.dp else 12.dp)) {
         val watched = watchedFraction(video.id)
-        Thumbnail(video.thumbnail, Modifier.fillMaxWidth().then(anchor.modifier)) {
+        Thumbnail(video.thumbnail, Modifier.fillMaxWidth().then(anchor.modifier).clip(RoundedCornerShape(corner))) {
             VideoBadge(video)
             WatchedBar(watched)
         }
+        val side = if (inGrid) 0.dp else 16.dp
         Row(
-            Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            Modifier.padding(start = side, end = side, top = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (video.channelAvatar != null) {

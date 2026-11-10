@@ -196,6 +196,8 @@ private fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (title: String
         title = { Text(stringResource(R.string.playlist_new)) },
         text = {
             Column {
+                // Opened from "Save to…" over a fullscreen video: its own window would show the system bars.
+                ImmersiveDialog()
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },

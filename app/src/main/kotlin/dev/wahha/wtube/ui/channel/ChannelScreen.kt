@@ -1,5 +1,13 @@
 package dev.wahha.wtube.ui.channel
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import dev.wahha.wtube.ui.components.FeedGrid
+import dev.wahha.wtube.ui.components.LocalWindowLayout
+import dev.wahha.wtube.ui.components.WindowLayout
+import dev.wahha.wtube.ui.components.bleed
+import dev.wahha.wtube.ui.components.gridSide
+import dev.wahha.wtube.ui.components.fullRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import dev.wahha.wtube.data.VideoItem
@@ -54,11 +62,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -97,6 +104,7 @@ import dev.wahha.wtube.ui.components.launchAction
 import dev.wahha.wtube.ui.components.subscribersText
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemTop
+import dev.wahha.wtube.ui.video.openWebLink
 import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 
@@ -254,28 +262,30 @@ fun ChannelScreen(url: String) {
     val vm: ChannelViewModel = viewModel(key = url) { ChannelViewModel(url) }
     val details = vm.details
     val list = vm.list
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LoadMoreEffect(listState, loaded = list?.items?.size ?: 0) { list?.loadMore() }
+    val side = gridSide()
+    val grid = LocalWindowLayout.current.grid
     val settings by Settings.current.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Box(Modifier.fillMaxSize()) {
         when {
             details == null && vm.error != null -> ErrorState(vm.error!!, vm::load, Modifier.align(Alignment.Center))
-            details == null -> FeedSkeleton(Modifier.statusBarsPadding().padding(top = 64.dp))
-            else -> LazyColumn(
+            details == null -> FeedSkeleton(Modifier.statusBarsPadding().padding(top = 64.dp).padding(horizontal = side))
+            else -> FeedGrid(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     bottom = systemBottom() + LocalBottomInset.current,
                 ),
             ) {
-                item(key = "header") { Header(details, vm.subscribed, vm::subscribe) }
-                item(key = "tabs") {
+                fullRow(key = "header") { Box(Modifier.bleed(side)) { Header(details, vm.subscribed, vm::subscribe) } }
+                fullRow(key = "tabs") {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.bleed(side).padding(vertical = 8.dp),
                     ) {
                         items(details.tabs, key = { it.kind }) { t ->
                             FilterChip(
@@ -311,10 +321,10 @@ fun ChannelScreen(url: String) {
                 }
                 val sorts = vm.extras?.videoSorts.orEmpty()
                 if (vm.section == ChannelSection.TAB && vm.tab?.kind == ChannelTabs.VIDEOS && sorts.size > 1) {
-                    item(key = "sorts") {
+                    fullRow(key = "sorts") {
                         // Four chips with a channel's memberships: too wide for a phone in a large font.
                         Row(
-                            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                            Modifier.bleed(side).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             sorts.forEachIndexed { index, chip ->
@@ -328,7 +338,7 @@ fun ChannelScreen(url: String) {
                     }
                 }
                 if (vm.section == ChannelSection.MEMBERS) {
-                    item(key = "members_join") {
+                    fullRow(key = "members_join") {
                         FilledTonalButton(
                             onClick = { openInYouTube(context, MembersOnly.joinUrl(details.url)) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -337,18 +347,18 @@ fun ChannelScreen(url: String) {
                         }
                     }
                     if (list != null && list.items.isEmpty() && list.endReached && list.error == null) {
-                        item(key = "members_empty") { MessageState(WIcons.Star, stringResource(R.string.channel_members_empty)) }
+                        fullRow(key = "members_empty") { MessageState(WIcons.Star, stringResource(R.string.channel_members_empty)) }
                     }
                 }
                 if (vm.section == ChannelSection.SEARCH) {
-                    item(key = "search_field") { SearchBox(vm.searched.orEmpty(), vm::search) }
-                    if (vm.searched == null) item(key = "search_hint") { MessageState(WIcons.Search, stringResource(R.string.channel_search_hint)) }
+                    fullRow(key = "search_field") { SearchBox(vm.searched.orEmpty(), vm::search) }
+                    if (vm.searched == null) fullRow(key = "search_hint") { MessageState(WIcons.Search, stringResource(R.string.channel_search_hint)) }
                     if (list != null && list.items.isEmpty() && !list.loading && list.error == null) {
-                        item(key = "search_empty") { MessageState(WIcons.Search, stringResource(R.string.search_empty)) }
+                        fullRow(key = "search_empty") { MessageState(WIcons.Search, stringResource(R.string.search_empty)) }
                     }
                 }
                 if (vm.section == ChannelSection.ABOUT) {
-                    item(key = "about") {
+                    fullRow(key = "about") {
                         val about = vm.about
                         when {
                             about != null -> About(about, details)
@@ -358,11 +368,12 @@ fun ChannelScreen(url: String) {
                     }
                 }
                 if (list != null) {
-                    if (list.initialLoading) item(key = "skeleton") { FeedSkeleton(compact = true) }
+                    if (list.initialLoading) fullRow(key = "skeleton") { FeedSkeleton(compact = true) }
                     // The members tab is where the filter sends people for these videos.
                     val shown = if (vm.section == ChannelSection.MEMBERS) list.items else list.items.filter { MembersOnly.inFeeds(it, settings.membersOnly) }
-                    items(shown, key = { it.url }) { ItemView(it, compact = true) }
-                    item(key = "footer") { ListFooter(list.loading && !list.initialLoading, list.error, list::retry) }
+                    // A wide window has room for the cards in a grid, as on the home page.
+                    items(shown, key = { it.url }) { ItemView(it, compact = !grid) }
+                    fullRow(key = "footer") { ListFooter(list.loading && !list.initialLoading, list.error, list::retry) }
                 }
             }
         }
@@ -379,7 +390,10 @@ private fun Header(details: ChannelDetails, subscribed: Boolean?, onSubscribe: (
                 model = details.banner,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 5f).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                // A wide window gets YouTube's desktop proportions, or the banner would fill half a tablet.
+                modifier = Modifier.fillMaxWidth()
+                    .aspectRatio(if (LocalWindowLayout.current.grid) 6.2f else 16f / 5f)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             )
         } else {
             Box(Modifier.padding(top = top + 56.dp))
@@ -434,7 +448,8 @@ private fun SearchBox(initial: String, onSearch: (String) -> Unit) {
 private fun About(about: ChannelAbout, details: ChannelDetails) {
     val uriHandler = LocalUriHandler.current
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Lines across a whole tablet are hard to read: the text keeps to a column's width.
+    Column(Modifier.widthIn(max = WindowLayout.ContentMaxWidth).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         val description = about.description.ifBlank { details.description }
         if (description.isNotBlank()) {
             SelectionContainer { Text(description, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
@@ -453,7 +468,7 @@ private fun About(about: ChannelAbout, details: ChannelDetails) {
             Text(stringResource(R.string.channel_links), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
             about.links.forEach { link ->
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { runCatching { uriHandler.openUri(link.url) } }.padding(vertical = 6.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { uriHandler.openWebLink(link.url) }.padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {

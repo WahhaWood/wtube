@@ -10,9 +10,8 @@ import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +50,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import dev.wahha.wtube.ui.components.ErrorState
+import dev.wahha.wtube.ui.components.FeedGrid
 import dev.wahha.wtube.ui.components.FreshAtTopEffect
+import dev.wahha.wtube.ui.components.fullRow
 import dev.wahha.wtube.ui.components.staleStrip
 import dev.wahha.wtube.ui.components.FeedSkeleton
 import dev.wahha.wtube.ui.components.ItemView
@@ -156,7 +157,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     LaunchedEffect(historyLoaded, accountLoaded, session, entries.isEmpty()) {
         if (historyLoaded && accountLoaded) vm.sync(session, entries.isEmpty())
     }
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LoadMoreEffect(listState, loaded = feed.items.size) { feed.loadMore() }
     FreshAtTopEffect(feed, listState)
     // A cached list is not YouTube showing the video again, and what is only flung past was not shown.
@@ -174,7 +175,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         onRefresh = { vm.reload(pullToRefresh = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(
+        FeedGrid(
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("home_feed"),
             contentPadding = PaddingValues(
@@ -182,10 +183,10 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 bottom = systemBottom() + LocalBottomInset.current,
             ),
         ) {
-            item(key = "header") { ScreenHeader(stringResource(R.string.app_name), leading = { LogoMark() }) }
-            item(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            fullRow(key = "header") { ScreenHeader(stringResource(R.string.app_name), leading = { LogoMark() }) }
+            fullRow(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             when {
-                vm.hasSource == false || feed.items.isEmpty() && feed.endReached && feed.error == null -> item(key = "empty") {
+                vm.hasSource == false || feed.items.isEmpty() && feed.endReached && feed.error == null -> fullRow(key = "empty") {
                     MessageState(
                         WIcons.Home,
                         stringResource(R.string.home_empty_body),
@@ -194,12 +195,12 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                         FilledTonalButton(onClick = nav.openSearch) { Text(stringResource(R.string.home_find)) }
                     }
                 }
-                vm.hasSource == null || feed.initialLoading -> item(key = "skeleton") { FeedSkeleton() }
-                feed.items.isEmpty() && feed.error != null -> item(key = "error") { ErrorState(feed.error!!, feed::retry) }
+                vm.hasSource == null || feed.initialLoading -> fullRow(key = "skeleton") { FeedSkeleton() }
+                feed.items.isEmpty() && feed.error != null -> fullRow(key = "error") { ErrorState(feed.error!!, feed::retry) }
                 else -> {
                     staleStrip(feed)
                     items(feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { it.url }) { ItemView(it, recommended = true) }
-                    item(key = "footer") { ListFooter(feed.loading, feed.pageError, feed::retry) }
+                    fullRow(key = "footer") { ListFooter(feed.loading, feed.pageError, feed::retry) }
                 }
             }
         }

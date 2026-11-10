@@ -2,10 +2,13 @@ package dev.wahha.wtube.ui.account
 
 import dev.wahha.wtube.data.ErrorLog
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceRequest
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -54,6 +57,7 @@ import androidx.webkit.WebViewFeature
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Cookies
 import dev.wahha.wtube.data.account.SignInException
+import dev.wahha.wtube.data.innertube.hostIn
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.errorDetail
 import dev.wahha.wtube.ui.components.errorMessage
@@ -125,7 +129,7 @@ fun LoginScreen() {
             )
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (pasteMode) CookiePaste(busy, onSubmit = ::signIn) else LoginWebView(onSignedIn = ::signIn)
+            if (pasteMode) CookiePaste(busy, onSubmit = ::signIn) else LoginWebView(onSignedIn = ::signIn, onGone = nav.back)
             if (busy) {
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
@@ -138,7 +142,7 @@ fun LoginScreen() {
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
+private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     AndroidView(
         modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
@@ -153,6 +157,25 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                 webViewClient = object : WebViewClient() {
                     private var done = false
+
+                    // Only Google's sign-in and YouTube load here; anything else a page links to goes to the browser.
+                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                        if (!request.isForMainFrame) return false
+                        val url = request.url
+                        if (url.scheme == "https" && isSignInHost(url.host)) return false
+                        if (url.scheme == "http" || url.scheme == "https") {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url)) }
+                        }
+                        return true
+                    }
+
+                    // A killed or crashed renderer would take the whole app down unless handled: leave the screen,
+                    // whose disposal destroys this WebView, and sign-in can simply be started again.
+                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                        ErrorLog.note("[login] web page renderer gone, crashed=${detail.didCrash()}")
+                        onGone()
+                        return true
+                    }
 
                     override fun onPageFinished(view: WebView, url: String) {
                         if (done || !isYouTubeHome(url)) return
@@ -187,10 +210,31 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit) {
             }
             // Leaving without a sign-in (back, an error) must not leave Google's cookies in the browser profile.
             clearWebSession()
-            webView?.destroy()
+            webView?.apply {
+                // Pages and the back list of Google's sign-in stay out of the app's files too.
+                clearCache(true)
+                clearHistory()
+                destroy()
+            }
             webView = null
         }
     }
+}
+
+private val LoginDomains = listOf("google.com", "youtube.com", "gstatic.com")
+
+/**
+ * Where Google's sign-in may take the page. Besides [LoginDomains], Google sets the session on the country's own
+ * domain too (`accounts.google.com.ua/accounts/SetSID` for a Ukrainian SIM): `google.<country>`, `google.com.<country>`
+ * and `google.co.<country>`. Sending that step to the browser left the sign-in half done.
+ */
+internal fun isSignInHost(host: String?): Boolean {
+    if (hostIn(host, LoginDomains)) return true
+    val labels = host?.trimEnd('.')?.lowercase()?.split('.') ?: return false
+    val google = labels.lastIndexOf("google").takeIf { it >= 0 } ?: return false
+    val suffix = labels.drop(google + 1)
+    val country = suffix.lastOrNull()?.takeIf { it.length == 2 && it.all(Char::isLetter) } ?: return false
+    return suffix.size == 1 || suffix.size == 2 && suffix[0] in setOf("com", "co")
 }
 
 private fun isYouTubeHome(url: String): Boolean {

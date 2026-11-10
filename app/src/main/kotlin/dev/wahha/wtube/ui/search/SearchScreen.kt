@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.gestures.ScrollableState
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
@@ -71,7 +73,10 @@ import dev.wahha.wtube.ui.components.ErrorState
 import dev.wahha.wtube.ui.components.FeedSkeleton
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.ListFooter
+import dev.wahha.wtube.ui.components.FeedGrid
 import dev.wahha.wtube.ui.components.LoadMoreEffect
+import dev.wahha.wtube.ui.components.fullRow
+import dev.wahha.wtube.ui.components.gridSide
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
@@ -310,7 +315,7 @@ private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
     val results = vm.results
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     val settings by Settings.current.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val listState = rememberLazyGridState()
     LoadMoreEffect(listState, loaded = results.items.size) { results.loadMore() }
     OnScrollEffect(listState, onScroll)
     LaunchedEffect(vm.submitted) { listState.scrollToItem(0) }
@@ -318,24 +323,24 @@ private fun Results(vm: SearchViewModel, onScroll: () -> Unit) {
     val bottom = systemBottom() + LocalBottomInset.current
     when {
         vm.submitted == null -> MessageState(WIcons.Search, stringResource(R.string.search_start))
-        results.initialLoading -> FeedSkeleton(Modifier.padding(top = 8.dp))
+        results.initialLoading -> FeedSkeleton(Modifier.padding(top = 8.dp).padding(horizontal = gridSide()))
         results.items.isEmpty() && results.error != null -> ErrorState(results.error!!, results::retry)
         results.items.isEmpty() && !results.loading -> MessageState(WIcons.Search, stringResource(R.string.search_empty))
-        else -> LazyColumn(
+        else -> FeedGrid(
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("search_results"),
             contentPadding = PaddingValues(top = 8.dp, bottom = bottom),
         ) {
             items(results.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) }, key = { it.url }) { ItemView(it, recommended = true) }
-            item(key = "footer") { ListFooter(results.loading, results.error, results::retry) }
-            item { Spacer(Modifier.height(8.dp)) }
+            fullRow(key = "footer") { ListFooter(results.loading, results.error, results::retry) }
+            fullRow(key = "end") { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
 
 /** Calls [onScroll] whenever the user starts scrolling [listState]. */
 @Composable
-private fun OnScrollEffect(listState: LazyListState, onScroll: () -> Unit) {
+private fun OnScrollEffect(listState: ScrollableState, onScroll: () -> Unit) {
     val current by rememberUpdatedState(onScroll)
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.filter { it }.collect { current() }

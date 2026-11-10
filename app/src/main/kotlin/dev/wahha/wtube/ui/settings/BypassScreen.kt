@@ -43,6 +43,7 @@ import dev.wahha.wtube.dpi.ProbeResult
 import dev.wahha.wtube.dpi.Strategies
 import dev.wahha.wtube.dpi.Strategy
 import dev.wahha.wtube.dpi.parseProxy
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.Notices
@@ -72,7 +73,7 @@ fun BypassScreen() {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = systemTop(), bottom = systemBottom() + LocalBottomInset.current),
+        contentPadding = PaddingValues(start = readableSide(), top = systemTop(), end = readableSide(), bottom = systemBottom() + LocalBottomInset.current),
     ) {
         item {
             Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

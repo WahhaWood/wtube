@@ -1,6 +1,8 @@
 package dev.wahha.wtube.data
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.grack.nanojson.JsonObject
 import com.grack.nanojson.JsonParser
 import kotlinx.coroutines.Dispatchers
@@ -8,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import java.io.IOException
 
@@ -34,7 +37,24 @@ object Updates {
             prefs.edit().remove("version").remove("url").remove("notes").apply()
             return
         }
-        state.value = Release(version, prefs.getString("url", "").orEmpty(), prefs.getString("notes", "").orEmpty())
+        val url = prefs.getString("url", "").orEmpty()
+        if (!isOwnLink(url)) return
+        state.value = Release(version, url, prefs.getString("notes", "").orEmpty())
+    }
+
+    /** Opens the release in the browser; a missing browser is no crash. */
+    fun open(context: Context, release: Release) {
+        if (!isOwnLink(release.url)) return
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.url))) }
+    }
+
+    /**
+     * Whether [url] leads into this app's own GitHub repository. The address comes from the network, so nothing
+     * else is ever opened from it (after `..` is resolved: HttpUrl normalises the path).
+     */
+    fun isOwnLink(url: String): Boolean {
+        val parsed = url.toHttpUrlOrNull() ?: return false
+        return parsed.isHttps && parsed.host == "github.com" && parsed.pathSegments.take(2) == listOf("WahhaWood", "wtube")
     }
 
     /**
@@ -82,7 +102,8 @@ object Updates {
         val version = json.getString("tag_name", "").removePrefix("v").ifEmpty { return null }
         val apk = json.getArray("assets").filterIsInstance<JsonObject>()
             .firstOrNull { it.getString("name", "").endsWith(".apk") }?.getString("browser_download_url")
-        return Release(version, apk ?: json.getString("html_url", ""), json.getString("body", "").trim())
+        val url = listOfNotNull(apk, json.getString("html_url", "")).firstOrNull(::isOwnLink) ?: return null
+        return Release(version, url, json.getString("body", "").trim())
     }
 
     /** Dotted numbers compared part by part ("0.10.0" is newer than "0.9.2"); a part that is not a number counts as 0. */

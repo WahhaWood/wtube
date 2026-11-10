@@ -69,4 +69,14 @@ class SettingsTest {
     fun emptyStoreGivesDefaults() = with(Settings) {
         assertEquals(AppSettings(), mutablePreferencesOf().toSettings())
     }
+
+    // A speed of 0 already in the store (an older restore) would crash the player on every start.
+    @Test
+    fun storedSpeedOutsideThePlayersRangeFallsBackToNormal() = with(Settings) {
+        for (speed in listOf(0f, -1f, Float.NaN, 10f)) {
+            val prefs = mutablePreferencesOf()
+            prefs[Speed] = speed
+            assertEquals("$speed", 1f, prefs.toSettings().speed)
+        }
+    }
 }

@@ -45,6 +45,7 @@ import dev.wahha.wtube.download.DownloadState
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.download.arranged
 import dev.wahha.wtube.download.waitingInOrder
+import dev.wahha.wtube.ui.components.readableSide
 import dev.wahha.wtube.ui.components.LocalBottomInset
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.MessageState
@@ -83,6 +84,8 @@ fun DownloadsScreen() {
         state = listState,
         contentPadding = PaddingValues(
             top = systemTop(),
+            start = readableSide(),
+            end = readableSide(),
             bottom = systemBottom() + LocalBottomInset.current,
         ),
     ) {

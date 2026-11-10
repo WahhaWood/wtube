@@ -40,4 +40,15 @@ class BackupTest {
             assertTrue("accepted: $text", runCatching { Backup.parse(text) }.isFailure)
         }
     }
+
+    // ExoPlayer throws on a speed of 0 or below, and the stored speed is applied on every start: such a file
+    // would crash the app until it is reinstalled.
+    @Test
+    fun speedOutsideThePlayersRangeIsRejected() {
+        for (speed in listOf("0", "-1", "0.1", "100")) {
+            val text = """{"version":1,"settings":{"speed":$speed},"history":[]}"""
+            assertTrue("accepted speed $speed", runCatching { Backup.parse(text) }.isFailure)
+        }
+        assertEquals(2f, Backup.parse("""{"version":1,"settings":{"speed":2},"history":[]}""").settings.speed)
+    }
 }

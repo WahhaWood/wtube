@@ -67,8 +67,8 @@ import kotlin.math.roundToInt
 private enum class SettingsPage { Main, Quality, Speed, Subtitles, Audio, Sleep }
 
 private val QuickSpeeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
-private const val MIN_SPEED = 0.25f
-private const val MAX_SPEED = 3f
+private val MIN_SPEED = Settings.SpeedRange.start
+private val MAX_SPEED = Settings.SpeedRange.endInclusive
 private const val SPEED_STEP = 0.05f
 private val SleepMinutes = listOf(15, 30, 45, 60, 90)
 

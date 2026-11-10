@@ -41,8 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.formatCompact
-import dev.wahha.wtube.ui.components.SaveSheet
 import dev.wahha.wtube.ui.components.Thumbnail
 import dev.wahha.wtube.ui.components.VideoBadge
 import dev.wahha.wtube.ui.components.shareVideo
@@ -83,14 +80,12 @@ private val ShelfCardWidth = 220.dp
 
 /** The row under the seek bar in fullscreen, as in YouTube: rating, comments, saving, sharing, more videos. */
 @Composable
-internal fun FullscreenActions(vm: VideoViewModel, onPanel: (FullscreenPanel) -> Unit) {
+internal fun FullscreenActions(vm: VideoViewModel, onPanel: (FullscreenPanel) -> Unit, onSave: (videoId: String) -> Unit) {
     val details = vm.details ?: return
     val video = details.item
     val state = vm.state
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var saving by remember { mutableStateOf(false) }
-    if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(end = 12.dp, top = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -106,7 +101,7 @@ internal fun FullscreenActions(vm: VideoViewModel, onPanel: (FullscreenPanel) ->
         }
         if (vm.chat != null) ActionPill(WIcons.Forum, stringResource(R.string.chat_title)) { onPanel(FullscreenPanel.Chat) }
         ActionPill(WIcons.Comment, stringResource(R.string.video_comments)) { onPanel(FullscreenPanel.Comments) }
-        if (state != null) ActionPill(WIcons.PlaylistAdd, stringResource(R.string.video_save)) { saving = true }
+        if (state != null) ActionPill(WIcons.PlaylistAdd, stringResource(R.string.video_save)) { onSave(video.id) }
         ActionPill(WIcons.Share, stringResource(R.string.video_share)) { shareVideo(context, video) }
         if (details.related.any { it is VideoItem }) {
             ActionPill(WIcons.VideoLibrary, stringResource(R.string.player_more_videos)) { onPanel(FullscreenPanel.MoreVideos) }
@@ -134,7 +129,8 @@ internal fun FullscreenPanels(vm: VideoViewModel, panel: FullscreenPanel?, shelf
         val sideModifier = if (upright) {
             Modifier.fillMaxWidth().fillMaxHeight(0.65f).clip(UprightPanelShape)
         } else {
-            Modifier.fillMaxHeight().fillMaxWidth(0.45f).clip(PanelShape)
+            // On a tablet 45% would be a mostly empty sheet over half the video.
+            Modifier.fillMaxHeight().width(minOf(maxWidth * 0.45f, 480.dp)).clip(PanelShape)
         }
         for (side in listOf(FullscreenPanel.Comments, FullscreenPanel.Chat)) {
             AnimatedVisibility(
