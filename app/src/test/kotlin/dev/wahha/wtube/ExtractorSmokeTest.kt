@@ -8,6 +8,9 @@ import dev.wahha.wtube.data.PlaylistItem
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.data.YouTube
+import dev.wahha.wtube.data.YouTubeLanguage
+import org.schabi.newpipe.extractor.stream.StreamInfoItem
+import org.schabi.newpipe.extractor.stream.StreamType
 import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.account.SessionExpiredException
 import dev.wahha.wtube.data.innertube.Actions
@@ -18,6 +21,7 @@ import dev.wahha.wtube.player.YoutubeRequests
 import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.data.innertube.InnerTube
 import dev.wahha.wtube.data.innertube.Channels
+import dev.wahha.wtube.data.innertube.ChipKind
 import dev.wahha.wtube.data.isLive
 import dev.wahha.wtube.player.VideoCodec
 import dev.wahha.wtube.player.selectStreams
@@ -45,7 +49,11 @@ class ExtractorSmokeTest {
     companion object {
         @JvmStatic
         @BeforeClass
-        fun init() = YouTube.init("RU")
+        fun init() {
+            YouTube.init("RU")
+            // The host's language would pick the requests' one; tests that need Russian set it themselves.
+            YouTubeLanguage.override = "en"
+        }
     }
 
     // On CI (GitHub's data-centre IPs) YouTube asks to sign in before giving streams: that says nothing
@@ -271,6 +279,26 @@ class ExtractorSmokeTest {
         if (next != null) assertTrue(YouTube.playlistMore(url, next).items.isNotEmpty())
     }
 
+    // Asked in Russian, YouTube gives Russian videos their own titles; counts and dates still parse.
+    @Test
+    fun russianAnswersKeepTitlesCountsAndDates() = runBlocking {
+        YouTubeLanguage.override = "ru"
+        try {
+            val videos = YouTube.search("wylsacom").items.filterIsInstance<VideoItem>()
+            println("ru search: " + videos.take(3).joinToString { "${it.title} / ${it.views} / ${it.uploadedAt}" })
+            assertTrue(videos.count { Cyrillic.containsMatchIn(it.title) } >= videos.size / 2)
+            assertTrue(videos.filterNot { it.isLive }.all { it.views >= 1000 && it.uploadedAt != null })
+            val related = YouTube.streamInfo("jNQXAC9IVRw").relatedItems.orEmpty().filterIsInstance<StreamInfoItem>()
+            println("ru related: " + related.take(3).joinToString { "${it.name} / ${it.viewCount} / ${it.textualUploadDate}" })
+            assertTrue(related.isNotEmpty())
+            assertTrue(related.filter { it.streamType == StreamType.VIDEO_STREAM }.all { it.viewCount >= 1000 && it.uploadDate != null })
+        } finally {
+            YouTubeLanguage.override = "en"
+        }
+    }
+
+    private val Cyrillic = Regex("[а-яА-ЯёЁ]")
+
     @Test
     fun watchHasRelatedVideos() = runBlocking {
         val info = YouTube.streamInfo("dQw4w9WgXcQ")
@@ -294,7 +322,7 @@ class ExtractorSmokeTest {
         val channel = "UC101o-vQ2iOj9vr00JUlyKw"
         val extras = Channels.extras(channel)
         assertTrue(extras.joinable)
-        assertEquals(listOf("Latest", "Popular", "Oldest", "Public"), extras.videoSorts.map { it.title })
+        assertEquals(listOf(ChipKind.LATEST, ChipKind.POPULAR, ChipKind.OLDEST, ChipKind.PUBLIC), extras.videoSorts.map { it.kind })
         // YouTube still obeys the sorts it offers no chip for here.
         val popular = Channels.sortedVideos(extras.videoSorts[1].token).items.filterIsInstance<VideoItem>()
         assertTrue(popular.size > 1 && popular.zipWithNext().all { (a, b) -> a.views >= b.views })
@@ -306,6 +334,15 @@ class ExtractorSmokeTest {
         assertTrue(video.membersOnly)
         val refusal = runCatching { YouTube.video(video.id) }.exceptionOrNull()
         assertTrue("Got $refusal", refusal != null && MembersOnly.refused(refusal))
+        // The player request stays English, so the refusal is told the same way with a Russian interface.
+        YouTubeLanguage.override = "ru"
+        try {
+            YouTube.forget(video.id)
+            val russian = runCatching { YouTube.video(video.id) }.exceptionOrNull()
+            assertTrue("Got $russian", russian != null && MembersOnly.refused(russian))
+        } finally {
+            YouTubeLanguage.override = "en"
+        }
         assertEquals("varlamov", Actions.watch(video.id, null).video?.channelName)
     }
 }

@@ -11,14 +11,21 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 class NewPipeDownloader(private val client: () -> OkHttpClient) : Downloader() {
     override fun execute(request: Request): Response {
         replay.get()?.let { return it.answer(request) }
+        val language = YouTubeLanguage.current
+        val body = request.dataToSend()
+        val text = body?.toString(Charsets.UTF_8)
+        // The extractor always asks in English; see YouTubeLanguage for why and what is left English.
+        val translated = language != "en" && text != null && EXTRACTOR_HL in text &&
+            "/youtubei/v1/" in request.url() && "/youtubei/v1/player" !in request.url()
         val builder = okhttp3.Request.Builder()
-            .method(request.httpMethod(), request.dataToSend()?.toRequestBody())
+            .method(request.httpMethod(), if (translated) text!!.replace(EXTRACTOR_HL, "\"hl\":\"$language\"").toRequestBody() else body?.toRequestBody())
             .url(request.url())
             .addHeader("User-Agent", Http.USER_AGENT)
         for ((name, values) in request.headers()) {
             builder.removeHeader(name)
             values.forEach { builder.addHeader(name, it) }
         }
+        if (translated) builder.header("Accept-Language", language)
 
         (clientOverride.get() ?: client()).newCall(builder.build()).execute().use { response ->
             if (response.code == 429) throw ReCaptchaException("reCaptcha Challenge requested", request.url())
@@ -26,13 +33,15 @@ class NewPipeDownloader(private val client: () -> OkHttpClient) : Downloader() {
                 response.code,
                 response.message,
                 response.headers.toMultimap(),
-                response.body.string(),
+                response.body.string().let { if (translated) YouTubeLanguage.toEnglish(it) else it },
                 response.request.url.toString(),
             ).also { observer.get()?.observe(request, it) }
         }
     }
 
     companion object {
+        private const val EXTRACTOR_HL = "\"hl\":\"en-GB\""
+
         /** Set around a blocking extractor call to send its requests another way (the bypass checking a route). */
         val clientOverride = ThreadLocal<OkHttpClient?>()
 

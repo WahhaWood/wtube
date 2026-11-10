@@ -6,6 +6,7 @@ import com.grack.nanojson.JsonParser
 import com.grack.nanojson.JsonParserException
 import com.grack.nanojson.JsonWriter
 import dev.wahha.wtube.data.Http
+import dev.wahha.wtube.data.YouTubeLanguage
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.account.Cookies
 import dev.wahha.wtube.data.account.Identity
@@ -103,9 +104,10 @@ object InnerTube {
 
     private suspend fun rawPost(session: Session?, endpoint: String, fill: JsonBuilder<JsonObject>.() -> Unit = {}): JsonObject =
         withContext(Dispatchers.IO) {
-            // The language alone: the extractor's localization is "en-<phone region>", and YouTube answers
-            // an hl like "en-RU" with 400 INVALID_ARGUMENT on every endpoint.
-            val language = Localization(NewPipe.getPreferredLocalization().languageCode)
+            // The interface language alone (see YouTubeLanguage): YouTube answers an hl like "en-RU" with
+            // 400 INVALID_ARGUMENT on every endpoint.
+            val hl = YouTubeLanguage.current
+            val language = Localization(hl)
             val body = YoutubeParsingHelper.prepareDesktopJsonBuilder(language, NewPipe.getPreferredContentCountry())
                 .apply(fill)
                 .done()
@@ -114,7 +116,7 @@ object InnerTube {
                 .post(JsonWriter.string(body).toRequestBody(JsonType))
                 .signedBy(session)
                 .build()
-            parseJson(request.url.encodedPath, execute(session, request))
+            parseJson(request.url.encodedPath, execute(session, request)).let { if (hl == "en") it else YouTubeLanguage.toEnglish(it) }
         }
 
     private fun isLoggedOut(json: JsonObject): Boolean =

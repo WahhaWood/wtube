@@ -10,6 +10,7 @@ import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.YouTube.toItems
 import dev.wahha.wtube.data.HiddenItems
 import dev.wahha.wtube.data.innertube.Channels
+import dev.wahha.wtube.data.innertube.ChipKind
 import dev.wahha.wtube.data.innertube.FeedParser
 import dev.wahha.wtube.data.innertube.WatchParser
 import dev.wahha.wtube.player.NextVideo
@@ -114,7 +115,10 @@ class MembersOnlyTest {
         val latest = Channels.extras(fixture("channel_videos.json")).videoSorts.first().token
         fun chip(title: String, token: String) = """{"chipViewModel":{"text":"$title","tapCommand":{"innertubeCommand":{"continuationCommand":{"token":"$token"}}}}}"""
         val page = """{"contents":{"chipBarViewModel":{"chips":[${chip("Latest", latest)},${chip("Members only", "m")},${chip("Public", "p")}]}}}"""
-        assertEquals(listOf("Latest", "Popular", "Oldest", "Public"), Channels.extras(JsonParser.`object`().from(page)).videoSorts.map { it.title })
+        assertEquals(
+            listOf(ChipKind.LATEST, ChipKind.POPULAR, ChipKind.OLDEST, ChipKind.PUBLIC),
+            Channels.extras(JsonParser.`object`().from(page)).videoSorts.map { it.kind },
+        )
     }
 
     // A token of another form must not turn into a wrong sort: no chip instead.

@@ -45,9 +45,10 @@ object YouTube {
     val ChannelTabKinds = listOf(ChannelTabs.VIDEOS, ChannelTabs.LIVESTREAMS, ChannelTabs.PLAYLISTS)
 
     /**
-     * English on purpose: YouTube answers parts of its pages (relative dates of related videos) in English
-     * whatever `hl` says, and the extractor parses dates and counts with English patterns. The app formats
-     * dates in Russian itself from the parsed values. [country] picks regional content (trending, search).
+     * The extractor pins `hl=en-GB` and parses dates and counts with English patterns whatever is set here;
+     * [NewPipeDownloader] asks YouTube in the interface language instead and turns those phrases back into
+     * English ([YouTubeLanguage]). The app formats dates and counts itself from the parsed values.
+     * [country] picks regional content (trending, search).
      */
     fun init(country: String) {
         val region = country.takeIf { it.length == 2 } ?: "US"

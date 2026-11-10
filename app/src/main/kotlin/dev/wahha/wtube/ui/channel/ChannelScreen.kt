@@ -33,6 +33,7 @@ import dev.wahha.wtube.ui.components.viewsText
 import dev.wahha.wtube.ui.components.MessageState
 import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.data.innertube.Channels
+import dev.wahha.wtube.data.innertube.ChipKind
 import dev.wahha.wtube.data.innertube.ChannelExtras
 import dev.wahha.wtube.data.innertube.ChannelAbout
 import dev.wahha.wtube.data.ItemsPage
@@ -244,12 +245,12 @@ class ChannelViewModel(private val url: String) : ViewModel() {
     }
 }
 
-// By YouTube's English titles; one that is not here shows as YouTube wrote it.
+// A chip of another kind shows as YouTube wrote it.
 private val VideoChipLabels = mapOf(
-    "Latest" to R.string.channel_sort_latest,
-    "Popular" to R.string.channel_sort_popular,
-    "Oldest" to R.string.channel_sort_oldest,
-    "Public" to R.string.channel_sort_public,
+    ChipKind.LATEST to R.string.channel_sort_latest,
+    ChipKind.POPULAR to R.string.channel_sort_popular,
+    ChipKind.OLDEST to R.string.channel_sort_oldest,
+    ChipKind.PUBLIC to R.string.channel_sort_public,
 )
 
 private val TabLabels = mapOf(
@@ -332,7 +333,7 @@ fun ChannelScreen(url: String) {
                                 FilterChip(
                                     selected = vm.videoSort == index,
                                     onClick = { vm.sortVideos(index) },
-                                    label = { Text(VideoChipLabels[chip.title]?.let { stringResource(it) } ?: chip.title) },
+                                    label = { Text(chip.kind?.let(VideoChipLabels::get)?.let { stringResource(it) } ?: chip.title) },
                                 )
                             }
                         }
