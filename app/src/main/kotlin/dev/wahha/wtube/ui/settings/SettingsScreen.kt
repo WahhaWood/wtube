@@ -246,6 +246,9 @@ fun SettingsScreen() {
             }
         }
         item {
+            SwitchRow(stringResource(R.string.settings_left_handed), stringResource(R.string.settings_left_handed_summary), settings.leftHanded, Settings.LeftHanded)
+        }
+        item {
             SwitchRow(stringResource(R.string.settings_pure_black), stringResource(R.string.settings_pure_black_summary), settings.pureBlack, Settings.PureBlack)
         }
         item {

@@ -111,6 +111,7 @@ import dev.wahha.wtube.ui.components.Notices
 import dev.wahha.wtube.ui.components.TAB_RESET
 import dev.wahha.wtube.ui.components.systemBottom
 import dev.wahha.wtube.ui.components.systemEnd
+import dev.wahha.wtube.ui.components.systemStart
 import dev.wahha.wtube.ui.downloads.DownloadsScreen
 import dev.wahha.wtube.ui.feed.FeedScreen
 import dev.wahha.wtube.ui.glass.BarHeight
@@ -413,6 +414,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                         navController.selectTab(tabRoutes[it])
                     },
                     onSearch = { navController.selectTab(Search) },
+                    searchFirst = settings.leftHanded,
                     gapAbove = if (sheetOpen) MiniPlayerGap else 0.dp,
                     modifier = Modifier.align(Alignment.BottomCenter).offset {
                         // Slides away under the video as the sheet opens, on the sheet's own progress, and
@@ -428,7 +430,11 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                             sheet = sheet,
                             miniWidth = rowWidth,
                             // A wide window keeps the middle for the content: the mini player waits in the corner.
-                            miniLeft = if (windowLayout.grid) maxWidth - rowWidth - BarEdgePadding - systemEnd() else (maxWidth - rowWidth) / 2,
+                            miniLeft = when {
+                                !windowLayout.grid -> (maxWidth - rowWidth) / 2
+                                settings.leftHanded -> BarEdgePadding + systemStart()
+                                else -> maxWidth - rowWidth - BarEdgePadding - systemEnd()
+                            },
                             // With the bar away the mini player takes its place at the bottom.
                             miniBottom = lerp(barSpace, systemBottom() + BarBottomPadding, barAway) + MiniPlayerGap,
                             backdrop = backdrop,
@@ -513,13 +519,12 @@ private fun GlassBottomBar(
     searchSelected: Boolean,
     onTabSelected: (Int) -> Unit,
     onSearch: () -> Unit,
+    // Left-handed: the search button before the tabs, under the thumb.
+    searchFirst: Boolean,
     // The gap up to the mini player, which must not let taps through either.
     gapAbove: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val glass = LocalLiquidGlass.current
-    val searchInteraction = rememberGlassInteraction()
-    val colors = MaterialTheme.colorScheme
     val home = GlassTab(stringResource(R.string.tab_home), WIcons.Home)
     val shorts = GlassTab(stringResource(R.string.tab_shorts), WIcons.SwipeVertical)
     val subscriptions = GlassTab(stringResource(R.string.tab_subscriptions), WIcons.Subscriptions)
@@ -543,6 +548,7 @@ private fun GlassBottomBar(
         horizontalArrangement = Arrangement.spacedBy(SearchGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (searchFirst) SearchButton(backdrop, luminance, searchSelected, onSearch)
         LiquidGlassTabBar(
             tabs = glassTabs,
             selectedTab = selectedTab,
@@ -552,28 +558,36 @@ private fun GlassBottomBar(
             onTabSelected = onTabSelected,
             availableWidth = capsuleBudget,
         )
-        Box(
-            Modifier
-                .size(SearchSize)
-                .drawInteractiveGlass(
-                    backdrop = backdrop,
-                    layer = null,
-                    luminance = { luminance.value },
-                    shape = CircleShape,
-                    interaction = searchInteraction,
-                    fallbackColor = colors.surfaceContainerHigh,
-                    enabled = glass,
-                )
-                .clickable(interactionSource = null, indication = null, onClick = onSearch)
-                .testTag("tab_search"),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                WIcons.Search,
-                contentDescription = stringResource(R.string.tab_search),
-                tint = if (searchSelected) colors.primary else colors.onSurface,
+        if (!searchFirst) SearchButton(backdrop, luminance, searchSelected, onSearch)
+    }
+}
+
+/** Search: its own glass circle beside the tab capsule. */
+@Composable
+private fun SearchButton(backdrop: LayerBackdrop, luminance: State<Float>, selected: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val interaction = rememberGlassInteraction()
+    Box(
+        Modifier
+            .size(SearchSize)
+            .drawInteractiveGlass(
+                backdrop = backdrop,
+                layer = null,
+                luminance = { luminance.value },
+                shape = CircleShape,
+                interaction = interaction,
+                fallbackColor = colors.surfaceContainerHigh,
+                enabled = LocalLiquidGlass.current,
             )
-        }
+            .clickable(interactionSource = null, indication = null, onClick = onClick)
+            .testTag("tab_search"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            WIcons.Search,
+            contentDescription = stringResource(R.string.tab_search),
+            tint = if (selected) colors.primary else colors.onSurface,
+        )
     }
 }
 

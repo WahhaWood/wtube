@@ -242,6 +242,8 @@
     <string name="settings_min_duration_3">3 minutes or longer</string>
     <string name="settings_min_duration_5">5 minutes or longer</string>
     <string name="settings_min_duration_10">10 minutes or longer</string>
+    <string name="settings_left_handed">Left-handed</string>
+    <string name="settings_left_handed_summary">Search and the buttons of the mini player, the player and Shorts move to the left edge</string>
     <string name="settings_shorts">Shorts</string>
     <string name="settings_shorts_summary">A tab with a vertical feed of short videos. Other feeds never show shorts anyway</string>
     <string name="settings_hide_streams">Hide live streams and premieres</string>

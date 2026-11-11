@@ -3,6 +3,7 @@ package dev.wahha.wtube.ui.components
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
@@ -22,3 +23,7 @@ fun systemBottom(): Dp = WindowInsets.navigationBars.union(WindowInsets.displayC
 /** The navigation bar or the camera cutout at the window's end side, on a phone or tablet on its side. */
 @Composable
 fun systemEnd(): Dp = WindowInsets.navigationBars.union(WindowInsets.displayCutout).asPaddingValues().calculateEndPadding(LocalLayoutDirection.current)
+
+/** The navigation bar or the camera cutout at the window's start side. */
+@Composable
+fun systemStart(): Dp = WindowInsets.navigationBars.union(WindowInsets.displayCutout).asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)

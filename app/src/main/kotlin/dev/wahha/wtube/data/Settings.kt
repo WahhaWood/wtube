@@ -98,6 +98,8 @@ data class AppSettings(
     val appLanguage: String = AppLanguage.SYSTEM,
     /** The Shorts tab on the bar; off, shorts are nowhere in the app. */
     val shorts: Boolean = true,
+    /** Thumb controls mirrored for the left hand: search, the mini player's buttons, the player's and Shorts' buttons. */
+    val leftHanded: Boolean = false,
 ) {
     /** [subtitleLanguage], or the interface's while none was picked. */
     val captionLanguage: String get() = subtitleLanguage.ifEmpty { AppLocale.language }
@@ -147,6 +149,7 @@ object Settings {
     val GestureHaptics = booleanPreferencesKey("gesture_haptics")
     val AppLanguageChoice = stringPreferencesKey("app_language")
     val ShortsTab = booleanPreferencesKey("shorts")
+    val LeftHanded = booleanPreferencesKey("left_handed")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -247,6 +250,7 @@ object Settings {
         this[GestureHaptics] = settings.gestureHaptics
         this[AppLanguageChoice] = settings.appLanguage
         this[ShortsTab] = settings.shorts
+        this[LeftHanded] = settings.leftHanded
     }
 
     internal fun Preferences.toSettings(): AppSettings {
@@ -294,6 +298,7 @@ object Settings {
             gestureHaptics = this[GestureHaptics] ?: defaults.gestureHaptics,
             appLanguage = this[AppLanguageChoice]?.takeIf { it in AppLanguage.Choices } ?: defaults.appLanguage,
             shorts = this[ShortsTab] ?: defaults.shorts,
+            leftHanded = this[LeftHanded] ?: defaults.leftHanded,
         )
     }
 }

@@ -505,7 +505,10 @@ fun VideoPlayer(
 
         if (membersOnly && roomy) {
             Box(Modifier.fillMaxSize().background(colors.scrim.copy(alpha = 0.45f))) {
-                IconButton(onClick = onCollapse, modifier = Modifier.align(Alignment.TopStart).padding(4.dp)) {
+                IconButton(
+                    onClick = onCollapse,
+                    modifier = Modifier.align(if (settings.leftHanded) Alignment.TopEnd else Alignment.TopStart).padding(4.dp),
+                ) {
                     Icon(
                         WIcons.ExpandMore,
                         contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_collapse),
@@ -594,13 +597,46 @@ private fun Controls(
             Modifier.align(Alignment.TopStart).fillMaxWidth().then(edges).padding(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onCollapse) {
-                Icon(
-                    WIcons.ExpandMore,
-                    contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_collapse),
-                    tint = colors.onSurface,
-                )
+            val collapse = @Composable {
+                IconButton(onClick = onCollapse) {
+                    Icon(
+                        WIcons.ExpandMore,
+                        contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_collapse),
+                        tint = colors.onSurface,
+                    )
+                }
             }
+            val tools = @Composable {
+                AutoplaySwitch(settings.autoplay) {
+                    Settings.set(Settings.Autoplay, it)
+                    onHint(if (it) R.string.player_autoplay_on else R.string.player_autoplay_off)
+                    onInteraction()
+                }
+                if (state.tracks.groups.any { it.type == C.TRACK_TYPE_TEXT }) {
+                    val captionsOn = C.TRACK_TYPE_TEXT !in state.parameters.disabledTrackTypes
+                    IconButton(onClick = {
+                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, captionsOn)
+                            .apply { if (captionsOn) clearOverridesOfType(C.TRACK_TYPE_TEXT) }
+                            .build()
+                        Settings.set(Settings.Subtitles, !captionsOn)
+                        onInteraction()
+                    }) {
+                        val captionsState = stringResource(if (captionsOn) R.string.switch_on else R.string.switch_off)
+                        Icon(
+                            WIcons.ClosedCaption,
+                            contentDescription = stringResource(R.string.player_subtitles),
+                            tint = if (captionsOn) colors.onSurface else colors.onSurface.copy(alpha = 0.55f),
+                            modifier = Modifier.semantics { stateDescription = captionsState },
+                        )
+                    }
+                }
+                IconButton(onClick = onSettings) {
+                    Icon(WIcons.Settings, contentDescription = stringResource(R.string.player_settings), tint = colors.onSurface)
+                }
+            }
+            // Left-handed: the buttons at the left edge, collapsing at the right.
+            if (settings.leftHanded) tools() else collapse()
             // Title and channel only in fullscreen: on the page they are right below the player.
             Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
                 if (fullscreen) {
@@ -622,33 +658,7 @@ private fun Controls(
                     }
                 }
             }
-            AutoplaySwitch(settings.autoplay) {
-                Settings.set(Settings.Autoplay, it)
-                onHint(if (it) R.string.player_autoplay_on else R.string.player_autoplay_off)
-                onInteraction()
-            }
-            if (state.tracks.groups.any { it.type == C.TRACK_TYPE_TEXT }) {
-                val captionsOn = C.TRACK_TYPE_TEXT !in state.parameters.disabledTrackTypes
-                IconButton(onClick = {
-                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, captionsOn)
-                        .apply { if (captionsOn) clearOverridesOfType(C.TRACK_TYPE_TEXT) }
-                        .build()
-                    Settings.set(Settings.Subtitles, !captionsOn)
-                    onInteraction()
-                }) {
-                    val captionsState = stringResource(if (captionsOn) R.string.switch_on else R.string.switch_off)
-                    Icon(
-                        WIcons.ClosedCaption,
-                        contentDescription = stringResource(R.string.player_subtitles),
-                        tint = if (captionsOn) colors.onSurface else colors.onSurface.copy(alpha = 0.55f),
-                        modifier = Modifier.semantics { stateDescription = captionsState },
-                    )
-                }
-            }
-            IconButton(onClick = onSettings) {
-                Icon(WIcons.Settings, contentDescription = stringResource(R.string.player_settings), tint = colors.onSurface)
-            }
+            if (settings.leftHanded) collapse() else tools()
         }
 
         Row(
@@ -703,9 +713,23 @@ private fun Controls(
 
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().then(edges)
-                .padding(start = 16.dp, end = 4.dp, bottom = if (fullscreen) 12.dp else 0.dp),
+                .padding(
+                    start = if (settings.leftHanded) 4.dp else 16.dp,
+                    end = if (settings.leftHanded) 16.dp else 4.dp,
+                    bottom = if (fullscreen) 12.dp else 0.dp,
+                ),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val toggle = @Composable {
+                    IconButton(onClick = onToggleFullscreen) {
+                        Icon(
+                            if (fullscreen) WIcons.FullscreenExit else WIcons.Fullscreen,
+                            contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_fullscreen),
+                            tint = colors.onSurface,
+                        )
+                    }
+                }
+                if (settings.leftHanded) toggle()
                 val shown = scrub?.let { (it * state.duration).toLong() } ?: state.position
                 if (state.live) {
                     LiveBadge(behindMs = state.duration - shown, onGoLive = {
@@ -728,13 +752,7 @@ private fun Controls(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onToggleFullscreen) {
-                    Icon(
-                        if (fullscreen) WIcons.FullscreenExit else WIcons.Fullscreen,
-                        contentDescription = stringResource(if (fullscreen) R.string.player_exit_fullscreen else R.string.player_fullscreen),
-                        tint = colors.onSurface,
-                    )
-                }
+                if (!settings.leftHanded) toggle()
             }
             val segments by SponsorBlock.current.collectAsStateWithLifecycle()
             SeekBar(
@@ -747,7 +765,8 @@ private fun Controls(
                 scrub = scrub,
                 onScrub = onScrub,
                 onSeek = { player.seekTo(it) },
-                modifier = Modifier.padding(end = 12.dp).systemGestureExclusion(),
+                modifier = Modifier.padding(start = if (settings.leftHanded) 12.dp else 0.dp, end = if (settings.leftHanded) 0.dp else 12.dp)
+                    .systemGestureExclusion(),
             )
             if (fullscreen) fullscreenActions()
         }

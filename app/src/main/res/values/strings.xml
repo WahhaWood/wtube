@@ -253,6 +253,8 @@
     <string name="settings_min_duration_3">От 3 минут</string>
     <string name="settings_min_duration_5">От 5 минут</string>
     <string name="settings_min_duration_10">От 10 минут</string>
+    <string name="settings_left_handed">Для левой руки</string>
+    <string name="settings_left_handed_summary">Поиск, кнопки мини-плеера, плеера и шортсов — у левого края</string>
     <string name="settings_shorts">Шортсы</string>
     <string name="settings_shorts_summary">Вкладка с вертикальной лентой коротких видео. В остальных лентах шортсов нет и так</string>
     <string name="settings_hide_streams">Скрывать трансляции и премьеры</string>

@@ -394,6 +394,7 @@ fun PlayerSheet(
                 miniHeight = MiniPlayerHeight.toPx(),
                 miniVideoStart = MiniVideoStart.toPx(),
                 miniVideoWidth = MiniVideoWidth.toPx(),
+                leftHanded = settings.leftHanded,
             )
         }
         SideEffect {
@@ -526,6 +527,7 @@ fun PlayerSheet(
                             author = details?.item?.channelName ?: vm.membersOnly?.channelName ?: state.metadata.artist?.toString().orEmpty(),
                             onClose = onClose,
                             canPlay = membersOnlyCover == null,
+                            leftHanded = settings.leftHanded,
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = miniAlpha(progress()) }.testTag("mini_player"),
                         )
                     }
@@ -608,6 +610,8 @@ private class SheetGeometry(
     val miniHeight: Float,
     miniVideoStart: Float,
     miniVideoWidth: Float,
+    // The mini player's video at its right end, beside buttons at the left.
+    leftHanded: Boolean,
 ) {
     val miniTop = height - miniBottom - miniHeight
 
@@ -616,7 +620,8 @@ private class SheetGeometry(
     private val fullVideo = Rect(0f, 0f, width, height)
     private val miniVideo = (miniVideoWidth * 9f / 16f).let { videoHeight ->
         val top = (miniHeight - videoHeight) / 2f
-        Rect(miniVideoStart, top, miniVideoStart + miniVideoWidth, top + videoHeight)
+        val left = if (leftHanded) miniWidth - miniVideoStart - miniVideoWidth else miniVideoStart
+        Rect(left, top, left + miniVideoWidth, top + videoHeight)
     }
 
     // Sideways shrinking trails the drag, so the video stays big for the first part of it, as in YouTube.

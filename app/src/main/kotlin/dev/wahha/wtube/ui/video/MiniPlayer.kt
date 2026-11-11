@@ -33,12 +33,15 @@ import dev.wahha.wtube.ui.icon.WIcons
 val MiniPlayerHeight = 60.dp
 internal val MiniPlayerRadius = 22.dp
 
-// The slot at the mini player's start that the player sheet shrinks the video into.
+// The slot at the mini player's start (its end when left-handed) that the player sheet shrinks the video into.
 internal val MiniVideoStart = 8.dp
 internal val MiniVideoWidth = 76.dp
 internal val MiniVideoRadius = 10.dp
 
-/** The mini player's row beside the shrunk video: title, play/pause, close and a hairline of progress. */
+/**
+ * The mini player's row beside the shrunk video: title, play/pause, close and a hairline of progress.
+ * [leftHanded] mirrors it: the buttons at the left edge, the video at the right.
+ */
 @Composable
 internal fun MiniPlayerContent(
     player: Player,
@@ -49,32 +52,49 @@ internal fun MiniPlayerContent(
     modifier: Modifier = Modifier,
     // False when the video could not be opened at all: its play button would do nothing.
     canPlay: Boolean = true,
+    leftHanded: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     Box(modifier) {
+        val videoSide = MiniVideoStart + MiniVideoWidth + 10.dp
         Row(
-            Modifier.fillMaxSize().padding(start = MiniVideoStart + MiniVideoWidth + 10.dp, end = 4.dp),
+            Modifier.fillMaxSize().padding(start = if (leftHanded) 4.dp else videoSide, end = if (leftHanded) videoSide else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(author, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (canPlay) Box(contentAlignment = Alignment.Center) {
-                if (state.playbackState == Player.STATE_BUFFERING) {
-                    CircularProgressIndicator(Modifier.size(36.dp), color = colors.primary, strokeWidth = 2.dp)
-                }
-                IconButton(onClick = { if (state.playWhenReady) player.pause() else player.play() }) {
-                    Icon(
-                        if (state.playWhenReady) WIcons.Pause else WIcons.PlayArrow,
-                        contentDescription = stringResource(if (state.playWhenReady) R.string.player_pause else R.string.player_play),
-                        tint = colors.onSurface,
-                    )
+            val text = @Composable {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(author, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            IconButton(onClick = onClose) {
-                Icon(WIcons.Close, contentDescription = stringResource(R.string.player_close), tint = colors.onSurface)
+            val playPause = @Composable {
+                if (canPlay) Box(contentAlignment = Alignment.Center) {
+                    if (state.playbackState == Player.STATE_BUFFERING) {
+                        CircularProgressIndicator(Modifier.size(36.dp), color = colors.primary, strokeWidth = 2.dp)
+                    }
+                    IconButton(onClick = { if (state.playWhenReady) player.pause() else player.play() }) {
+                        Icon(
+                            if (state.playWhenReady) WIcons.Pause else WIcons.PlayArrow,
+                            contentDescription = stringResource(if (state.playWhenReady) R.string.player_pause else R.string.player_play),
+                            tint = colors.onSurface,
+                        )
+                    }
+                }
+            }
+            val close = @Composable {
+                IconButton(onClick = onClose) {
+                    Icon(WIcons.Close, contentDescription = stringResource(R.string.player_close), tint = colors.onSurface)
+                }
+            }
+            if (leftHanded) {
+                close()
+                playPause()
+                text()
+            } else {
+                text()
+                playPause()
+                close()
             }
         }
         val progress = if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f

@@ -74,6 +74,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import dev.wahha.wtube.R
 import dev.wahha.wtube.data.AppLocale
 import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.account.Account
 import dev.wahha.wtube.data.formatCompact
@@ -233,6 +234,7 @@ private fun ShortPageView(
     val player = players.at(index)
     val held = players.holds(index, item.id)
     val colors = MaterialTheme.colorScheme
+    val leftHanded = Settings.current.collectAsStateWithLifecycle().value.leftHanded
 
     // Into its player once near the screen; the stream info is cached by then, or comes with the page.
     LaunchedEffect(near, held, item.id) {
@@ -296,15 +298,20 @@ private fun ShortPageView(
 
         val bottom = systemBottom() + LocalBottomInset.current
         Row(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 16.dp, end = 10.dp, bottom = bottom + 8.dp),
+            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = if (leftHanded) 10.dp else 16.dp, end = if (leftHanded) 16.dp else 10.dp, bottom = bottom + 8.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val actions = @Composable {
+                ShortActions(page, backdrop, inRow = low, onComments = {
+                    if (page.comments.list.items.isEmpty() && !page.comments.list.loading) page.comments.list.refresh()
+                    commentsOpen = true
+                })
+            }
+            // Left-handed: the buttons at the left edge, under the thumb.
+            if (leftHanded) actions()
             ShortInfo(page, onOpenDescription = { descriptionOpen = true }, modifier = Modifier.weight(1f))
-            ShortActions(page, backdrop, inRow = low, onComments = {
-                if (page.comments.list.items.isEmpty() && !page.comments.list.loading) page.comments.list.refresh()
-                commentsOpen = true
-            })
+            if (!leftHanded) actions()
         }
         if (current && held) ShortProgress(player, Modifier.align(Alignment.BottomStart).padding(bottom = bottom))
         GlassButton(
@@ -312,7 +319,8 @@ private fun ShortPageView(
             icon = if (muted) WIcons.VolumeOff else WIcons.VolumeUp,
             description = stringResource(if (muted) R.string.shorts_sound_on else R.string.shorts_sound_off),
             onClick = onToggleMute,
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = systemTop() + 8.dp, end = 10.dp),
+            modifier = Modifier.align(if (leftHanded) Alignment.TopStart else Alignment.TopEnd)
+                .padding(top = systemTop() + 8.dp, start = 10.dp, end = 10.dp),
         )
     }
 
