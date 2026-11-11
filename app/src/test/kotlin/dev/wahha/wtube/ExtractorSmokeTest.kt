@@ -14,6 +14,7 @@ import org.schabi.newpipe.extractor.stream.StreamType
 import dev.wahha.wtube.data.account.Session
 import dev.wahha.wtube.data.account.SessionExpiredException
 import dev.wahha.wtube.data.innertube.Actions
+import dev.wahha.wtube.data.innertube.Shorts
 import dev.wahha.wtube.data.innertube.ChatAction
 import dev.wahha.wtube.data.innertube.LiveChat
 import dev.wahha.wtube.download.downloadOptions
@@ -31,6 +32,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -344,5 +346,20 @@ class ExtractorSmokeTest {
             YouTubeLanguage.override = "en"
         }
         assertEquals("varlamov", Actions.watch(video.id, null).video?.channelName)
+    }
+
+    // The Shorts tab: a seedless start, a batch after it, and a short plays like any video.
+    @Test
+    fun shortsFeedStartsContinuesAndPlays() = runBlocking {
+        val first = Shorts.page(null, session = null)
+        assertEquals(1, first.items.size)
+        val batch = Shorts.page(checkNotNull(first.next) { "No sequence token" }, session = null)
+        println("shorts: " + batch.items.joinToString { it.id })
+        assertTrue("short batch: ${batch.items.size}", batch.items.size >= 3)
+        assertNotNull(batch.next)
+        val info = YouTube.streamInfo(first.items.single().id)
+        assertTrue("no streams for a short", info.videoOnlyStreams.isNotEmpty() && info.audioStreams.isNotEmpty())
+        assertNotNull(Actions.watch(info.id, null).commentsToken)
+        Unit
     }
 }

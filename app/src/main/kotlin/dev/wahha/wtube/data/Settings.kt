@@ -96,6 +96,8 @@ data class AppSettings(
     val gestureHaptics: Boolean = true,
     /** One of [AppLanguage.Choices]: the interface language, "" = the phone's. */
     val appLanguage: String = AppLanguage.SYSTEM,
+    /** The Shorts tab on the bar; off, shorts are nowhere in the app. */
+    val shorts: Boolean = true,
 ) {
     /** [subtitleLanguage], or the interface's while none was picked. */
     val captionLanguage: String get() = subtitleLanguage.ifEmpty { AppLocale.language }
@@ -144,6 +146,7 @@ object Settings {
     val GestureBrightnessLevel = floatPreferencesKey("gesture_brightness_level")
     val GestureHaptics = booleanPreferencesKey("gesture_haptics")
     val AppLanguageChoice = stringPreferencesKey("app_language")
+    val ShortsTab = booleanPreferencesKey("shorts")
 
     // Before 0.3 metered networks had an on/off 480p cap instead of their own quality.
     private val MobileDataSaver = booleanPreferencesKey("mobile_data_saver")
@@ -243,6 +246,7 @@ object Settings {
         this[GestureBrightnessLevel] = settings.gestureBrightnessLevel
         this[GestureHaptics] = settings.gestureHaptics
         this[AppLanguageChoice] = settings.appLanguage
+        this[ShortsTab] = settings.shorts
     }
 
     internal fun Preferences.toSettings(): AppSettings {
@@ -289,6 +293,7 @@ object Settings {
             gestureBrightnessLevel = this[GestureBrightnessLevel] ?: defaults.gestureBrightnessLevel,
             gestureHaptics = this[GestureHaptics] ?: defaults.gestureHaptics,
             appLanguage = this[AppLanguageChoice]?.takeIf { it in AppLanguage.Choices } ?: defaults.appLanguage,
+            shorts = this[ShortsTab] ?: defaults.shorts,
         )
     }
 }

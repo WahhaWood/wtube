@@ -294,6 +294,9 @@ fun SettingsScreen() {
 
         item { SectionHeader(stringResource(R.string.settings_recommendations)) }
         item {
+            SwitchRow(stringResource(R.string.settings_shorts), stringResource(R.string.settings_shorts_summary), settings.shorts, Settings.ShortsTab)
+        }
+        item {
             SwitchRow(stringResource(R.string.settings_hide_watched_recommended), stringResource(R.string.settings_hide_watched_recommended_summary), settings.hideWatchedRecommended, Settings.HideWatchedRecommended)
         }
         item {

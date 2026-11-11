@@ -6,6 +6,13 @@
     <string name="tab_subscriptions">Подписки</string>
     <string name="tab_search">Поиск</string>
     <string name="tab_library">Библиотека</string>
+    <string name="tab_shorts">Шортсы</string>
+    <string name="shorts_empty">YouTube не прислал ни одного шортса.</string>
+    <string name="shorts_sound_on">Включить звук</string>
+    <string name="shorts_sound_off">Выключить звук</string>
+    <string name="shorts_play">Продолжить</string>
+    <string name="shorts_play_failed">Не удалось воспроизвести шортс.</string>
+    <string name="shorts_sign_in_to_rate">Оценивать можно после входа в аккаунт</string>
 
     <string name="home_empty_title">Здесь будут рекомендации</string>
     <string name="home_empty_body">Они подбираются по тому, что вы смотрите. Найдите первое видео, и лента заполнится.</string>
@@ -246,6 +253,8 @@
     <string name="settings_min_duration_3">От 3 минут</string>
     <string name="settings_min_duration_5">От 5 минут</string>
     <string name="settings_min_duration_10">От 10 минут</string>
+    <string name="settings_shorts">Шортсы</string>
+    <string name="settings_shorts_summary">Вкладка с вертикальной лентой коротких видео. В остальных лентах шортсов нет и так</string>
     <string name="settings_hide_streams">Скрывать трансляции и премьеры</string>
     <string name="settings_hide_streams_summary">На главной и в похожих. Поиск, каналы и подписки показывают всё</string>
     <string name="settings_demote_seen">Опускать примелькавшиеся видео</string>

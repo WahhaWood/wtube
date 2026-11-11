@@ -99,6 +99,9 @@ import dev.wahha.wtube.player.rememberPlayerState
 import dev.wahha.wtube.ui.account.LoginScreen
 import dev.wahha.wtube.ui.channel.ChannelScreen
 import dev.wahha.wtube.ui.components.LocalBottomInset
+import dev.wahha.wtube.ui.components.LocalVideoCovering
+import dev.wahha.wtube.ui.icon.SwipeVertical
+import dev.wahha.wtube.ui.shorts.ShortsScreen
 import dev.wahha.wtube.ui.components.LocalNavigator
 import dev.wahha.wtube.ui.components.LocalWindowLayout
 import dev.wahha.wtube.ui.components.WindowLayout
@@ -144,6 +147,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable object Home
+@Serializable object Shorts
 @Serializable object Subscriptions
 @Serializable object Search
 @Serializable object Library
@@ -158,11 +162,11 @@ import kotlinx.serialization.Serializable
 @Serializable object StatsRoute
 @Serializable object BypassRoute
 
-// The bar's tabs; Search is its own glass button beside the capsule, as in SimpMusic.
-private val TabRoutes = listOf(Home, Subscriptions, Library)
+// The bar's tabs; Search is its own glass button beside the capsule, as in SimpMusic. Shorts only while the setting is on.
+private fun tabRoutes(shorts: Boolean): List<Any> = if (shorts) listOf(Home, Shorts, Subscriptions, Library) else listOf(Home, Subscriptions, Library)
 
 // Reached from the bar: these swap with a fade-through, every other page slides in over them.
-private val TopLevelRoutes = listOf(Home::class, Subscriptions::class, Search::class, Library::class)
+private val TopLevelRoutes = listOf(Home::class, Shorts::class, Subscriptions::class, Search::class, Library::class)
 
 private val BarEdgePadding = 16.dp
 private val SearchGap = 12.dp
@@ -316,6 +320,13 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
         savedExpanded = sheet.expanded
     }
 
+    val tabRoutes = tabRoutes(settings.shorts)
+    val onShorts = destination.isOn(Shorts::class)
+    // Turned off on the Shorts tab itself (from a backup, or the tab outlived the switch): back to Home.
+    LaunchedEffect(settings.shorts, onShorts) {
+        if (!settings.shorts && onShorts) navController.navigateToTab(Home)
+    }
+
     val sheetOpen = video.id != null
     // The bar steps aside while a list scrolls down and comes back on the way up or on a new page.
     val haptic = LocalHapticFeedback.current
@@ -329,7 +340,8 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
             }
         }
     }
-    val barAway by animateFloatAsState(if (barScrolledAway) 1f else 0f, tween(BAR_HIDE_MS), label = "bar_away")
+    // The Shorts pager scrolls too, but there the bar stays: it is how one leaves the feed.
+    val barAway by animateFloatAsState(if (barScrolledAway && !onShorts) 1f else 0f, tween(BAR_HIDE_MS), label = "bar_away")
     val bottomInset = BottomBarSpace + if (sheetOpen) MiniPlayerHeight + MiniPlayerGap else 0.dp
 
     CompositionLocalProvider(
@@ -337,12 +349,13 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
         LocalNavigator provides navigator,
         LocalPlayerState provides playerState,
         LocalBottomInset provides bottomInset,
+        LocalVideoCovering provides (sheetOpen && sheet.expanded),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize().background(background)) {
             val windowLayout = remember(maxWidth, maxHeight) { WindowLayout(maxWidth, maxHeight) }
             CompositionLocalProvider(LocalWindowLayout provides windowLayout) {
                 val capsuleBudget = maxWidth - BarEdgePadding * 2 - SearchGap - SearchSize
-                val rowWidth = liquidTabBarWidth(TabRoutes.size, capsuleBudget) + SearchGap + SearchSize
+                val rowWidth = liquidTabBarWidth(tabRoutes.size, capsuleBudget) + SearchGap + SearchSize
                 val barSpace = systemBottom() + BarBottomPadding + BarHeight
 
                 val axisShift = with(LocalDensity.current) { AxisShift.roundToPx() }
@@ -361,6 +374,7 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                         popExitTransition = { if (betweenTopLevel()) fadeThroughOut() else pageBackOut(axisShift) },
                     ) {
                         composable<Home> { entry -> TabPage(entry) { HomeScreen() } }
+                        composable<Shorts> { entry -> TabPage(entry) { ShortsScreen() } }
                         composable<Subscriptions> { entry -> TabPage(entry) { SubscriptionsScreen() } }
                         composable<Search> { entry -> TabPage(entry) { SearchScreen() } }
                         composable<Library> { entry -> TabPage(entry) { LibraryScreen() } }
@@ -391,11 +405,12 @@ fun WTubeApp(deepLink: LinkTarget? = null, onDeepLinkHandled: () -> Unit = {}) {
                     layer = glassLayer,
                     luminance = luminance,
                     capsuleBudget = capsuleBudget,
-                    selectedTab = TabRoutes.indexOfFirst { destination.isOn(it::class) },
+                    tabs = tabRoutes,
+                    selectedTab = tabRoutes.indexOfFirst { destination.isOn(it::class) },
                     searchSelected = destination.isOn(Search::class),
                     onTabSelected = {
                         haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                        navController.selectTab(TabRoutes[it])
+                        navController.selectTab(tabRoutes[it])
                     },
                     onSearch = { navController.selectTab(Search) },
                     gapAbove = if (sheetOpen) MiniPlayerGap else 0.dp,
@@ -441,7 +456,7 @@ private fun NavController.navigateToTab(route: Any) = navigate(route) {
 // A tap on the open tab: a page opened inside it goes back to the tab first, the tab itself starts over.
 private fun NavController.selectTab(route: Any) {
     // Tabs replace each other above Home, so at most one of them is on the back stack.
-    val tab = listOf(Subscriptions, Search, Library).firstNotNullOfOrNull { runCatching { getBackStackEntry(it) }.getOrNull() }
+    val tab = listOf(Shorts, Subscriptions, Search, Library).firstNotNullOfOrNull { runCatching { getBackStackEntry(it) }.getOrNull() }
         ?: getBackStackEntry(Home)
     when {
         !tab.destination.hasRoute(route::class) -> navigateToTab(route)
@@ -493,6 +508,7 @@ private fun GlassBottomBar(
     layer: GraphicsLayer,
     luminance: State<Float>,
     capsuleBudget: Dp,
+    tabs: List<Any>,
     selectedTab: Int,
     searchSelected: Boolean,
     onTabSelected: (Int) -> Unit,
@@ -504,11 +520,18 @@ private fun GlassBottomBar(
     val glass = LocalLiquidGlass.current
     val searchInteraction = rememberGlassInteraction()
     val colors = MaterialTheme.colorScheme
-    val tabs = listOf(
-        GlassTab(stringResource(R.string.tab_home), WIcons.Home),
-        GlassTab(stringResource(R.string.tab_subscriptions), WIcons.Subscriptions),
-        GlassTab(stringResource(R.string.tab_library), WIcons.VideoLibrary),
-    )
+    val home = GlassTab(stringResource(R.string.tab_home), WIcons.Home)
+    val shorts = GlassTab(stringResource(R.string.tab_shorts), WIcons.SwipeVertical)
+    val subscriptions = GlassTab(stringResource(R.string.tab_subscriptions), WIcons.Subscriptions)
+    val library = GlassTab(stringResource(R.string.tab_library), WIcons.VideoLibrary)
+    val glassTabs = tabs.map {
+        when (it) {
+            Shorts -> shorts
+            Subscriptions -> subscriptions
+            Library -> library
+            else -> home
+        }
+    }
 
     Row(
         modifier
@@ -521,7 +544,7 @@ private fun GlassBottomBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LiquidGlassTabBar(
-            tabs = tabs,
+            tabs = glassTabs,
             selectedTab = selectedTab,
             backdrop = backdrop,
             layer = layer,

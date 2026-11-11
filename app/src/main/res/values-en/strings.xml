@@ -5,6 +5,13 @@
     <string name="tab_subscriptions">Subscriptions</string>
     <string name="tab_search">Search</string>
     <string name="tab_library">Library</string>
+    <string name="tab_shorts">Shorts</string>
+    <string name="shorts_empty">YouTube sent no shorts.</string>
+    <string name="shorts_sound_on">Sound on</string>
+    <string name="shorts_sound_off">Sound off</string>
+    <string name="shorts_play">Play</string>
+    <string name="shorts_play_failed">Couldn\'t play this short.</string>
+    <string name="shorts_sign_in_to_rate">Sign in to rate videos</string>
 
     <string name="home_empty_title">Recommendations will show up here</string>
     <string name="home_empty_body">They are picked from what you watch. Find your first video and the feed will fill up.</string>
@@ -235,6 +242,8 @@
     <string name="settings_min_duration_3">3 minutes or longer</string>
     <string name="settings_min_duration_5">5 minutes or longer</string>
     <string name="settings_min_duration_10">10 minutes or longer</string>
+    <string name="settings_shorts">Shorts</string>
+    <string name="settings_shorts_summary">A tab with a vertical feed of short videos. Other feeds never show shorts anyway</string>
     <string name="settings_hide_streams">Hide live streams and premieres</string>
     <string name="settings_hide_streams_summary">On Home and in related videos. Search, channels and subscriptions show everything</string>
     <string name="settings_demote_seen">Move down videos seen too often</string>

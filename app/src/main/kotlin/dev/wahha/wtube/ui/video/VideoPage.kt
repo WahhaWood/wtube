@@ -161,26 +161,11 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         private set
     var error by mutableStateOf<Throwable?>(null)
         private set
-    var comments by mutableStateOf<PagedList<Comment>?>(null)
+    var comments by mutableStateOf<VideoComments?>(null)
         private set
 
     /** The signed-in account's rating and subscription; null when signed out or YouTube did not answer. */
     var state by mutableStateOf<VideoState?>(null)
-        private set
-
-    /** Lets the account post a comment; set by the first comments page loaded through the account. */
-    var commentBox by mutableStateOf<String?>(null)
-        private set
-
-    /** Comments liked or unliked here, by id, over what the list said. */
-    val commentLikes = mutableStateMapOf<String, Boolean>()
-
-    /** Tokens that reload the comments as Top or Newest; empty when the list came from the extractor. */
-    var commentSorts by mutableStateOf<List<String>>(emptyList())
-        private set
-
-    /** Index into [commentSorts]; 0 is YouTube's default, Top. */
-    var commentSort by mutableIntStateOf(0)
         private set
 
     /** YouTube's "Most replayed" graph: intensities 0..1 of equal slices of the video; empty when it has none. */
@@ -201,9 +186,6 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
     /** Return YouTube Dislike's estimate; -1 when off or unknown. */
     var dislikes by mutableLongStateOf(-1L)
         private set
-
-    /** Replies of the threads opened in the comments sheet, by comment id. */
-    val replies = mutableStateMapOf<String, PagedList<Comment>>()
 
     /** Set by [open] until the sheet hands the video to the player, which needs [details] or [streamsReady] first. */
     var playPending by mutableStateOf(false)
@@ -246,17 +228,12 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         recordPending = false
         details = null
         state = null
-        commentBox = null
-        commentLikes.clear()
-        commentSorts = emptyList()
-        commentSort = 0
-        replies.clear()
         dislikes = -1
         betterTitle = null
         heatmap = emptyList()
         chat = null
         chatOpen = false
-        comments = PagedList(viewModelScope, Comment::id) { loadComments(id, it) }
+        comments = VideoComments(viewModelScope, firstToken = { watch?.await()?.commentsToken }, extractor = { source.comments(id, it) })
         load()
     }
 
@@ -295,7 +272,7 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
                     (Downloads.finished(id, audioOnly = false) ?: Downloads.finished(id, audioOnly = true))?.let { offlineDetails(it.video) } ?: throw e
                 }
                 this@VideoViewModel.details = details
-                comments?.refresh()
+                comments?.list?.refresh()
                 val watched = watch.await()
                 heatmap = watched?.heatmap.orEmpty()
                 if (chat == null) chat = watched?.chat?.let(::ChatState)
@@ -310,54 +287,6 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
                 if (MembersOnly.refused(e)) membersOnly = watch?.await()?.video
             }
         }
-    }
-
-    /**
-     * Through InnerTube, as the web page loads them: signed in, each comment comes with its like and reply
-     * actions; either way the list can be sorted. The extractor's list stands in when the watch page gave
-     * no comments token or the anonymous request failed.
-     */
-    private suspend fun loadComments(id: String, page: Page?): PageOf<Comment> {
-        if (page != null && !Feeds.isCursor(page)) return source.comments(id, page)
-        val token = if (page == null) commentSorts.getOrNull(commentSort) ?: watch?.await()?.commentsToken ?: return source.comments(id, null) else null
-        val result = try {
-            Actions.comments(token, page)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            if (page != null || Account.active != null) throw e
-            Log.w("Video", "InnerTube comments failed, extractor instead: ${errorDetail(e)}")
-            ErrorLog.note("[video] InnerTube comments failed, extractor instead: ${errorDetail(e)}")
-            return source.comments(id, null)
-        }
-        if (page == null) {
-            commentBox = result.createParams
-            if (result.sortTokens.isNotEmpty()) commentSorts = result.sortTokens
-        }
-        return PageOf(result.comments, result.continuation?.let(Feeds::cursor))
-    }
-
-    /** Reloads the comments as YouTube's sort [index] orders them (0 Top, 1 Newest). */
-    fun sortComments(index: Int) {
-        if (index == commentSort || index !in commentSorts.indices) return
-        commentSort = index
-        replies.clear()
-        comments?.refresh()
-    }
-
-    /** Opens or closes the replies of [comment] under it. */
-    fun toggleReplies(comment: Comment) {
-        val first = comment.repliesPage ?: return
-        if (replies.remove(comment.id) != null) return
-        val id = id ?: return
-        replies[comment.id] = PagedList(viewModelScope, Comment::id) { page ->
-            val at = page ?: first
-            if (Feeds.isCursor(at)) {
-                Actions.comments(null, at).let { PageOf(it.comments, it.continuation?.let(Feeds::cursor)) }
-            } else {
-                source.comments(id, at)
-            }
-        }.also { it.refresh() }
     }
 
     private fun offlineDetails(video: VideoItem) = VideoDetails(
@@ -405,31 +334,6 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         launchAction(onFailure = { if (this.id == id) state = state?.copy(subscribed = before.subscribed) }) { Actions.subscribe(channel, subscribe) }
     }
 
-    fun postComment(text: String) {
-        val params = commentBox ?: return
-        val comments = comments
-        launchAction(R.string.comment_posted) {
-            Actions.comment(params, text)
-            // YouTube shows the author's fresh comment first.
-            comments?.refresh()
-        }
-    }
-
-    fun reply(comment: Comment, text: String) {
-        val params = comment.actions?.replyParams ?: return
-        launchAction(R.string.reply_posted) { Actions.reply(params, text) }
-    }
-
-    fun isLiked(comment: Comment): Boolean = commentLikes[comment.id] ?: comment.actions?.liked ?: false
-
-    fun likeComment(comment: Comment) {
-        val actions = comment.actions ?: return
-        val liked = isLiked(comment)
-        val token = (if (liked) actions.unlike else actions.like) ?: return
-        commentLikes[comment.id] = !liked
-        launchAction(onFailure = { commentLikes[comment.id] = liked }) { Actions.commentAction(token) }
-    }
-
     fun playStarted() {
         playPending = false
         recordPending = true
@@ -466,9 +370,6 @@ class VideoViewModel internal constructor(private val source: VideoSource) : Vie
         membersOnly = null
         comments = null
         state = null
-        commentBox = null
-        commentSorts = emptyList()
-        replies.clear()
         heatmap = emptyList()
         playPending = false
         recordPending = false
@@ -537,7 +438,7 @@ internal fun AmbientGlow(thumbnail: String?) {
 }
 
 @Composable
-private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedList<Comment>, onSeek: (Long) -> Unit) {
+private fun Details(vm: VideoViewModel, details: VideoDetails, comments: VideoComments, onSeek: (Long) -> Unit) {
     val nav = LocalNavigator.current
     val video = details.item
     val state = vm.state
@@ -555,7 +456,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     val settings by Settings.current.collectAsStateWithLifecycle()
     val watched by WatchProgress.watched.collectAsStateWithLifecycle()
-    if (commentsOpen) CommentsSheet(vm, comments, onLink, onDismiss = { commentsOpen = false })
+    if (commentsOpen) CommentsSheet(comments, onLink, onDismiss = { commentsOpen = false })
     if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     if (queueOpen) QueueSheet(onDismiss = { queueOpen = false })
     if (downloading) DownloadSheet(video, onDismiss = { downloading = false })
@@ -642,7 +543,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: PagedLi
         if (details.chapters.isNotEmpty()) {
             item(key = "chapters") { Chapters(details.chapters, onSeek) }
         }
-        item(key = "comments") { CommentsPreview(comments, onOpen = { commentsOpen = true }) }
+        item(key = "comments") { CommentsPreview(comments.list, onOpen = { commentsOpen = true }) }
         item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
         items(details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
     }

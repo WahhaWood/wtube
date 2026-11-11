@@ -163,7 +163,7 @@ private fun CommentsPanel(vm: VideoViewModel, onSeek: (Long) -> Unit, onClose: (
             .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
             .padding(top = 8.dp),
     ) {
-        CommentsContent(vm, comments, onLink, listModifier = Modifier.weight(1f), onClose = onClose)
+        CommentsContent(comments, onLink, listModifier = Modifier.weight(1f), onClose = onClose)
     }
 }
 

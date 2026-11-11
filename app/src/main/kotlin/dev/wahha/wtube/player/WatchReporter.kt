@@ -20,9 +20,14 @@ import kotlin.coroutines.cancellation.CancellationException
  * Tells YouTube what is watched here, so the account's history and recommendations include it. Does what
  * the web player does (and yt-dlp's `--mark-watched`): a playback ping when a video starts, then watchtime
  * pings with the ranges played — every [INTERVAL_MS] while playing, and on pause, seek and leaving the video.
- * Only with an account and the setting on; failures are dropped, playback never waits for them.
+ * Only with an account and the setting on; failures are dropped, playback never waits for them. [page] is
+ * where the view is filed: the watch page, or [SHORTS] for the Shorts feed.
  */
-internal class WatchReporter(private val scope: CoroutineScope, private val player: Player) : Player.Listener {
+internal class WatchReporter(
+    private val scope: CoroutineScope,
+    private val player: Player,
+    private val page: String = WATCH,
+) : Player.Listener {
     private class Report(val videoId: String, val cpn: String) {
         var tracking: Tracking? = null
         /** Start of the range played since the last watchtime ping, in seconds. */
@@ -45,6 +50,13 @@ internal class WatchReporter(private val scope: CoroutineScope, private val play
     }
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+        // A loop is the same view going on: the range starts over, the page is not fetched again.
+        val looped = report?.takeIf { reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && it.videoId == mediaItem?.mediaId }
+        if (looped != null) {
+            if (player.duration > 0) watchtime(looped, player.duration / 1000.0, playing = true)
+            looped.from = 0.0
+            return
+        }
         // The position already belongs to the new item: the old one keeps what it reported up to its last tick or pause.
         report = null
         ticker?.cancel()
@@ -101,7 +113,7 @@ internal class WatchReporter(private val scope: CoroutineScope, private val play
             setQueryParameter("ver", "2")
             setQueryParameter("cpn", cpn)
             // Without it YouTube files the view under Shorts.
-            setQueryParameter("el", "detailpage")
+            setQueryParameter("el", page)
             params.forEach { (name, value) -> setQueryParameter(name, value) }
         }.build().toString()
 
@@ -117,6 +129,8 @@ internal class WatchReporter(private val scope: CoroutineScope, private val play
 
     companion object {
         const val INTERVAL_MS = 40_000L
+        const val WATCH = "detailpage"
+        const val SHORTS = "shortspage"
         private const val CPN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
         /** The client playback nonce that ties one view's pings together, as the web player makes it. */

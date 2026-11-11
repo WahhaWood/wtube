@@ -32,6 +32,7 @@ The screenshots show the Russian interface; the app also speaks English.
 **Watching**
 - Videos and live streams in high quality, background playback, mini player and picture-in-picture
 - A player sheet with gestures: swipes, predictive back, full screen with auto-rotation
+- Shorts in a tab of their own: a vertical feed you swipe through, with likes, comments and subscribing; no Shorts in any other feed. The tab can be turned off in Settings
 - Captions (including auto-translation), transcript, dubbed audio tracks, speed, sleep timer, autoplay, "stats for nerds" (codecs, frames, buffer, network)
 - DeArrow (honest titles on the video page), hiding watched videos in subscriptions
 - "Most replayed" moments (heatmap), SponsorBlock and Return YouTube Dislike

@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -146,6 +147,9 @@ val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No Navigator")
 /** Extra bottom padding lists need to clear the floating bar and the mini player. */
 val LocalBottomInset = staticCompositionLocalOf { 0.dp }
 
+/** The video sheet is open over the pages: what plays on a page (Shorts) must stop. */
+val LocalVideoCovering = compositionLocalOf { false }
+
 private val ThumbnailCorner = 12.dp
 private val ThumbnailShape = RoundedCornerShape(ThumbnailCorner)
 
@@ -212,6 +216,12 @@ fun VideoMenu(
     modifier: Modifier = Modifier,
     @StringRes removeLabel: Int = 0,
     onRemove: (() -> Unit)? = null,
+    // What opens the menu; the Shorts feed has its own glass button.
+    anchor: @Composable (open: () -> Unit) -> Unit = { open ->
+        IconButton(onClick = open, modifier = Modifier.size(36.dp)) {
+            Icon(WIcons.MoreVert, contentDescription = stringResource(R.string.item_more), modifier = Modifier.size(20.dp))
+        }
+    },
 ) {
     val nav = LocalNavigator.current
     val context = LocalContext.current
@@ -225,9 +235,7 @@ fun VideoMenu(
     if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     if (downloading) DownloadSheet(video, onDismiss = { downloading = false })
     Box(modifier) {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(36.dp)) {
-            Icon(WIcons.MoreVert, contentDescription = stringResource(R.string.item_more), modifier = Modifier.size(20.dp))
-        }
+        anchor { open = true }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (!video.membersOnly) DropdownMenuItem(
                 text = { Text(stringResource(R.string.queue_play_next)) },

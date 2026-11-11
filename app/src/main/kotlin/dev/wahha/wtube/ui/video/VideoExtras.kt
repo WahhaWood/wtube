@@ -181,25 +181,24 @@ fun CommentsPreview(comments: PagedList<Comment>, onOpen: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CommentsSheet(vm: VideoViewModel, comments: PagedList<Comment>, onLink: (String) -> Unit, onDismiss: () -> Unit) {
+fun CommentsSheet(comments: VideoComments, onLink: (String) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         ImmersiveDialog()
-        CommentsContent(vm, comments, onLink, listModifier = Modifier.fillMaxHeight(0.85f))
+        CommentsContent(comments, onLink, listModifier = Modifier.fillMaxHeight(0.85f))
     }
 }
 
 /** Title, sorting, the account's comment field and the threads: in the bottom sheet or the fullscreen side panel. */
 @Composable
 fun ColumnScope.CommentsContent(
-    vm: VideoViewModel,
-    comments: PagedList<Comment>,
+    comments: VideoComments,
     onLink: (String) -> Unit,
     listModifier: Modifier = Modifier,
     onClose: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     var replyTo by remember { mutableStateOf<Comment?>(null) }
-    LoadMoreEffect(listState) { comments.loadMore() }
+    LoadMoreEffect(listState) { comments.list.loadMore() }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             stringResource(R.string.video_comments),
@@ -212,30 +211,30 @@ fun ColumnScope.CommentsContent(
             }
         }
     }
-    if (vm.commentSorts.size >= 2) {
+    if (comments.sorts.size >= 2) {
         Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(R.string.comments_sort_top, R.string.comments_sort_new).forEachIndexed { index, label ->
                 FilterChip(
-                    selected = vm.commentSort == index,
-                    onClick = { vm.sortComments(index) },
+                    selected = comments.sort == index,
+                    onClick = { comments.sortBy(index) },
                     label = { Text(stringResource(label)) },
                 )
             }
         }
     }
-    if (vm.commentBox != null) CommentBox(vm::postComment)
+    if (comments.box != null) CommentBox(comments::post)
     LazyColumn(state = listState, modifier = listModifier) {
-        comments.items.forEach { comment ->
+        comments.list.items.forEach { comment ->
             item(key = comment.id) {
                 CommentRow(
-                    comment, onLink, liked = vm.isLiked(comment), onLike = { vm.likeComment(comment) }, onReply = { replyTo = comment },
-                    repliesOpen = comment.id in vm.replies, onReplies = { vm.toggleReplies(comment) },
+                    comment, onLink, liked = comments.isLiked(comment), onLike = { comments.like(comment) }, onReply = { replyTo = comment },
+                    repliesOpen = comment.id in comments.replies, onReplies = { comments.toggleReplies(comment) },
                 )
             }
-            vm.replies[comment.id]?.let { replies ->
+            comments.replies[comment.id]?.let { replies ->
                 items(replies.items, key = { "reply_${comment.id}_${it.id}" }) { reply ->
                     CommentRow(
-                        reply, onLink, liked = vm.isLiked(reply), onLike = { vm.likeComment(reply) }, onReply = { replyTo = reply },
+                        reply, onLink, liked = comments.isLiked(reply), onLike = { comments.like(reply) }, onReply = { replyTo = reply },
                         modifier = Modifier.padding(start = 44.dp),
                     )
                 }
@@ -250,7 +249,7 @@ fun ColumnScope.CommentsContent(
                 }
             }
         }
-        item(key = "footer") { ListFooter(comments.loading, comments.error, comments::retry) }
+        item(key = "footer") { ListFooter(comments.list.loading, comments.list.error, comments.list::retry) }
     }
     replyTo?.let { comment ->
         TextEntryDialog(
@@ -260,7 +259,7 @@ fun ColumnScope.CommentsContent(
             onDismiss = { replyTo = null },
             onConfirm = { text ->
                 replyTo = null
-                vm.reply(comment, text)
+                comments.reply(comment, text)
             },
         )
     }
