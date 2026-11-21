@@ -84,7 +84,7 @@ internal fun ChatPreview(chat: ChatState, onOpen: () -> Unit) {
 
 /** The chat itself: views, the pinned message, the messages, and the account's input. Under the video or beside it. */
 @Composable
-internal fun ChatContent(chat: ChatState, onClose: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ChatContent(chat: ChatState, onClose: (() -> Unit)?, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val listState = rememberLazyListState()
     // Follows new messages while the list is at its end; scrolling up stops that until it is back there.
@@ -115,7 +115,7 @@ internal fun ChatContent(chat: ChatState, onClose: () -> Unit, modifier: Modifie
                     )
                 }
             }
-            IconButton(onClick = onClose) {
+            if (onClose != null) IconButton(onClick = onClose) {
                 Icon(WIcons.Close, contentDescription = stringResource(R.string.close), tint = colors.onSurface)
             }
         }

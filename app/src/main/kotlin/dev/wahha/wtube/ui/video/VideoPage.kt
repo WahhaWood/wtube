@@ -96,6 +96,7 @@ import dev.wahha.wtube.ui.components.isNetworkError
 import dev.wahha.wtube.ui.components.FeedSkeleton
 import dev.wahha.wtube.ui.components.ItemView
 import dev.wahha.wtube.ui.components.LocalNavigator
+import dev.wahha.wtube.ui.components.LocalWindowLayout
 import dev.wahha.wtube.ui.components.PagedList
 import dev.wahha.wtube.ui.components.shareVideo
 import dev.wahha.wtube.ui.components.subscribersText
@@ -387,9 +388,10 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
     val comments = vm.comments
     val error = vm.error
     val chat = vm.chat
+    val twoPane = LocalWindowLayout.current.twoPane
     Box(modifier) {
         when {
-            chat != null && vm.chatOpen -> {
+            chat != null && vm.chatOpen && !twoPane -> {
                 BackHandler { vm.chatOpen = false }
                 ChatContent(chat, onClose = { vm.chatOpen = false }, modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding())
             }
@@ -400,6 +402,34 @@ internal fun VideoInfo(vm: VideoViewModel, onSeek: (Long) -> Unit, modifier: Mod
             else -> FeedSkeleton(Modifier.padding(top = 16.dp), compact = true)
         }
     }
+}
+
+/** The right column of the two-column video page: the live chat when there is one, else related videos. */
+@Composable
+internal fun VideoSide(vm: VideoViewModel, modifier: Modifier = Modifier) {
+    val details = vm.details
+    val chat = vm.chat
+    Box(modifier) {
+        when {
+            chat != null -> ChatContent(chat, onClose = null, modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding())
+            details != null -> {
+                val related = relatedFor(details, enabled = true)
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = systemBottom() + 16.dp)) {
+                    items(related, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
+                }
+            }
+        }
+    }
+}
+
+/** Related videos that pass the user's filters; empty when [enabled] is off (they show in the other column). */
+@Composable
+private fun relatedFor(details: VideoDetails, enabled: Boolean): List<VideoItem> {
+    val hidden by Hidden.items.collectAsStateWithLifecycle()
+    val settings by Settings.current.collectAsStateWithLifecycle()
+    val watched by WatchProgress.watched.collectAsStateWithLifecycle()
+    if (!enabled) return emptyList()
+    return details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }
 }
 
 /**
@@ -453,9 +483,8 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: VideoCo
     val downloads by Downloads.entries.collectAsStateWithLifecycle()
     val ours = downloads.filter { it.video.id == video.id }
     val queue by PlayQueue.items.collectAsStateWithLifecycle()
-    val hidden by Hidden.items.collectAsStateWithLifecycle()
-    val settings by Settings.current.collectAsStateWithLifecycle()
-    val watched by WatchProgress.watched.collectAsStateWithLifecycle()
+    val twoPane = LocalWindowLayout.current.twoPane
+    val related = relatedFor(details, enabled = !twoPane)
     if (commentsOpen) CommentsSheet(comments, onLink, onDismiss = { commentsOpen = false })
     if (saving) SaveSheet(video.id, onDismiss = { saving = false })
     if (queueOpen) QueueSheet(onDismiss = { queueOpen = false })
@@ -534,7 +563,7 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: VideoCo
                 }
             }
         }
-        vm.chat?.let { chat ->
+        vm.chat?.takeUnless { twoPane }?.let { chat ->
             item(key = "chat") { ChatPreview(chat, onOpen = { vm.chatOpen = true }) }
         }
         if (details.description.isNotBlank()) {
@@ -544,8 +573,8 @@ private fun Details(vm: VideoViewModel, details: VideoDetails, comments: VideoCo
             item(key = "chapters") { Chapters(details.chapters, onSeek) }
         }
         item(key = "comments") { CommentsPreview(comments.list, onOpen = { commentsOpen = true }) }
-        item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
-        items(details.related.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
+        if (!twoPane) item(key = "related_gap") { Spacer(Modifier.height(12.dp)) }
+        items(related, key = { "related_" + it.url }) { ItemView(it, recommended = true) }
     }
 }
 

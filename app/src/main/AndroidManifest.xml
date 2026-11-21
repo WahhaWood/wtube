@@ -20,7 +20,7 @@
         <!-- Rotation is handled in Compose (fullscreen video), so the activity and its player connection survive it. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboardHidden"
             android:exported="true"
             android:launchMode="singleTask"
             android:supportsPictureInPicture="true">

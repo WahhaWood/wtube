@@ -2,7 +2,6 @@ package dev.wahha.wtube.ui.video
 
 import dev.wahha.wtube.data.MembersOnly
 import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.media3.common.Player
@@ -85,6 +84,7 @@ import dev.wahha.wtube.data.History
 import dev.wahha.wtube.data.Settings
 import dev.wahha.wtube.player.LocalPlayerConnection
 import dev.wahha.wtube.player.LocalPlayerState
+import dev.wahha.wtube.ui.components.LocalWindowLayout
 import dev.wahha.wtube.ui.components.SaveSheet
 import dev.wahha.wtube.ui.components.VideoOrigin
 import dev.wahha.wtube.ui.glass.LocalLiquidGlass
@@ -300,15 +300,20 @@ fun PlayerSheet(
             uprightFullscreen = false
         }
     }
-    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val windowLayout = LocalWindowLayout.current
+    // From 600 dp the system ignores a requested orientation (Android 16), so the button there is a plain flag.
+    val ignoresOrientation = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    var largeScreenFullscreen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(sheet.expanded) { if (!sheet.expanded) largeScreenFullscreen = false }
     val fullscreen = sheet.expanded && when (orientationLock) {
         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> true
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> uprightFullscreen
-        else -> landscape
+        else -> largeScreenFullscreen || windowLayout.autoFullscreen
     }
     val vertical = state?.videoSize?.let { it.height > 0 && it.width * it.pixelWidthHeightRatio < it.height } == true
     val toggleFullscreen = {
         when {
+            ignoresOrientation -> largeScreenFullscreen = !fullscreen
             fullscreen -> {
                 orientationLock = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 uprightFullscreen = false
@@ -395,6 +400,7 @@ fun PlayerSheet(
                 miniVideoStart = MiniVideoStart.toPx(),
                 miniVideoWidth = MiniVideoWidth.toPx(),
                 leftHanded = settings.leftHanded,
+                side = windowLayout.sideWidth.toPx(),
             )
         }
         SideEffect {
@@ -444,6 +450,16 @@ fun PlayerSheet(
                             modifier = Modifier.fillMaxSize()
                                 .graphicsLayer { alpha = pageContentAlpha(progress()) * launchContentAlpha(sheet.launch) }
                                 .nestedScroll(pageScroll),
+                        )
+                    }
+                },
+                {
+                    // The second column, only where the window has room for it; its own scroll, no sheet drag.
+                    if (!videoFills && windowLayout.twoPane) {
+                        VideoSide(
+                            vm,
+                            modifier = Modifier.fillMaxSize()
+                                .graphicsLayer { alpha = pageContentAlpha(progress()) * launchContentAlpha(sheet.launch) },
                         )
                     }
                 },
@@ -555,7 +571,7 @@ fun PlayerSheet(
                 .pointerInput(sheet) { detectTapGestures { if (sheet.progress > 0.5f) sheet.expand() } }
                 .testTag("player_sheet")
                 .semantics { stateDescription = sheetState },
-        ) { (glassLayer, background, info, video, mini), constraints ->
+        ) { (glassLayer, background, info, sidePane, video, mini), constraints ->
             val p = progress()
             val videoBox = geometry.video(p, videoFills).let { page ->
                 // Growing out of a card, the video fills the card's thumbnail at the start.
@@ -566,7 +582,12 @@ fun PlayerSheet(
             val glassPlaceables = glassLayer.map { it.measure(Constraints.fixed(constraints.maxWidth, constraints.maxHeight)) }
             val backgroundPlaceables = background.map { it.measure(window) }
             val infoPlaceables = info.map {
-                it.measure(Constraints.fixed(geometry.width.roundToInt(), (geometry.height - infoTop).roundToInt().coerceAtLeast(0)))
+                it.measure(Constraints.fixed((geometry.width - geometry.side).roundToInt(), (geometry.height - infoTop).roundToInt().coerceAtLeast(0)))
+            }
+            val sideWidth = geometry.side.roundToInt()
+            val sideTop = geometry.pageVideo.top.roundToInt()
+            val sidePlaceables = sidePane.map {
+                it.measure(Constraints.fixed(sideWidth, (geometry.height.roundToInt() - sideTop).coerceAtLeast(0)))
             }
             val videoPlaceables = video.map {
                 it.measure(Constraints.fixed(videoBox.width.roundToInt().coerceAtLeast(1), videoBox.height.roundToInt().coerceAtLeast(1)))
@@ -580,6 +601,7 @@ fun PlayerSheet(
                 // Pushed a mini player's height further down as it fades, so it is clipped away (and
                 // untouchable) by the time the sheet is the mini player.
                 infoPlaceables.forEach { it.place(0, (videoBox.bottom + p * geometry.miniHeight).roundToInt()) }
+                sidePlaceables.forEach { it.place(geometry.width.roundToInt() - sideWidth, sideTop + (p * geometry.miniHeight).roundToInt()) }
                 videoPlaceables.forEach { it.place(videoBox.left.roundToInt(), videoBox.top.roundToInt()) }
                 miniPlaceables.forEach { it.place(0, 0) }
             }
@@ -612,11 +634,13 @@ private class SheetGeometry(
     miniVideoWidth: Float,
     // The mini player's video at its right end, beside buttons at the left.
     leftHanded: Boolean,
+    // The second column of the page, right of the video; zero on one column.
+    val side: Float,
 ) {
     val miniTop = height - miniBottom - miniHeight
 
     /** The portrait player under the status bar; the page continues below it. */
-    val pageVideo = Rect(0f, statusBar, width, statusBar + width * 9f / 16f)
+    val pageVideo = (width - side).let { column -> Rect(0f, statusBar, column, statusBar + column * 9f / 16f) }
     private val fullVideo = Rect(0f, 0f, width, height)
     private val miniVideo = (miniVideoWidth * 9f / 16f).let { videoHeight ->
         val top = (miniHeight - videoHeight) / 2f

@@ -38,6 +38,9 @@ data class WindowLayout(val width: Dp, val height: Dp) {
     /** Room for the video page and its side list next to each other. */
     val twoPane: Boolean = width >= TWO_PANE_FROM
 
+    /** The right column beside the video page when [twoPane]: related videos or the live chat. */
+    val sideWidth: Dp = if (twoPane) (width * 0.32f).coerceIn(360.dp, 440.dp) else 0.dp
+
     /** A phone on its side: too low for a page under the video, so the video takes the screen. */
     val autoFullscreen: Boolean = width > height && height < AUTO_FULLSCREEN_BELOW
 
