@@ -124,6 +124,7 @@
     <string name="player_autoplay_on">Autoplay is on</string>
     <string name="player_autoplay_off">Autoplay is off</string>
     <string name="close">Close</string>
+    <string name="data_file_damaged">Could not read saved data (%1$s). A copy of the file was kept with a .bad extension, the list starts over</string>
 
     <string name="channel_tab_videos">Videos</string>
     <string name="channel_tab_livestreams">Live</string>
@@ -170,7 +171,7 @@
     <string name="login_title">Sign in to Google</string>
     <string name="login_cookies">Paste cookies</string>
     <string name="login_cookies_hint">A Cookie header or the contents of cookies.txt for youtube.com</string>
-    <string name="login_cookies_help">If Google won\'t let you in from the sign-in window, sign in to youtube.com in a desktop browser, export the cookies with an extension (Netscape cookies.txt format) and paste them here or pick the file.</string>
+    <string name="login_cookies_help">If Google won\'t let you in from the sign-in window, sign in to youtube.com in a desktop browser, export the cookies with an extension (Netscape cookies.txt format) and paste them here or pick the file. Delete cookies.txt after signing in: it holds full access to the account.</string>
     <string name="login_cookies_file">Pick a file</string>
     <string name="login_signing_in">Signing in…</string>
     <string name="login_failed">YouTube did not accept the sign-in. Try again or paste cookies.</string>

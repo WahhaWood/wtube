@@ -18,6 +18,7 @@ import dev.wahha.wtube.ui.icon.DownloadDone
 import dev.wahha.wtube.ui.icon.Download
 import dev.wahha.wtube.ui.downloads.DownloadSheet
 import dev.wahha.wtube.data.Hidden
+import dev.wahha.wtube.data.Item
 import dev.wahha.wtube.data.VideoItem
 import dev.wahha.wtube.download.Downloads
 import dev.wahha.wtube.data.Settings
@@ -424,7 +425,7 @@ internal fun VideoSide(vm: VideoViewModel, modifier: Modifier = Modifier) {
 
 /** Related videos that pass the user's filters; empty when [enabled] is off (they show in the other column). */
 @Composable
-private fun relatedFor(details: VideoDetails, enabled: Boolean): List<VideoItem> {
+private fun relatedFor(details: VideoDetails, enabled: Boolean): List<Item> {
     val hidden by Hidden.items.collectAsStateWithLifecycle()
     val settings by Settings.current.collectAsStateWithLifecycle()
     val watched by WatchProgress.watched.collectAsStateWithLifecycle()

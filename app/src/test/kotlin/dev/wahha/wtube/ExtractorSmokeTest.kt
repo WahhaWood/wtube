@@ -31,6 +31,7 @@ import dev.wahha.wtube.player.subtitleUrl
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.junit.experimental.categories.Category
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -47,6 +48,7 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
  * Live checks against YouTube through the real extractor and HTTP stack: when these fail, YouTube changed
  * something and the extractor needs a bump (see Plan.md, "Поддержка"). Needs network.
  */
+@Category(Network::class)
 class ExtractorSmokeTest {
     companion object {
         @JvmStatic

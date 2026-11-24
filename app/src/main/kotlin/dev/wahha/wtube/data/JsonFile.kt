@@ -1,6 +1,8 @@
 package dev.wahha.wtube.data
 
 import android.util.Log
+import dev.wahha.wtube.R
+import dev.wahha.wtube.ui.components.Notices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,7 +32,13 @@ internal class JsonFile<T>(private val tag: String, private val serializer: KSer
         scope.launch {
             file.parentFile?.listFiles { f -> f.name.startsWith(file.name + ".") && f.name.endsWith(".tmp") }?.forEach { it.delete() }
             val fromFile = runCatching { if (file.exists()) json.decodeFromString(serializer, file.readText()) else null }
-                .onFailure { Log.e(tag, "Unreadable ${file.name}, starting fresh", it) }
+                .onFailure {
+                    // Kept aside rather than overwritten by the first save, and the user is told.
+                    val bad = File(file.path + ".bad")
+                    val kept = runCatching { bad.delete(); file.renameTo(bad) }.getOrDefault(false)
+                    Log.e(tag, "Unreadable ${file.name}, starting fresh" + if (kept) ", kept as ${bad.name}" else "", it)
+                    Notices.show(R.string.data_file_damaged, file.name)
+                }
                 .getOrNull()
             onLoaded(fromFile)
             dirty.consumeEach { write(file) }

@@ -149,10 +149,17 @@ class Relay(
             }
             val portBytes = ByteArray(2).also { readFully(input, it) }
             val targetPort = ((portBytes[0].toInt() and 0xff) shl 8) or (portBytes[1].toInt() and 0xff)
+            // The app sends only YouTube's hosts here, by name; the sign-in page (anonymous) may load others.
+            if (!anonymous && (host == null || !isBypassHost(host))) {
+                output.write(byteArrayOf(5, 2, 0, 1, 0, 0, 0, 0, 0, 0))
+                return
+            }
             output.write(byteArrayOf(5, 0, 0, 1, 0, 0, 0, 0, 0, 0))
             output.flush()
 
-            val addresses = if (host == null) listOf(InetAddress.getByAddress(address)) else resolver.resolve(host)
+            val addresses = (if (host == null) listOf(InetAddress.getByAddress(address)) else resolver.resolve(host))
+                // Never a way into the phone itself or the local network.
+                .filterNot { it.isLoopbackAddress || it.isAnyLocalAddress || it.isLinkLocalAddress || it.isSiteLocalAddress }
             if (addresses.isEmpty()) {
                 note("relay: cannot resolve $host")
                 return

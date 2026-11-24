@@ -299,7 +299,7 @@ object YouTube {
     /** Where a pasted YouTube link leads: a video (also one inside a playlist), a playlist or a channel. */
     fun linkTarget(text: String): LinkTarget? {
         val url = text.trim().takeIf { it.startsWith("http://") || it.startsWith("https://") || it.startsWith("youtu") || it.startsWith("www.") || it.startsWith("m.youtube") }
-            ?.let { if (it.startsWith("http")) it else "https://$it" }
+            ?.let { if (it.startsWith("http")) it.replaceFirst("http://", "https://") else "https://$it" }
             ?: return null
         videoIdOf(url)?.let { return LinkTarget.Video(it) }
         playlistIdOf(url)?.let { return LinkTarget.Playlist("https://www.youtube.com/playlist?list=$it") }

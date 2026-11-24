@@ -3,9 +3,11 @@ package dev.wahha.wtube
 import dev.wahha.wtube.data.Dislikes
 import dev.wahha.wtube.data.SponsorBlock
 import kotlinx.coroutines.runBlocking
+import org.junit.experimental.categories.Category
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Category(Network::class)
 class CommunitySmokeTest {
     @Test
     fun liveSponsorBlockAndDislikes() = runBlocking {

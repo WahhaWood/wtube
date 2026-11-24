@@ -571,7 +571,9 @@ fun PlayerSheet(
                 .pointerInput(sheet) { detectTapGestures { if (sheet.progress > 0.5f) sheet.expand() } }
                 .testTag("player_sheet")
                 .semantics { stateDescription = sheetState },
-        ) { (glassLayer, background, info, sidePane, video, mini), constraints ->
+        ) { layers, constraints ->
+            val (glassLayer, background, info, sidePane, video) = layers
+            val mini = layers[5]
             val p = progress()
             val videoBox = geometry.video(p, videoFills).let { page ->
                 // Growing out of a card, the video fills the card's thumbnail at the start.

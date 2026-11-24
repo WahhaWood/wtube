@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,5 +54,18 @@ class JsonFileTest {
         assertTrue("old entries lost", (1..200).all { "old$it" in ids })
         assertTrue("new entries lost", (1..100).all { "new$it" in ids })
         assertTrue("temp files left", dir.list()!!.none { it.endsWith(".tmp") })
+    }
+
+    // An unreadable file is kept aside as .bad instead of being replaced by the first save.
+    @Test
+    fun unreadableFileIsKeptAside() {
+        val dir = folder.newFolder()
+        val file = File(dir, "list.json")
+        file.writeText("{not json")
+        val loaded = java.util.concurrent.CompletableFuture<List<String>?>()
+        val disk = dev.wahha.wtube.data.JsonFile("Test", ListSerializer(String.serializer())) { listOf("new") }
+        disk.load(file) { loaded.complete(it) }
+        assertEquals(null, loaded.get(5, java.util.concurrent.TimeUnit.SECONDS))
+        assertEquals("{not json", File(dir, "list.json.bad").readText())
     }
 }

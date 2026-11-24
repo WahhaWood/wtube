@@ -177,6 +177,16 @@ class RelayTest {
     }
 
     @Test
+    fun hostsOutsideYouTubeAndLocalAddressesAreRefused() {
+        val backend = FakeBackend { true }
+        val relay = relay(listOf(Backend(backend.port, "a")))
+        assertTrue(runCatching { connect(relay, "example.com") }.isFailure)
+        val local = relay(listOf(Backend(backend.port, "a")), addresses = listOf("192.168.1.1"))
+        assertEquals(-1, runCatching { connect(local).getInputStream().read() }.getOrDefault(-1))
+        assertTrue(backend.received.isEmpty())
+    }
+
+    @Test
     fun aSilentStrategyIsBackedUpByTheNextOneWithTheSameHello() {
         val silent = FakeBackend { false }
         val good = FakeBackend { true }

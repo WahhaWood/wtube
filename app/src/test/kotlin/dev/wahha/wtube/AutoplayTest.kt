@@ -81,7 +81,8 @@ class AutoplayTest {
         PlayQueue.add(video("a"))
         PlayQueue.add(video("b"))
         val deadline = System.currentTimeMillis() + 5_000
-        while (!file.readText().contains("\"b\"") && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        // The broken file is moved aside as .bad, so it is missing until the first save.
+        while (!(file.exists() && file.readText().contains("\"b\"")) && System.currentTimeMillis() < deadline) Thread.sleep(10)
         assertTrue(file.readText().contains("\"b\""))
 
         PlayQueue.forget()

@@ -5,6 +5,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.Color
 import dev.wahha.wtube.data.Chapter
 import dev.wahha.wtube.data.formatDuration
@@ -451,12 +453,7 @@ fun VideoPlayer(
 
         // While the controls are hidden a hairline keeps the progress in sight, as in YouTube.
         if (showControls && !controlsVisible && !fullscreen && state.duration > 0) {
-            Box(
-                Modifier.align(Alignment.BottomStart)
-                    .fillMaxWidth((state.position.toFloat() / state.duration).coerceIn(0f, 1f))
-                    .height(2.dp)
-                    .background(colors.primary),
-            )
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp).progressLine(state, colors.primary))
         }
 
         val density = LocalDensity.current
@@ -1022,3 +1019,14 @@ private fun DrawScope.drawHeatmap(heatmap: List<Float>, color: Color, grow: Floa
 private val HeatmapGap = 6.dp
 private val HeatmapMin = 2.dp
 private val HeatmapMax = 30.dp
+
+/**
+ * Draws [state]'s playback progress as a line from the start: the position is read while drawing, so
+ * its updates redraw the line alone instead of recomposing the player around it.
+ */
+internal fun Modifier.progressLine(state: PlayerState, color: Color, corner: Dp = 0.dp): Modifier = drawBehind {
+    val fraction = if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f
+    val width = size.width * fraction
+    val left = if (layoutDirection == LayoutDirection.Rtl) size.width - width else 0f
+    drawRoundRect(color, topLeft = Offset(left, 0f), size = Size(width, size.height), cornerRadius = CornerRadius(corner.toPx()))
+}

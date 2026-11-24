@@ -25,7 +25,13 @@ internal class StatsRecorder(private val scope: CoroutineScope, private val play
     private var ticker: Job? = null
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
-        if (isPlaying) begin() else flush()
+        if (isPlaying) {
+            begin()
+        } else {
+            flush()
+            // Paused, buffering or at the end: here, not only in the screen, which may be gone.
+            player.saveProgress()
+        }
     }
 
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {

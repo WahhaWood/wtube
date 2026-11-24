@@ -10,6 +10,7 @@ import dev.wahha.wtube.data.innertube.FeedParser
 import dev.wahha.wtube.data.innertube.Feeds
 import dev.wahha.wtube.data.innertube.InnerTube
 import kotlinx.coroutines.runBlocking
+import org.junit.experimental.categories.Category
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -24,6 +25,7 @@ import java.io.File
  * The account feeds against YouTube with a real session: `WTUBE_COOKIES` holds a Cookie header or the
  * path of a cookies.txt. Skipped without it. Prints only counts, never names or titles.
  */
+@Category(Network::class)
 class AccountSmokeTest {
     private val source = System.getenv("WTUBE_COOKIES")
 

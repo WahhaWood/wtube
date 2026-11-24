@@ -134,6 +134,8 @@ object Dpi {
     private var cancelledOn: String? = null
     private val deaths = Restarts()
     private val failures = ArrayDeque<Long>()
+    // Whether [failures] has anything, for OkHttp's threads: the deque itself is only touched in [scope].
+    @Volatile private var anyFailures = false
     private var lastRecheck = 0L
     private var recheck: Job? = null
     private val firstRoute = FirstRoute(FIRST_ROUTE_WAIT_MS)
@@ -515,9 +517,11 @@ object Dpi {
             if (!validated) return@launch
             val now = System.currentTimeMillis()
             failures.addLast(now)
+            anyFailures = true
             while (failures.isNotEmpty() && now - failures.first() > FAILURE_WINDOW_MS) failures.removeFirst()
             if (failures.size < FAILURES_TO_RECHECK || now - lastRecheck < RECHECK_EVERY_MS || recheck?.isActive == true) return@launch
             failures.clear()
+            anyFailures = false
             lastRecheck = now
             recheck = launch { quickRecheck() }
         }
@@ -594,7 +598,10 @@ object Dpi {
     }
 
     fun onRequestSucceeded(host: String) {
-        if (::app.isInitialized && isBypassHost(host) && failures.isNotEmpty()) scope.launch { failures.clear() }
+        if (::app.isInitialized && isBypassHost(host) && anyFailures) scope.launch {
+            failures.clear()
+            anyFailures = false
+        }
     }
 
     /** YouTube keeps failing in a network that had a working choice: try directly and the recent strategies. */

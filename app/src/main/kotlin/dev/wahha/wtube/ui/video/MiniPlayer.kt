@@ -97,10 +97,6 @@ internal fun MiniPlayerContent(
                 close()
             }
         }
-        val progress = if (state.duration > 0) (state.position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f
-        Box(
-            Modifier.align(Alignment.BottomStart).padding(horizontal = 18.dp).fillMaxWidth(progress).height(2.dp)
-                .background(colors.primary, RoundedCornerShape(1.dp)),
-        )
+        Box(Modifier.align(Alignment.BottomStart).padding(horizontal = 18.dp).fillMaxWidth().height(2.dp).progressLine(state, colors.primary, 1.dp))
     }
 }

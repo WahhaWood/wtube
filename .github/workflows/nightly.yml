@@ -33,6 +33,19 @@ jobs:
           else
             echo "NewPipeExtractor: ours ${OURS:0:7}, dev is at ${LATEST:0:7}" >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Community smoke tests
+        id: community
+        continue-on-error: true
+        run: ./gradlew testDebugUnitTest --tests 'dev.wahha.wtube.CommunitySmokeTest'
+      - name: Report community
+        if: steps.community.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="SponsorBlock or Return YouTube Dislike smoke tests fail"
+          if [ -z "$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[].number')" ]; then
+            gh issue create --title "$TITLE" --body "The nightly run failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. The SponsorBlock or Return YouTube Dislike API may have changed or been down."
+          fi
       - name: Extractor smoke tests
         run: ./gradlew testDebugUnitTest --tests 'dev.wahha.wtube.ExtractorSmokeTest'
       - name: Summary

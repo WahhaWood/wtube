@@ -134,6 +134,7 @@
     <string name="player_autoplay_on">Автовоспроизведение включено</string>
     <string name="player_autoplay_off">Автовоспроизведение выключено</string>
     <string name="close">Закрыть</string>
+    <string name="data_file_damaged">Не удалось прочитать сохранённые данные (%1$s). Копия файла сохранена рядом с расширением .bad, список начат заново</string>
 
     <string name="channel_tab_videos">Видео</string>
     <string name="channel_tab_livestreams">Трансляции</string>
@@ -181,7 +182,7 @@
     <string name="login_title">Вход в Google</string>
     <string name="login_cookies">Вставить cookies</string>
     <string name="login_cookies_hint">Строка Cookie или содержимое cookies.txt для youtube.com</string>
-    <string name="login_cookies_help">Если Google не пускает в окне входа, войдите на youtube.com в браузере на компьютере, выгрузите cookies расширением (формат Netscape cookies.txt) и вставьте их сюда или выберите файл.</string>
+    <string name="login_cookies_help">Если Google не пускает в окне входа, войдите на youtube.com в браузере на компьютере, выгрузите cookies расширением (формат Netscape cookies.txt) и вставьте их сюда или выберите файл. После входа удалите cookies.txt: в нём весь доступ к аккаунту.</string>
     <string name="login_cookies_file">Выбрать файл</string>
     <string name="login_signing_in">Входим…</string>
     <string name="login_failed">YouTube не принял вход. Попробуйте ещё раз или вставьте cookies.</string>

@@ -197,11 +197,7 @@ class AppTest {
             audio.setStreamVolume(AudioManager.STREAM_MUSIC, half, 0)
             launchVideo()
             val video = compose.onNodeWithTag("video_player")
-            if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
-                video.performTouchInput { click(Offset(width * 0.1f, centerY)) }
-            }
-            compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
-            compose.onNodeWithContentDescription("Во весь экран").performClick()
+            tapFullscreenButton()
             compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
             compose.waitForIdle()
             video.performTouchInput { swipe(Offset(width * 0.85f, height * 0.7f), Offset(width * 0.85f, height * 0.3f), durationMillis = 300) }
@@ -225,11 +221,7 @@ class AppTest {
     fun endedVideoInFullscreenLetsScreenSleep() {
         launchVideo()
         // Off-centre: the controls may be up already, and the centre is the pause button.
-        if (compose.onAllNodes(hasContentDescription("Во весь экран")).fetchSemanticsNodes().isEmpty()) {
-            compose.onNodeWithTag("video_player").performTouchInput { click(Offset(width * 0.1f, centerY)) }
-        }
-        compose.waitUntilExactlyOneExists(hasContentDescription("Во весь экран"), UI_TIMEOUT)
-        compose.onNodeWithContentDescription("Во весь экран").performClick()
+        tapFullscreenButton()
         compose.waitUntilAtLeastOneExists(hasContentDescription("Выйти из полноэкранного режима"), UI_TIMEOUT)
         // "Me at the zoo" is 19 s long.
         compose.waitUntil(LOAD_TIMEOUT) { playerState() == str(R.string.player_state_ended) }
@@ -244,6 +236,22 @@ class AppTest {
         // Only this app's windows: another app's (a phone's TikTok, say) may keep the screen on in the background.
         val app = ApplicationProvider.getApplicationContext<android.content.Context>().packageName
         return dump.split("Window #").any { "package=$app " in it && "KEEP_SCREEN_ON" in it }
+    }
+
+    /**
+     * Brings up the controls and presses fullscreen. The controls hide by themselves and a tap toggles
+     * them, so a single look-then-tap races them; taps are spaced so two never make a double tap.
+     */
+    private fun tapFullscreenButton() {
+        val button = hasContentDescription("Во весь экран")
+        repeat(4) {
+            if (compose.onAllNodes(button).fetchSemanticsNodes().isEmpty()) {
+                compose.onNodeWithTag("video_player").performTouchInput { click(Offset(width * 0.1f, centerY)) }
+            }
+            val shown = runCatching { compose.waitUntilExactlyOneExists(button, 1_500) }.isSuccess
+            if (shown && runCatching { compose.onNodeWithContentDescription("Во весь экран").performClick() }.isSuccess) return
+        }
+        compose.onNodeWithContentDescription("Во весь экран").performClick()
     }
 
     private fun launchVideo() {

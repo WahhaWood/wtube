@@ -34,7 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -263,6 +265,8 @@ private fun CookiePaste(busy: Boolean, onSubmit: (Map<String, String>) -> Unit) 
             value = text,
             onValueChange = { text = it },
             label = { Text(stringResource(R.string.login_cookies_hint)) },
+            // A password keyboard keeps the session out of the keyboard's suggestions and learned words.
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
             modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

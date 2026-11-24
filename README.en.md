@@ -32,6 +32,7 @@ The screenshots show the Russian interface; the app also speaks English.
 **Watching**
 - Videos and live streams in high quality, background playback, mini player and picture-in-picture
 - A player sheet with gestures: swipes, predictive back, full screen with auto-rotation
+- Tablets and foldables: feeds as a grid, related videos or the live chat in a column beside the video on a wide window, full screen by button without rotating; the window resizes on the fly without stopping the video (checked by emulating screen sizes on a phone, not on a real tablet)
 - Shorts in a tab of their own: a vertical feed you swipe through, with likes, comments and subscribing; no Shorts in any other feed. The tab can be turned off in Settings
 - Captions (including auto-translation), transcript, dubbed audio tracks, speed, sleep timer, autoplay, "stats for nerds" (codecs, frames, buffer, network)
 - DeArrow (honest titles on the video page), hiding watched videos in subscriptions
@@ -82,7 +83,7 @@ The screenshots show the Russian interface; the app also speaks English.
 - DeArrow (off by default) is the same service and works the same way: 4 characters of the id's hash and your IP, only for the open video.
 - Update check (on by default): at start, at most once an hour, a request to `api.github.com`. Only this repository's page is opened. Can be turned off in Settings.
 - With the blocking bypass on, YouTube server names are resolved over DNS-over-HTTPS at `1.1.1.1` and `8.8.8.8`, and strategy presets are downloaded from `raw.githubusercontent.com`.
-- Caption auto-translation runs on Google's ML Kit. The library itself sends Google service metrics (device and app details, an installation id, error codes); its module starts with the app even if auto-translation is never used.
+- Caption auto-translation runs on Google's ML Kit. Translation models (about 30 MB per language) are downloaded from Google's servers the first time you translate into that language; ML Kit then registers the installation with Google (an installation id). ML Kit's service metrics (device and app details, error codes) are turned off in the app: they are dropped on the phone instead of being sent.
 - The last loaded feeds (Home, subscriptions, playlists, YouTube history, up to 100 entries per list) are kept on the phone to open offline. On an unmetered network the pictures of the first 30 rows are also fetched in advance, from the same YouTube server as when scrolling. Each account has its own folder, deleted on sign-out. They are not in the transfer file; Settings → "Clear feed cache" removes them.
 
 ## Limitations and risks

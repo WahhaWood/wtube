@@ -51,5 +51,8 @@ fun wtubeTypography(colorScheme: ColorScheme, font: Int, textSize: Int): Typogra
         headlineLarge = body.copy(fontSize = (21 * scale).sp, fontWeight = FontWeight.Bold),
         labelMedium = body.copy(fontSize = (14 * scale).sp, fontWeight = FontWeight.Bold),
         labelSmall = body.copy(fontSize = (12.5f * scale).sp, fontWeight = FontWeight.SemiBold),
+        // Button text and dialog titles: no color of their own, so they keep the button's or dialog's.
+        labelLarge = TextStyle(fontFamily = family, fontSize = (14 * scale).sp, fontWeight = FontWeight.Medium),
+        headlineSmall = TextStyle(fontFamily = family, fontSize = (22 * scale).sp, fontWeight = FontWeight.SemiBold),
     )
 }

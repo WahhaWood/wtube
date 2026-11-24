@@ -72,6 +72,9 @@ object Http {
 
     fun isHeld(call: Call): Boolean = call in held
 
+    /** Calls [RouteGate] moved onto a newer route, by the original: cancelling the original cancels its move. */
+    private val moved = ConcurrentHashMap<Call, Call>()
+
     /**
      * Holds YouTube requests made right after launch until the bypass has its first route, and moves a
      * request whose client's route has been replaced since (it waited here, or queued) onto the current one.
@@ -93,9 +96,13 @@ object Http {
                 held -= call
                 return chain.withShortVideoTimeouts().proceed(request)
             }
+            val next = now.newCall(request)
+            moved[call] = next
             try {
-                return now.newCall(request).execute()
+                if (call.isCanceled()) next.cancel()
+                return next.execute()
             } finally {
+                moved.remove(call)
                 held -= call
             }
         }
@@ -122,6 +129,10 @@ object Http {
         }
 
         override fun callEnd(call: Call) = Dpi.onRequestSucceeded(call.request().url.host)
+
+        override fun canceled(call: Call) {
+            moved[call]?.cancel()
+        }
 
         override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
             val host = call.request().url.host

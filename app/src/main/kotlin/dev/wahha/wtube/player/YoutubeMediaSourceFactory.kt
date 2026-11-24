@@ -223,13 +223,19 @@ private val videoDecoders by lazy { MediaCodecList(MediaCodecList.REGULAR_CODECS
  * Whether the device plays [codec] at [width] × [height] and [fps]: by its hardware decoders when it has
  * any for the codec, as ExoPlayer prefers them, otherwise by the software ones. Either orientation counts.
  */
-private fun deviceDecodes(codec: VideoCodec, width: Int, height: Int, fps: Int): Boolean {
-    val rate = fps.coerceAtLeast(1).toDouble()
-    return decodersFor(codec).any { info ->
-        val caps = runCatching { info.getCapabilitiesForType(codec.mimeType).videoCapabilities }.getOrNull() ?: return@any false
-        caps.areSizeAndRateSupported(width, height, rate) || caps.areSizeAndRateSupported(height, width, rate)
+private fun deviceDecodes(codec: VideoCodec, width: Int, height: Int, fps: Int): Boolean =
+    decodable.getOrPut(DecodeQuery(codec, width, height, fps)) {
+        val rate = fps.coerceAtLeast(1).toDouble()
+        decodersFor(codec).any { info ->
+            val caps = runCatching { info.getCapabilitiesForType(codec.mimeType).videoCapabilities }.getOrNull() ?: return@any false
+            caps.areSizeAndRateSupported(width, height, rate) || caps.areSizeAndRateSupported(height, width, rate)
+        }
     }
-}
+
+private data class DecodeQuery(val codec: VideoCodec, val width: Int, val height: Int, val fps: Int)
+
+// The answers never change while the process lives; every video asks about the same few sizes.
+private val decodable = java.util.concurrent.ConcurrentHashMap<DecodeQuery, Boolean>()
 
 /** The decoders [deviceDecodes] judges [codec] by: the hardware ones when there are any, as ExoPlayer prefers them. */
 private fun decodersFor(codec: VideoCodec): List<MediaCodecInfo> {

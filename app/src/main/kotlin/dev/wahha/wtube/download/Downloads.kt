@@ -147,7 +147,7 @@ object Downloads {
     private fun newDownload(video: VideoItem, audioOnly: Boolean, quality: Int, addedAt: Long, audio: AudioChoice? = null): Download? {
         val context = app ?: return null
         val folder = context.getExternalFilesDir(if (audioOnly) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES) ?: context.filesDir
-        val name = safeName(video.title).ifEmpty { video.id } + " [${video.id}]" + if (audioOnly) ".m4a" else ".mp4"
+        val name = safeFileName(video.title).ifEmpty { video.id } + " [${video.id}]" + if (audioOnly) ".m4a" else ".mp4"
         return Download(video, audioOnly, quality, File(File(folder, "WTube"), name).absolutePath, addedAt = addedAt, audio = audio)
     }
 
@@ -237,10 +237,26 @@ object Downloads {
             .onFailure { Log.w("Downloads", "Service not started now: $it") }
     }
 
-    private fun safeName(title: String) = title.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "").trim().take(80)
 
     private fun change(transform: (List<Download>) -> List<Download>) {
         state.update(transform)
         disk.save()
     }
 }
+
+/** The title as a file name: no characters file systems refuse, at most [NAME_BYTES] bytes of UTF-8 (the limit is 255 bytes, not characters). */
+internal fun safeFileName(title: String): String {
+    val clean = title.replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "").trim()
+    var bytes = 0
+    var end = 0
+    while (end < clean.length) {
+        val next = clean.offsetByCodePoints(end, 1)
+        bytes += clean.substring(end, next).toByteArray(Charsets.UTF_8).size
+        if (bytes > NAME_BYTES) break
+        end = next
+    }
+    return clean.substring(0, end).trim()
+}
+
+// Leaves room for " [id].mp4" and a temporary suffix under the 255-byte limit.
+private const val NAME_BYTES = 200

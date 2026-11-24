@@ -11,6 +11,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /**
  * The phone's own error log for "Share log": crashes are kept in a file (the process that crashed takes its
@@ -48,17 +49,26 @@ object ErrorLog {
      */
     fun note(text: String) {
         val file = events ?: return
-        val line = "${timestamp()} ${redact(text)}\n"
-        synchronized(this) {
-            runCatching {
-                if (file.length() > MAX_EVENT_BYTES) file.writeText(file.readText().takeLast(MAX_EVENT_BYTES / 2))
-                file.appendText(line)
+        val time = timestamp()
+        // Off the caller's thread: the player and the bypass note things from the main one.
+        writer.execute {
+            val line = "$time ${redact(text)}\n"
+            synchronized(this) {
+                runCatching {
+                    if (file.length() > MAX_EVENT_BYTES) file.writeText(file.readText().takeLast(MAX_EVENT_BYTES / 2))
+                    file.appendText(line)
+                }
             }
         }
     }
 
+    /** One thread for [note], so lines keep their order. */
+    private val writer = Executors.newSingleThreadExecutor { Thread(it, "ErrorLog").apply { isDaemon = true } }
+
     /** Writes the report into the cache for sharing: versions, saved crashes, then this run's log. */
     suspend fun report(context: Context): File = withContext(Dispatchers.IO) {
+        // Notes still on their way to the file go in too.
+        runCatching { writer.submit {}.get() }
         val logcat = runCatching {
             val command = listOf("logcat", "-d", "-v", "threadtime", "--pid=${Process.myPid()}") + LogcatFilter
             ProcessBuilder(command).redirectErrorStream(true).start().inputStream.bufferedReader().use { it.readText() }

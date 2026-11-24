@@ -210,11 +210,9 @@ fun rememberPlayerState(player: Player): PlayerState {
     }
     LaunchedEffect(player, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            var ticks = 0
+            // The position is saved by the service every 30 s of playback (StatsRecorder), on pause and on stop.
             while (true) {
                 state.tick()
-                // Every ~10 s of playback, persist the position for resuming later.
-                if (state.isPlaying && ++ticks % 20 == 0) player.saveProgress()
                 delay(500)
             }
         }

@@ -55,8 +55,9 @@ object WatchProgress {
                 }
                 if (fraction > 0f) result[entry.video.id] = fraction.coerceIn(0f, 1f)
             }
+            val byId = if (session != null && account.isNotEmpty()) entries.associateBy { it.video.id } else emptyMap()
             if (session != null) for ((id, position) in account) {
-                val local = entries.firstOrNull { it.video.id == id }
+                val local = byId[id]
                 if (!accountWins(local, position)) continue
                 val duration = local?.video?.duration?.times(1000L) ?: durations[id] ?: 0
                 result[id] = if (position.finished) 1f else if (duration > 0) (position.positionMs.toFloat() / duration).coerceIn(0f, 1f) else continue
