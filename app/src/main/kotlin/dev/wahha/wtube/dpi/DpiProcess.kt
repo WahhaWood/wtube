@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
@@ -77,7 +78,11 @@ class DpiProcess(context: Context, private val service: Class<out DpiService>) :
         connection = conn
         try {
             withTimeout(START_TIMEOUT_MS) {
-                binder = connected.await()
+                // A process that dies before it connects would otherwise be waited for the whole timeout.
+                binder = select {
+                    connected.onAwait { it }
+                    lost.onAwait { throw IOException("byedpi exited at start") }
+                }
                 while (!socksAnswers(port)) {
                     if (lost.isCompleted) throw IOException("byedpi exited at start")
                     delay(50)

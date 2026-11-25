@@ -346,18 +346,20 @@ fun VideoMenu(
 
 /** Opens a youtube.com [url] outside WTube, which would catch the link itself: in the YouTube app, else whatever else takes it. */
 fun openInYouTube(context: Context, url: String) {
-    val view = Intent(Intent.ACTION_VIEW, url.toUri())
+    val uri = url.toUri()
+    if (uri.scheme?.lowercase() !in setOf("http", "https")) return
+    val view = Intent(Intent.ACTION_VIEW, uri)
     try {
         context.startActivity(Intent(view).setPackage("com.google.android.youtube"))
     } catch (_: ActivityNotFoundException) {
         val us = arrayOf(ComponentName(context, MainActivity::class.java))
-        context.startActivity(Intent.createChooser(view, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, us))
+        runCatching { context.startActivity(Intent.createChooser(view, null).putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, us)) }
     }
 }
 
 fun shareVideo(context: Context, video: VideoItem) {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, video.url)
-    context.startActivity(Intent.createChooser(send, null))
+    runCatching { context.startActivity(Intent.createChooser(send, null)) }
 }
 
 /**

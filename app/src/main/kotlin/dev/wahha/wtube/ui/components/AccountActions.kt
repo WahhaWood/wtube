@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 // Account writes outlive the sheet or screen that started them: closing it must not cancel a like halfway.
-private val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+internal val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
 /**
  * Runs an account action in the background: on success shows [done] (with [arg]) if given; on failure
@@ -229,6 +229,8 @@ fun TextEntryDialog(title: String, placeholder: String, confirm: String, onDismi
         onDismissRequest = onDismiss,
         title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         text = {
+            // Opened from the comments panel over a fullscreen video too.
+            ImmersiveDialog()
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },

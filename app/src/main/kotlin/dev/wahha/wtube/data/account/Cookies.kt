@@ -6,10 +6,13 @@ import java.security.MessageDigest
 object Cookies {
     const val ORIGIN = "https://www.youtube.com"
 
-    /** `name=value; name=value` as sent in a Cookie header; a pasted `Cookie:` prefix is ignored. */
+    /**
+     * `name=value; name=value` as sent in a Cookie header; a pasted `Cookie:` prefix is ignored. A line break in a
+     * paste separates too: in a header it would make OkHttp throw instead of saying the cookies are wrong.
+     */
     fun parse(header: String): Map<String, String> = header.trim()
         .removePrefix("Cookie:").removePrefix("cookie:")
-        .split(';')
+        .split(';', '\n', '\r')
         .mapNotNull { part ->
             val eq = part.indexOf('=')
             if (eq <= 0) null else part.substring(0, eq).trim() to part.substring(eq + 1).trim()
@@ -28,7 +31,8 @@ object Cookies {
         .filter { it.isNotEmpty() && !it.startsWith("#") }
         .mapNotNull { line ->
             val fields = line.split('\t')
-            if (fields.size < 7 || !fields[0].trimStart('.').endsWith("youtube.com")) null else fields[5] to fields[6]
+            val domain = fields[0].trimStart('.').lowercase()
+            if (fields.size < 7 || domain != "youtube.com" && !domain.endsWith(".youtube.com")) null else fields[5] to fields[6]
         }
         .toMap()
 

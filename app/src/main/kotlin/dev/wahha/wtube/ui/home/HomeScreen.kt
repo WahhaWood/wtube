@@ -185,8 +185,10 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         ) {
             fullRow(key = "header") { ScreenHeader(stringResource(R.string.app_name), leading = { LogoMark() }) }
             fullRow(key = "expired") { ExpiredBanner(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            val shown = feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }
             when {
-                vm.hasSource == false || feed.items.isEmpty() && feed.endReached && feed.error == null -> fullRow(key = "empty") {
+                // By what is shown: a feed whose every video was filtered out is empty too.
+                vm.hasSource == false || shown.isEmpty() && feed.endReached && feed.error == null -> fullRow(key = "empty") {
                     MessageState(
                         WIcons.Home,
                         stringResource(R.string.home_empty_body),
@@ -199,7 +201,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 feed.items.isEmpty() && feed.error != null -> fullRow(key = "error") { ErrorState(feed.error!!, feed::retry) }
                 else -> {
                     staleStrip(feed)
-                    items(feed.items.filter { hidden.allows(it) && MembersOnly.inRecommendations(it, settings.membersOnly) && Recommendations.allows(it, settings, watched) }, key = { it.url }) { ItemView(it, recommended = true) }
+                    items(shown, key = { it.url }) { ItemView(it, recommended = true) }
                     fullRow(key = "footer") { ListFooter(feed.loading, feed.pageError, feed::retry) }
                 }
             }

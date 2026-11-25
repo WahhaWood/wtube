@@ -279,7 +279,7 @@ private fun Suggestions(
                 }
             }
         }
-        items(suggestions, key = { "suggestion_$it" }) { text -> SuggestionRow(text, WIcons.Search, onPick, onFill) }
+        items(suggestions.distinct(), key = { "suggestion_$it" }) { text -> SuggestionRow(text, WIcons.Search, onPick, onFill) }
     }
 }
 

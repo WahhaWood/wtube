@@ -15,7 +15,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.PlaybackException
+import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSourceException
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -35,6 +39,7 @@ import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import dev.wahha.wtube.data.Http
 import dev.wahha.wtube.data.YouTube
 import dev.wahha.wtube.data.isLive
+import java.io.IOException
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeOtfDashManifestCreator
 import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.YoutubeProgressiveDashManifestCreator
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
@@ -86,7 +91,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
             // prepare instead, and the player reports an ordinary error.
             Log.e(TAG, "No stream info for ${mediaItem.mediaId}")
             ErrorLog.note("[player] no stream info for ${mediaItem.mediaId}")
-            return progressive(mediaItem)
+            return unavailable(mediaItem)
         }
 
         // A stream that has just ended has no DASH-able streams yet (the extractor marks them not isUrl):
@@ -114,7 +119,7 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
             val muxed = info.videoStreams.filter { it.isUrl }.maxByOrNull { it.height }
             Log.w(TAG, "No DASH streams for ${info.id}, muxed fallback: ${muxed?.height}p")
             ErrorLog.note("[player] no DASH streams for ${info.id}, muxed fallback: ${muxed?.height}p")
-            progressive(mediaItem.buildUpon().setUri(muxed?.content.orEmpty()).build())
+            if (muxed == null) unavailable(mediaItem) else progressive(mediaItem.buildUpon().setUri(muxed.content).build())
         }
         return withSubtitles(main, info)
     }
@@ -150,6 +155,13 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
     private fun progressive(mediaItem: MediaItem): MediaSource =
         ProgressiveMediaSource.Factory(youtubeDataSource).configured().createMediaSource(mediaItem)
 
+    /**
+     * Fails on prepare with a network error: the item's page URL is not a stream, and loading it would end in a
+     * parser error about an HTML page. Missing stream info nearly always means the request for it failed.
+     */
+    private fun unavailable(mediaItem: MediaItem): MediaSource =
+        ProgressiveMediaSource.Factory { NoStreamDataSource() }.configured().createMediaSource(mediaItem)
+
     private fun <F : MediaSource.Factory> F.configured(): F = apply {
         drmProvider?.let { setDrmSessionManagerProvider(it) }
         errorPolicy?.let { setLoadErrorHandlingPolicy(it) }
@@ -165,12 +177,14 @@ class YoutubeMediaSourceFactory : MediaSource.Factory {
                 YoutubeOtfDashManifestCreator.fromOtfStreamingUrl(stream.content, itag, info.duration)
             }
             parser.parse(Uri.parse(stream.content), xml.byteInputStream())
-        }.onFailure { Log.w(TAG, "Manifest for itag ${stream.itagItem?.id} failed", it) }.getOrNull()
+        }.onFailure { Log.w(TAG, ErrorLog.redact("Manifest for itag ${stream.itagItem?.id} failed: ${it.javaClass.simpleName}: ${it.message}")) }.getOrNull()
 
         // One adaptation set per audio track: the extractor's manifests carry its language and role
         // (main, dub, description), and picking a dub is a track override like picking a quality.
         val video = selection.video.mapNotNull(::parse)
         val audio = selection.audio.map { track -> track.mapNotNull(::parse) }
+        // Sound alone under a black screen only when there is no picture at all to fall back to.
+        if (video.isEmpty() && info.videoStreams.any { it.isUrl }) return null
         val base = (video + audio.flatten()).firstOrNull() ?: return null
         val sets = (listOf(C.TRACK_TYPE_VIDEO to video) + audio.map { C.TRACK_TYPE_AUDIO to it })
             .filter { (_, manifests) -> manifests.isNotEmpty() }
@@ -268,4 +282,16 @@ private class NetworkRetryPolicy : DefaultLoadErrorHandlingPolicy(NETWORK_RETRIE
         const val NETWORK_RETRIES = 8
         const val HTTP_RETRIES = DEFAULT_MIN_LOADABLE_RETRY_COUNT
     }
+}
+
+@OptIn(UnstableApi::class)
+private class NoStreamDataSource : BaseDataSource(true) {
+    override fun open(dataSpec: DataSpec): Long =
+        throw DataSourceException(IOException("No stream info"), PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED)
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int = C.RESULT_END_OF_INPUT
+
+    override fun getUri(): Uri? = null
+
+    override fun close() {}
 }

@@ -303,20 +303,51 @@ fun PlayerSheet(
     val windowLayout = LocalWindowLayout.current
     // From 600 dp the system ignores a requested orientation (Android 16), so the button there is a plain flag.
     val ignoresOrientation = LocalConfiguration.current.smallestScreenWidthDp >= 600
-    var largeScreenFullscreen by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(sheet.expanded) { if (!sheet.expanded) largeScreenFullscreen = false }
+    // The button's choice there; null follows the window (a low one, split screen, is fullscreen by itself).
+    var largeScreenFullscreen by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(sheet.expanded) { if (!sheet.expanded) largeScreenFullscreen = null }
+    // A window size change resets the choice: the low window may have become a tall one, or the other way.
+    // Not on the first run: an activity recreated by a turn must keep the choice.
+    var autoSeen by rememberSaveable { mutableStateOf(windowLayout.autoFullscreen) }
+    LaunchedEffect(windowLayout.autoFullscreen) {
+        if (autoSeen != windowLayout.autoFullscreen) {
+            autoSeen = windowLayout.autoFullscreen
+            largeScreenFullscreen = null
+        }
+    }
     val fullscreen = sheet.expanded && when (orientationLock) {
         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> true
         ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> uprightFullscreen
-        else -> largeScreenFullscreen || windowLayout.autoFullscreen
+        else -> largeScreenFullscreen ?: windowLayout.autoFullscreen
+    }
+    // A foldable opened or closed: the other screen keeps fullscreen its own way, so the old way must not hold it.
+    LaunchedEffect(ignoresOrientation) {
+        if (ignoresOrientation) {
+            if (orientationLock != null) {
+                largeScreenFullscreen = fullscreen
+                orientationLock = null
+                uprightFullscreen = false
+            }
+        } else {
+            largeScreenFullscreen = null
+        }
     }
     val vertical = state?.videoSize?.let { it.height > 0 && it.width * it.pixelWidthHeightRatio < it.height } == true
+    val horizontal = state?.videoSize?.let { it.height > 0 && !vertical } == true
+    // Held upright for a vertical video, the next one is wide: turn it as the button would.
+    LaunchedEffect(horizontal) {
+        if (horizontal && uprightFullscreen) {
+            uprightFullscreen = false
+            orientationLock = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
     val toggleFullscreen = {
         when {
             ignoresOrientation -> largeScreenFullscreen = !fullscreen
             fullscreen -> {
                 orientationLock = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 uprightFullscreen = false
+                largeScreenFullscreen = null
             }
             vertical -> {
                 orientationLock = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -699,17 +730,23 @@ private fun Modifier.pointerInputVideoDrag(
         // Down, or anything once the sheet has moved, drags the sheet; up on the full page means fullscreen.
         var moving = !fullscreen && total > 0f
         if (moving) sheet.dragBy(total)
-        val completed = verticalDrag(start.id) { change ->
-            val dy = change.positionChange().y
-            change.consume()
-            total += dy
-            tracker.addPosition(change.uptimeMillis, Offset(0f, total))
-            // The shelf of more videos follows the finger up, not only opens after release.
-            if (fullscreen) onShelfDrag((-total / shelfRange).coerceIn(0f, 1f))
-            if (!fullscreen && (moving || total > 0f)) {
-                moving = true
-                sheet.dragBy(dy)
+        val completed = try {
+            verticalDrag(start.id) { change ->
+                val dy = change.positionChange().y
+                change.consume()
+                total += dy
+                tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+                // The shelf of more videos follows the finger up, not only opens after release.
+                if (fullscreen) onShelfDrag((-total / shelfRange).coerceIn(0f, 1f))
+                if (!fullscreen && (moving || total > 0f)) {
+                    moving = true
+                    sheet.dragBy(dy)
+                }
             }
+        } catch (e: CancellationException) {
+            // The input restarted mid-drag (a turn into fullscreen, picture-in-picture): the sheet must not stay halfway.
+            if (moving) sheet.settle(0f) else if (fullscreen) onShelfEnd(false)
+            throw e
         }
         when {
             moving -> sheet.settle(if (completed) tracker.calculateVelocity().y else 0f)

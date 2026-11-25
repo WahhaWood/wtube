@@ -87,7 +87,8 @@ fun rememberLinkHandler(videoId: String, onSeek: (Long) -> Unit): (String) -> Un
         { url ->
             val uri = Uri.parse(url)
             val linkedVideo = YouTube.videoIdOf(url)
-            val seconds = uri.getQueryParameter("t")?.let(::parseYoutubeTime)
+            // mailto: and tel: have no query, and asking for one throws.
+            val seconds = uri.takeIf { it.isHierarchical }?.getQueryParameter("t")?.let(::parseYoutubeTime)
             val youtubeHost = hostIn(uri.host, listOf("youtube.com"))
             when {
                 linkedVideo == videoId && seconds != null -> onSeek(seconds * 1000)

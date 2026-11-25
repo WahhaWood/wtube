@@ -14,9 +14,9 @@ class ErrorLogTest {
 
     @Test
     fun cutsCookiesAndAuthHeader() {
-        val text = "Cookie: SID=abc; __Secure-3PSID=def; PREF=f6=40000000\nAuthorization: SAPISIDHASH 123_abcdef"
+        val text = "Cookie: SID=abc; __Secure-3PSID=def; __Host-3PLSID=ghi; PREF=f6=40000000\nAuthorization: SAPISIDHASH 123_abcdef"
         val redacted = ErrorLog.redact(text)
-        assertEquals("Cookie: SID=[cut]; __Secure-3PSID=[cut]; PREF=f6=40000000\nAuthorization: SAPISIDHASH [cut]", redacted)
+        assertEquals("Cookie: SID=[cut]; __Secure-3PSID=[cut]; __Host-3PLSID=[cut]; PREF=f6=40000000\nAuthorization: SAPISIDHASH [cut]", redacted)
         assertFalse(redacted.contains("abc"))
     }
 

@@ -97,7 +97,7 @@ object ErrorLog {
     }
 
     private val StreamLink = Regex("""https?://[^\s"'<>]*googlevideo\.com[^\s"'<>]*""")
-    private val CookieValue = Regex("""\b(SAPISID|APISID|HSID|SSID|SID|SIDCC|LOGIN_INFO|__Secure-[\w-]+)=[^;\s]+""")
+    private val CookieValue = Regex("""\b(SAPISID|APISID|HSID|SSID|SID|SIDCC|LOGIN_INFO|__Secure-[\w-]+|__Host-[\w-]+)=[^;\s]+""")
     // The header carries one hash per scheme: SAPISIDHASH, SAPISID1PHASH, SAPISID3PHASH.
     private val AuthHeader = Regex("""\b(SAPISID\w*HASH)\s+\S+""")
 

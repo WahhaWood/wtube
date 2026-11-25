@@ -287,10 +287,14 @@ fun VideoPlayer(
                     .pointerInput(player) {
                         detectTapGestures(
                             onPress = {
-                                tryAwaitRelease()
-                                if (boosting) {
-                                    boosting = false
-                                    player.setPlaybackSpeed(Settings.current.value.speed)
+                                try {
+                                    tryAwaitRelease()
+                                } finally {
+                                    // Also when the controls leave mid-press (picture-in-picture): 2x must not stay.
+                                    if (boosting) {
+                                        boosting = false
+                                        player.setPlaybackSpeed(Settings.current.value.speed)
+                                    }
                                 }
                             },
                             onLongPress = {
@@ -358,19 +362,23 @@ fun VideoPlayer(
                                     var fraction = (player.currentPosition.toFloat() / duration + total.x / size.width * span).coerceIn(0f, 1f)
                                     scrub = fraction
                                     controlsVisible = true
-                                    val completed = drag(down.id) { change ->
-                                        fraction = (fraction + change.positionChange().x / size.width * span).coerceIn(0f, 1f)
-                                        scrub = fraction
-                                        change.consume()
+                                    // A restart of this input (fullscreen, a turn) cancels mid-drag: the preview must still go.
+                                    try {
+                                        val completed = drag(down.id) { change ->
+                                            fraction = (fraction + change.positionChange().x / size.width * span).coerceIn(0f, 1f)
+                                            scrub = fraction
+                                            change.consume()
+                                        }
+                                        if (completed) player.seekTo((fraction * duration).toLong())
+                                    } finally {
+                                        scrub = null
+                                        interaction++
                                     }
-                                    if (completed) player.seekTo((fraction * duration).toLong())
-                                    scrub = null
-                                    interaction++
                                 }
                                 DragMode.Level -> {
                                     val swiping = checkNotNull(kind)
                                     val prefs = Settings.current.value
-                                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
                                     val min = if (swiping == LevelKind.Brightness) MIN_BRIGHTNESS else 0f
                                     var value = when (swiping) {
                                         LevelKind.Volume -> audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
@@ -378,22 +386,25 @@ fun VideoPlayer(
                                             ?: (SystemSettings.getInt(context.contentResolver, SystemSettings.SCREEN_BRIGHTNESS, 128) / 255f).coerceIn(min, 1f)
                                     }
                                     level = swiping to value
-                                    drag(down.id) { change ->
-                                        val next = levelAfter(value, change.positionChange().y, size.height.toFloat(), prefs, min)
-                                        if (prefs.gestureHaptics && next != value && (next == 1f || next == min)) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                    try {
+                                        drag(down.id) { change ->
+                                            val next = levelAfter(value, change.positionChange().y, size.height.toFloat(), prefs, min)
+                                            if (prefs.gestureHaptics && next != value && (next == 1f || next == min)) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                                            }
+                                            value = next
+                                            when (swiping) {
+                                                // No system volume panel: the badge shows the level.
+                                                LevelKind.Volume -> audio.setStreamVolume(AudioManager.STREAM_MUSIC, (value * max).roundToInt(), 0)
+                                                LevelKind.Brightness -> checkNotNull(window).let { w -> w.attributes = w.attributes.apply { screenBrightness = value } }
+                                            }
+                                            level = swiping to value
+                                            change.consume()
                                         }
-                                        value = next
-                                        when (swiping) {
-                                            // No system volume panel: the badge shows the level.
-                                            LevelKind.Volume -> audio.setStreamVolume(AudioManager.STREAM_MUSIC, (value * max).roundToInt(), 0)
-                                            LevelKind.Brightness -> checkNotNull(window).let { w -> w.attributes = w.attributes.apply { screenBrightness = value } }
-                                        }
-                                        level = swiping to value
-                                        change.consume()
+                                    } finally {
+                                        level = null
                                     }
                                     if (swiping == LevelKind.Brightness && prefs.gestureRememberBrightness) Settings.set(Settings.GestureBrightnessLevel, value)
-                                    level = null
                                 }
                                 DragMode.Pinch -> {
                                     var zoom = 1f

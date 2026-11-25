@@ -218,7 +218,7 @@ object WatchParser {
     private fun absoluteUrl(url: String): String {
         val full = if (url.startsWith("/")) "https://www.youtube.com$url" else url
         if (!full.startsWith("https://www.youtube.com/redirect")) return full
-        return Regex("[?&]q=([^&]+)").find(full)?.groupValues?.get(1)?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: full
+        return Regex("[?&]q=([^&]+)").find(full)?.groupValues?.get(1)?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() } ?: full
     }
 
     private fun escape(text: String) =

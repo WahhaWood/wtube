@@ -32,6 +32,8 @@ internal object Vault {
         return String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES))
     }
 
+    // Two first calls at once would each generate a key, and the second would orphan what the first sealed.
+    @Synchronized
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }

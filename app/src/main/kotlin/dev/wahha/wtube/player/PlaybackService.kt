@@ -88,6 +88,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var exo: ExoPlayer
     private var videoDecoder: String? = null
     private var audioDecoder: String? = null
+    // A "next" press fetching its video.
+    private var skip: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -236,13 +238,19 @@ class PlaybackService : MediaSessionService() {
     /** "Next" from the notification, lock screen or headset: the queue's first, else a related video, as the player's button. */
     private fun skipToNext(player: Player) {
         val id = player.currentMediaItem?.mediaId ?: return
-        PlayQueue.pop()?.let {
-            Autoplay.schedule(it, 0)
-            return
-        }
-        scope.launch {
-            val next = relatedNext(id, orWatched = true)
-            if (next != null && player.currentMediaItem?.mediaId == id) Autoplay.schedule(next, 0)
+        // Not through Autoplay: the current video buffering meanwhile would cancel it as a countdown. A second
+        // press replaces the first; another video picked meanwhile wins over both.
+        skip?.cancel()
+        val queued = PlayQueue.pop()
+        skip = scope.launch {
+            val next = queued ?: relatedNext(id, orWatched = true) ?: return@launch
+            val item = runCatching { mediaItem(next.id) }.getOrNull() ?: return@launch
+            if (player.currentMediaItem?.mediaId != id) return@launch
+            Autoplay.cancel()
+            player.setMediaItem(item, resumePosition(item.mediaId))
+            player.prepare()
+            player.play()
+            History.record(next)
         }
     }
 
@@ -302,7 +310,7 @@ class PlaybackService : MediaSessionService() {
                 val item = try {
                     mediaItem(id)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Refreshing $id failed", e)
+                    Log.w(TAG, ErrorLog.redact("Refreshing $id failed: ${errorDetail(e)}"))
                     ErrorLog.note("[player] refreshing $id failed: ${errorDetail(e)}")
                     return@launch
                 }

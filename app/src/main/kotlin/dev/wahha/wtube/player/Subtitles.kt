@@ -50,30 +50,42 @@ private const val FETCH_ATTEMPTS = 3
  */
 fun fetchSubtitles(url: String): String {
     val target = Regex("[?&]tlang=([^&]*)").find(url)?.groupValues?.get(1) ?: return fetchTrack(url)
-    translations[url]?.let { return it }
+    synchronized(translations) { translations[url] }?.let { return it }
     val source = Regex("[?&]lang=([^&]*)").find(url)?.groupValues?.get(1) ?: return EMPTY_VTT
     val original = fetchTrack(url.replace(Regex("&tlang=[^&]*"), ""))
     if (original == EMPTY_VTT) return EMPTY_VTT
     return runCatching { translateOnDevice(original, source, target) }
-        .onSuccess { translations[url] = it }
+        .onSuccess { synchronized(translations) { translations[url] = it } }
         .getOrElse {
             Log.w("WTubeSubtitles", "Translating the caption track failed", it)
             EMPTY_VTT
         }
 }
 
+// Reads reorder it (access order), and loader threads of the service and the Shorts players share it.
 private val translations = object : LinkedHashMap<String, String>(4, 0.75f, true) {
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>) = size > 3
 }
 
 private fun fetchTrack(url: String): String {
     repeat(FETCH_ATTEMPTS) { attempt ->
-        if (attempt > 0) Thread.sleep(1_000L * attempt)
+        if (attempt > 0) {
+            try {
+                Thread.sleep(1_000L * attempt)
+            } catch (_: InterruptedException) {
+                // The player gave up on this load (another track, a seek): not an error of the whole video.
+                Thread.currentThread().interrupt()
+                return EMPTY_VTT
+            }
+        }
+        var final = false
         val vtt = runCatching {
             val request = Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
             Http.client.newCall(request).execute().use { response ->
                 val body = response.body.string().trimStart('\uFEFF')
                 if (response.isSuccessful && body.startsWith("WEBVTT")) body else {
+                    // Only a 429 or a server error may go through on another try.
+                    final = response.code in 400..499 && response.code != 429
                     Log.w("WTubeSubtitles", "Caption track refused (try ${attempt + 1}): HTTP ${response.code}, ${body.length} chars: ${body.take(60).replace('\n', ' ')}")
                     null
                 }
@@ -83,6 +95,7 @@ private fun fetchTrack(url: String): String {
             null
         }
         if (vtt != null) return vtt
+        if (final) return EMPTY_VTT
     }
     return EMPTY_VTT
 }

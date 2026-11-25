@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
@@ -138,6 +139,8 @@ object Dpi {
     @Volatile private var anyFailures = false
     private var lastRecheck = 0L
     private var recheck: Job? = null
+    // The network [recheck] tests: its result is saved under this key, so another network must stop it.
+    private var recheckOn: String? = null
     private val firstRoute = FirstRoute(FIRST_ROUTE_WAIT_MS)
     private val backupDeaths = Array(SLOTS) { Restarts() }
 
@@ -184,7 +187,18 @@ object Dpi {
             Settings.loaded.first { it }
             combine(Settings.current, store.memory, network, mutablePresets, requests) { settings, memory, key, presets, request ->
                 Inputs(settings.dpiBypass, memory.customArgs, memory.customProxy, key, key?.let { memory.networks[it] }, presets, request)
-            }.distinctUntilChanged().collectLatest { apply(it) }
+            }.distinctUntilChanged().collectLatest {
+                // Caught here: an exception escaping collectLatest would end it, and with it every later decision.
+                try {
+                    apply(it)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    ErrorLog.note("[dpi] ${e::class.java.simpleName}: ${e.message}")
+                    runCatching { stopMain() }
+                    mutableState.value = DpiState.EngineFailed
+                }
+            }
         }
         scope.launch {
             Settings.current.first { it.dpiBypass }
@@ -204,6 +218,7 @@ object Dpi {
     }
 
     private suspend fun apply(inputs: Inputs) {
+        if (recheckOn != inputs.network) recheck?.cancel()
         if (!inputs.enabled) {
             recheck?.cancel()
             stopMain()
@@ -418,6 +433,7 @@ object Dpi {
     fun retest() {
         val key = network.value ?: return
         cancelledOn = null
+        recheck?.cancel()
         scope.launch {
             store.forget(key)
             requests.value++
@@ -426,6 +442,7 @@ object Dpi {
 
     fun cancelSearch() {
         cancelledOn = network.value
+        recheck?.cancel()
         requests.value++
     }
 
@@ -433,6 +450,7 @@ object Dpi {
     fun choose(id: String) {
         val key = network.value ?: return
         cancelledOn = null
+        recheck?.cancel()
         scope.launch { store.remember(key, id) }
     }
 
@@ -523,6 +541,7 @@ object Dpi {
             failures.clear()
             anyFailures = false
             lastRecheck = now
+            recheckOn = network.value
             recheck = launch { quickRecheck() }
         }
     }
@@ -581,6 +600,7 @@ object Dpi {
             val stream = YouTube.cachedStreamInfo(id)?.videoOnlyStreams?.filter { it.isUrl }?.maxByOrNull { it.bitrate }?.content
                 ?: return@launch
             recheck?.cancel()
+            recheckOn = key
             recheck = launch {
                 val memory = memory.value
                 val saved = memory.networks[key]

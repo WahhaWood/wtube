@@ -54,8 +54,16 @@ class InnerTubeTest {
             .youtube.com	TRUE	/	TRUE	1999999999	SAPISID	s1
             #HttpOnly_.youtube.com	TRUE	/	TRUE	1999999999	SID	sid
             .google.com	TRUE	/	TRUE	1999999999	SID	other
+            .notyoutube.com	TRUE	/	TRUE	1999999999	HSID	evil
+            .WWW.YOUTUBE.COM	TRUE	/	TRUE	1999999999	SSID	upper
         """.trimIndent()
-        assertEquals(mapOf("SAPISID" to "s1", "SID" to "sid"), Cookies.fromUserInput(file))
+        assertEquals(mapOf("SAPISID" to "s1", "SID" to "sid", "SSID" to "upper"), Cookies.fromUserInput(file))
+    }
+
+    @Test
+    fun pastedHeaderOverLinesIsSplit() {
+        assertEquals(mapOf("SID" to "a", "SAPISID" to "s"), Cookies.parse("SID=a;\r\nSAPISID=s"))
+        assertEquals(mapOf("SID" to "a", "SAPISID" to "s"), Cookies.parse("SID=a\nSAPISID=s"))
     }
 
     /** Known vectors: sha1("1700000000 <cookie> https://www.youtube.com"), computed outside the app. */

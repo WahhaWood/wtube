@@ -150,6 +150,8 @@ fun LoginScreen() {
 @Composable
 private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
+    // The cookie wipe and the proxy answer later: after the screen is gone they must not reopen the proxy or load a page.
+    val disposed = remember { booleanArrayOf(false) }
     AndroidView(
         modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
         factory = { context ->
@@ -157,13 +159,13 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -
                 layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
                 @Suppress("DEPRECATION")
                 settings.saveFormData = false
                 webView = this
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                 webViewClient = object : WebViewClient() {
-                    private var done = false
-
                     // Only Google's sign-in and YouTube load here; anything else a page links to goes to the browser.
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         if (!request.isForMainFrame) return false
@@ -184,23 +186,24 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -
                     }
 
                     override fun onPageFinished(view: WebView, url: String) {
-                        if (done || !isYouTubeHome(url)) return
+                        // No flag for "taken": a failed check must let a later page try again; signIn skips while busy.
+                        if (!isYouTubeHome(url)) return
                         val cookies = Cookies.parse(CookieManager.getInstance().getCookie(Cookies.ORIGIN).orEmpty())
                         // Google sets the signing cookie on its way back; a page without it is not signed in yet.
-                        if (Cookies.canSign(cookies)) {
-                            done = true
-                            onSignedIn(cookies)
-                        }
+                        if (Cookies.canSign(cookies)) onSignedIn(cookies)
                     }
                 }
                 // Start from a clean browser: no half-finished sign-in or other account left from before.
                 WebStorage.getInstance().deleteAllData()
                 CookieManager.getInstance().removeAllCookies {
+                    if (disposed[0]) return@removeAllCookies
                     // Through the blocking bypass when it runs: the WebView does not use the app's OkHttp.
                     val proxy = if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) Dpi.webViewProxy() else null
                     if (proxy != null) {
                         val config = ProxyConfig.Builder().addProxyRule(proxy).build()
-                        ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) { loadUrl(loginUrl()) }
+                        ProxyController.getInstance().setProxyOverride(config, ContextCompat.getMainExecutor(context)) {
+                            if (!disposed[0]) loadUrl(loginUrl())
+                        }
                     } else {
                         loadUrl(loginUrl())
                     }
@@ -210,6 +213,7 @@ private fun LoginWebView(onSignedIn: (Map<String, String>) -> Unit, onGone: () -
     )
     DisposableEffect(Unit) {
         onDispose {
+            disposed[0] = true
             Dpi.closeWebViewProxy()
             if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
                 ProxyController.getInstance().clearProxyOverride({}, {})
@@ -245,7 +249,7 @@ internal fun isSignInHost(host: String?): Boolean {
 
 private fun isYouTubeHome(url: String): Boolean {
     val uri = Uri.parse(url)
-    return uri.host in setOf("www.youtube.com", "m.youtube.com", "youtube.com") && uri.path?.startsWith("/signin") != true
+    return uri.scheme == "https" && uri.host in setOf("www.youtube.com", "m.youtube.com", "youtube.com") && uri.path?.startsWith("/signin") != true
 }
 
 @Composable

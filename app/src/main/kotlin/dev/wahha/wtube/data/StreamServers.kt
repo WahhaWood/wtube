@@ -25,7 +25,7 @@ object StreamServers {
         val host = uri.host ?: return null
         if (!host.endsWith(".googlevideo.com")) return null
         val query = uri.rawQuery?.split('&')?.associate { it.substringBefore('=') to it.substringAfter('=', "") } ?: return null
-        val servers = URLDecoder.decode(query["mn"].orEmpty(), "UTF-8").split(',').filter { it.isNotBlank() }
+        val servers = (runCatching { URLDecoder.decode(query["mn"].orEmpty(), "UTF-8") }.getOrNull() ?: return null).split(',').filter { it.isNotBlank() }
         val spare = servers.getOrNull(1) ?: return null
         val number = query["fvip"]?.toIntOrNull() ?: return null
         val spareHost = "rr$number---$spare.googlevideo.com"
@@ -50,7 +50,7 @@ object StreamServers {
         val host = runCatching { URI(url).host }.getOrNull() ?: return url
         val own = downSince(host, route, now) ?: return url
         val spare = spareUrl(url) ?: return url
-        val other = downSince(URI(spare).host, route, now) ?: return spare
+        val other = downSince(runCatching { URI(spare).host }.getOrNull() ?: return url, route, now) ?: return spare
         // Both failed: the one that failed longer ago.
         return if (own <= other) url else spare
     }

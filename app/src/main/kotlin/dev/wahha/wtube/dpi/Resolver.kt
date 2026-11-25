@@ -38,6 +38,8 @@ class Resolver(
     /** Addresses to try for [host], IPv4 first; empty if nothing resolves. Blocks. */
     fun resolve(host: String): List<InetAddress> {
         literal(host)?.let { return listOf(it) }
+        // Goes into the DoH URL as it is: a name with '&' or '/' would add parameters there.
+        if (!HostName.matches(host)) return emptyList()
         val key = host.lowercase()
         cache[key]?.takeIf { it.expires > clock() }?.let { return it.addresses }
         var ttl = DEFAULT_TTL_S
@@ -120,11 +122,18 @@ class Resolver(
             return found.map { it.first } to found.minOf { it.second }
         }
 
-        /** [text] as an address if it is one (no lookup ever), else null. */
+        private val HostName = Regex("[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*\\.?")
+
+        /**
+         * [text] as an address if it is one (no lookup ever), else null. Only well-formed ones reach getByName:
+         * on Android it looks up anything it cannot parse (`1.2.3.999`) with the system's DNS.
+         */
         fun literal(text: String): InetAddress? {
             val bare = text.removePrefix("[").removeSuffix("]")
-            val v4 = Regex("""\d{1,3}(\.\d{1,3}){3}""").matches(bare)
-            val v6 = ':' in bare && bare.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' || it == '.' }
+            val v4 = Regex("""\d{1,3}(\.\d{1,3}){3}""").matches(bare) && bare.split('.').all { it.toInt() <= 255 }
+            val v6 = ':' in bare && bare.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' || it == '.' } &&
+                bare.windowed(2).count { it == "::" } <= 1 && ":::" !in bare &&
+                bare.split(':').let { groups -> groups.size in 3..9 && groups.all { it.length <= 4 || '.' in it } }
             return if (v4 || v6) runCatching { InetAddress.getByName(bare) }.getOrNull() else null
         }
 

@@ -263,4 +263,27 @@ class RelayTest {
         assertFalse(resolver.resolve("198.51.100.1").isEmpty())
         assertEquals(1, notes.size)
     }
+
+    @Test
+    fun localAddressesAreRefused() {
+        val local = listOf("127.0.0.1", "10.1.2.3", "192.168.0.1", "169.254.1.1", "0.0.0.0", "::1", "fe80::1", "fd12:3456::1", "fc00::1", "ff02::1", "224.0.0.251")
+        for (a in local) assertTrue(a, Relay.isLocal(InetAddress.getByName(a)))
+        for (a in listOf("142.250.74.110", "2a00:1450:4010:c0e::5b")) assertFalse(a, Relay.isLocal(InetAddress.getByName(a)))
+    }
+
+    @Test
+    fun onlyWellFormedAddressesAreLiterals() {
+        for (a in listOf("1.2.3.4", "[::1]", "2a00:1450:4010:c0e::5b", "::ffff:1.2.3.4", "fe80::1")) assertNotNull(a, Resolver.literal(a))
+        // Any of these would go to the system's DNS on Android.
+        for (a in listOf("1.2.3.999", ":::", "1::2::3", "12345::1", "youtube.com")) assertNull(a, Resolver.literal(a))
+    }
+
+    @Test
+    fun oddNamesAreNotLookedUp() {
+        val asked = mutableListOf<String>()
+        val resolver = Resolver({ OkHttpClient() }, endpoints = emptyList(), system = { asked += it; emptyList() })
+        assertTrue(resolver.resolve("evil&type=TXT.youtube.com").isEmpty())
+        assertTrue(resolver.resolve("a/b.youtube.com").isEmpty())
+        assertEquals(emptyList<String>(), asked)
+    }
 }

@@ -161,7 +161,7 @@ class DownloadService : Service() {
             } catch (e: Exception) {
                 // A paused download that also lost its connection is still just paused.
                 if (Downloads.wanted(download)) {
-                    Log.w(TAG, "Download failed: ${errorDetail(e)}")
+                    Log.w(TAG, ErrorLog.redact("Download failed: ${errorDetail(e)}"))
                     ErrorLog.note("[download] failed: ${errorDetail(e)}")
                     Downloads.update(download) { it.copy(state = DownloadState.FAILED, error = errorDetail(e)) }
                 }
@@ -192,7 +192,7 @@ class DownloadService : Service() {
                 return fetch(download)
             } catch (e: IOException) {
                 if (e is Unavailable || attempt >= RETRY_PAUSES_MS.size) throw e
-                Log.w(TAG, "Download interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
+                Log.w(TAG, ErrorLog.redact("Download interrupted, retry ${attempt + 1}: ${errorDetail(e)}"))
                 ErrorLog.note("[download] interrupted, retry ${attempt + 1}: ${errorDetail(e)}")
                 delay(RETRY_PAUSES_MS[attempt++])
                 ensureWanted(download)

@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -55,6 +57,7 @@ import dev.wahha.wtube.data.account.SignInException
 import dev.wahha.wtube.data.innertube.InnerTube
 import dev.wahha.wtube.ui.components.Avatar
 import dev.wahha.wtube.ui.components.LocalNavigator
+import dev.wahha.wtube.ui.components.actionScope
 import dev.wahha.wtube.ui.components.errorMessage
 import dev.wahha.wtube.ui.icon.AccountCircle
 import dev.wahha.wtube.ui.icon.Check
@@ -101,7 +104,8 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
     var confirmSignOut by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+        // Scrolls: a long list of the account's channels must not push sign-out off the screen.
+        Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 16.dp)) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -175,20 +179,19 @@ private fun AccountSheet(session: Session, onDismiss: () -> Unit) {
     if (confirmSignOut) {
         SignOutDialog(onDismiss = { confirmSignOut = false }) { clearLocal ->
             confirmSignOut = false
-            scope.launch {
-                Account.signOut()
-                clearWebSession()
-                // The device's own data stays by default: the app is personal, the history is the user's, not the account's.
-                if (clearLocal) {
-                    History.clear()
-                    SearchHistory.clear()
-                    PlayQueue.clear()
-                    Hidden.clear()
-                    SeenVideos.clear()
-                    WatchStats.clear()
-                }
-                onDismiss()
+            // All of it before the session goes: the sheet leaves with it, and its scope would cancel the rest.
+            onDismiss()
+            clearWebSession()
+            // The device's own data stays by default: the app is personal, the history is the user's, not the account's.
+            if (clearLocal) {
+                History.clear()
+                SearchHistory.clear()
+                PlayQueue.clear()
+                Hidden.clear()
+                SeenVideos.clear()
+                WatchStats.clear()
             }
+            actionScope.launch { Account.signOut() }
         }
     }
 }

@@ -16,6 +16,7 @@ import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -77,12 +78,19 @@ class Relay(
                     runCatching { client.close() }
                     continue
                 }
-                pool.execute {
-                    try {
-                        handle(client)
-                    } finally {
-                        slots.release()
+                try {
+                    pool.execute {
+                        try {
+                            handle(client)
+                        } finally {
+                            slots.release()
+                        }
                     }
+                } catch (_: RejectedExecutionException) {
+                    // Closed between accept and here.
+                    slots.release()
+                    runCatching { client.close() }
+                    break
                 }
             }
         }
@@ -159,8 +167,8 @@ class Relay(
 
             val addresses = (if (host == null) listOf(InetAddress.getByAddress(address)) else resolver.resolve(host))
                 // Never a way into the phone itself or the local network.
-                .filterNot { it.isLoopbackAddress || it.isAnyLocalAddress || it.isLinkLocalAddress || it.isSiteLocalAddress }
-            if (addresses.isEmpty()) {
+                .filterNot(::isLocal)
+            if (addresses.isEmpty() || targetPort == 0) {
                 note("relay: cannot resolve $host")
                 return
             }
@@ -179,6 +187,9 @@ class Relay(
                 open -= upstream
             }
         } catch (_: IOException) {
+        } catch (_: InterruptedException) {
+            // close() stops the pool; an uncaught one here would take the whole app down.
+        } catch (_: RejectedExecutionException) {
         } finally {
             runCatching { client.close() }
             open -= client
@@ -312,33 +323,37 @@ class Relay(
         var nextStart = hedgeMs
         var winner: Attempt? = null
         val limit = minOf(maxAttempts, order.size)
-        launch()
-        while (winner == null) {
-            val now = elapsed()
-            if (now >= deadlineMs) break
-            val wait = if (running.size < limit) minOf(nextStart - now, deadlineMs - now) else deadlineMs - now
-            val result = results.poll(wait.coerceAtLeast(1), TimeUnit.MILLISECONDS)
-            if (result != null) {
-                finished++
-                if (result.error == null) {
-                    winner = result
-                } else {
-                    record(result.combo.key, false)
-                    bump("b:" + result.combo.backend.label, 1)
-                    noteFailure(host, result)
-                    if (running.size < limit) {
-                        launch()
-                        nextStart = elapsed() + hedgeMs
-                    } else if (finished == running.size) {
-                        break
+        try {
+            launch()
+            while (winner == null) {
+                val now = elapsed()
+                if (now >= deadlineMs) break
+                val wait = if (running.size < limit) minOf(nextStart - now, deadlineMs - now) else deadlineMs - now
+                val result = results.poll(wait.coerceAtLeast(1), TimeUnit.MILLISECONDS)
+                if (result != null) {
+                    finished++
+                    if (result.error == null) {
+                        winner = result
+                    } else {
+                        record(result.combo.key, false)
+                        bump("b:" + result.combo.backend.label, 1)
+                        noteFailure(host, result)
+                        if (running.size < limit) {
+                            launch()
+                            nextStart = elapsed() + hedgeMs
+                        } else if (finished == running.size) {
+                            break
+                        }
                     }
+                } else if (running.size < limit && elapsed() >= nextStart) {
+                    launch()
+                    nextStart = elapsed() + hedgeMs
                 }
-            } else if (running.size < limit && elapsed() >= nextStart) {
-                launch()
-                nextStart = elapsed() + hedgeMs
             }
+        } finally {
+            // Also when the wait is interrupted: the attempts' sockets are not in [open].
+            running.filter { it !== winner }.forEach { it.cancel() }
         }
-        running.filter { it !== winner }.forEach { it.cancel() }
         if (winner == null) {
             bump("nothing")
             val line = "relay: ${bypassDomain(host) ?: host} got nothing from ${running.size} tries"
@@ -365,7 +380,10 @@ class Relay(
         try {
             socket.tcpNoDelay = true
             attempt.socket = socket
-            if (attempt.cancelled.get()) return
+            if (attempt.cancelled.get()) {
+                socket.close()
+                return
+            }
             socket.connect(InetSocketAddress("127.0.0.1", attempt.combo.backend.port), CONNECT_MS)
             socket.soTimeout = BACKEND_REPLY_MS
             val input = socket.getInputStream()
@@ -407,6 +425,14 @@ class Relay(
     }
 
     companion object {
+        /**
+         * The phone itself or a local network. Java's site-local check for IPv6 knows only the retired fec0::/10,
+         * so unique local fc00::/7 is checked by hand.
+         */
+        internal fun isLocal(address: InetAddress): Boolean =
+            address.isLoopbackAddress || address.isAnyLocalAddress || address.isLinkLocalAddress || address.isSiteLocalAddress ||
+                address.isMulticastAddress || (address is java.net.Inet6Address && (address.address[0].toInt() and 0xfe) == 0xfc)
+
         /** A second pair starts next to the first when the server has not answered in this long. */
         const val HEDGE_MS = 1_500L
         /** A pair that has not got a byte back this long after the hello is given up on. */
